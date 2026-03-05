@@ -96,7 +96,7 @@ export class LocalEvomap {
     }
     
     // 创建进化引擎
-    this.engine = new EvolutionEngine(this.config, this.eventLogger);
+    this.engine = new EvolutionEngine(this.config, this.eventLogger, this.capsuleStore);
     
     // 加载基因和胶囊
     const genes = await this.geneStore.getAll();

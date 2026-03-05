@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node -e \"const fs=require('fs');const path=require('path');const src=path.join(__dirname,'public');const dst=path.join(__dirname,'dist','public');fs.mkdirSync(dst,{recursive:true});fs.cpSync(src,dst,{recursive:true});console.log('public folder copied to dist');\"",
     "start": "node dist/server.js",
     "dev": "tsc --watch",
     "test": "jest",
@@ -36,5 +36,11 @@
     "playwright": "^1.58.2",
     "ts-jest": "^29.4.6",
     "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.58",
+    "@ai-sdk/openai": "^3.0.41",
+    "ai": "^6.0.116",
+    "zod": "^4.3.6"
   }
 }

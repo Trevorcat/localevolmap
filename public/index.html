@@ -3,36 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LocalEvomap Core</title>
+    <title>LocalEvomap Core Dashboard</title>
     <style>
-        :root {
-            --bg-color: #050505;
-            --text-primary: #f0f0f0;
-            --accent: #ff3366;
-            --accent-glow: rgba(255, 51, 102, 0.4);
-            --border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
         @import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;800&display=swap');
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
+        :root {
+            --bg-base: #050505;
+            --text-main: #f0f0f0;
+            --text-muted: #888;
+            --accent: #ff3366;
+            --accent-glow: rgba(255, 51, 102, 0.15);
+            --border-color: rgba(255, 255, 255, 0.08);
+            --glass-bg: rgba(15, 15, 15, 0.6);
+            --radius-md: 12px;
+            --radius-lg: 16px;
         }
 
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
         body {
-            background-color: var(--bg-color);
-            color: var(--text-primary);
+            background-color: var(--bg-base);
+            color: var(--text-main);
             font-family: 'Space Mono', monospace;
             min-height: 100vh;
-            display: grid;
-            grid-template-columns: 1fr 2fr;
-            grid-template-rows: auto 1fr;
-            gap: 2px;
-            padding: 2px;
+            display: flex;
+            overflow: hidden;
             background-image: 
-                radial-gradient(circle at 10% 20%, rgba(255, 51, 102, 0.05) 0%, transparent 40%),
+                radial-gradient(circle at 10% 20%, var(--accent-glow) 0%, transparent 40%),
                 radial-gradient(circle at 90% 80%, rgba(51, 204, 255, 0.05) 0%, transparent 40%);
         }
 
@@ -47,309 +44,662 @@
             z-index: 50;
         }
 
-        header {
-            grid-column: 1 / -1;
-            padding: 2rem;
-            background: rgba(10, 10, 10, 0.8);
-            border-bottom: var(--border);
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-end;
-            backdrop-filter: blur(10px);
-        }
-
-        h1 {
-            font-family: 'Syne', sans-serif;
-            font-size: 3.5rem;
-            font-weight: 800;
-            letter-spacing: -2px;
-            text-transform: uppercase;
-            position: relative;
-        }
-        
-        h1::after {
-            content: 'EVOLUTION_MATRIX';
-            position: absolute;
-            bottom: -15px;
-            left: 2px;
-            font-size: 0.8rem;
-            font-family: 'Space Mono', monospace;
-            color: var(--accent);
-            letter-spacing: 4px;
-        }
-
-        .stats-panel {
-            background: #0a0a0a;
-            padding: 2rem;
+        /* Layout */
+        nav {
+            width: 280px;
+            border-right: 1px solid var(--border-color);
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
             display: flex;
             flex-direction: column;
-            gap: 2rem;
-            border-right: var(--border);
+            padding: 2rem 1rem;
+            z-index: 10;
         }
 
-        .stat-box {
+        main {
+            flex: 1;
+            height: 100vh;
+            overflow-y: auto;
+            padding: 2rem 3rem;
             position: relative;
-            padding: 1.5rem;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            background: linear-gradient(135deg, rgba(255,255,255,0.02) 0%, transparent 100%);
         }
 
-        .stat-box::before {
-            content: '';
-            position: absolute;
-            top: 0; left: 0;
-            width: 3px; height: 100%;
-            background: var(--accent);
-            transform: scaleY(0);
-            transition: transform 0.3s ease;
-            transform-origin: bottom;
-        }
+        /* Typography */
+        h1, h2, h3 { font-family: 'Syne', sans-serif; }
+        .title { font-size: 2rem; font-weight: 800; text-transform: uppercase; letter-spacing: -1px; margin-bottom: 2rem; position: relative;}
+        .title::after { content: 'SYSTEM_CORE'; position: absolute; bottom: -12px; left: 0; font-size: 0.7rem; font-family: 'Space Mono', monospace; color: var(--accent); letter-spacing: 2px; }
 
-        .stat-box:hover::before {
-            transform: scaleY(1);
-        }
-
-        .stat-value {
-            font-family: 'Syne', sans-serif;
-            font-size: 4rem;
-            font-weight: 600;
-            line-height: 1;
-            margin-bottom: 0.5rem;
-            text-shadow: 0 0 20px rgba(255,255,255,0.1);
-        }
-
-        .stat-label {
-            font-size: 0.75rem;
+        /* Navigation */
+        .nav-brand { margin-bottom: 4rem; padding-left: 1rem; }
+        .nav-links { display: flex; flex-direction: column; gap: 0.5rem; flex: 1; }
+        .nav-link {
+            padding: 1rem;
+            color: var(--text-muted);
+            text-decoration: none;
+            border-radius: var(--radius-md);
+            transition: all 0.2s;
             text-transform: uppercase;
-            letter-spacing: 2px;
-            color: #888;
-        }
-
-        .main-panel {
-            padding: 2rem;
-            background: #080808;
-            display: grid;
-            grid-template-rows: auto 1fr;
-            gap: 2rem;
-        }
-
-        .controls {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 1rem;
-        }
-
-        button {
-            background: transparent;
-            color: var(--text-primary);
-            font-family: 'Space Mono', monospace;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            padding: 1rem 2rem;
-            font-size: 0.9rem;
-            text-transform: uppercase;
+            font-size: 0.85rem;
             letter-spacing: 1px;
-            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .nav-link:hover, .nav-link.active {
+            color: var(--text-main);
+            background: rgba(255,255,255,0.05);
+        }
+        .nav-link.active { border-left: 2px solid var(--accent); border-radius: 0 var(--radius-md) var(--radius-md) 0; }
+        
+        .api-key-section { margin-top: auto; padding: 1rem; border-top: 1px solid var(--border-color); }
+        .api-key-section input {
+            width: 100%;
+            background: rgba(0,0,0,0.5);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 0.75rem;
+            border-radius: var(--radius-md);
+            font-family: inherit;
+            font-size: 0.8rem;
+            margin-top: 0.5rem;
+        }
+
+        /* Pages */
+        .page { display: none; animation: fadeIn 0.4s ease forwards; }
+        .page.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Glass Cards */
+        .glass-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        /* Dashboard Stats */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-bottom: 3rem; }
+        .stat-card {
             position: relative;
             overflow: hidden;
-            transition: all 0.3s ease;
+        }
+        .stat-card::before {
+            content: ''; position: absolute; top: 0; left: 0; width: 3px; height: 100%; background: var(--accent);
+            transform: scaleY(0); transition: transform 0.3s ease; transform-origin: bottom;
+        }
+        .stat-card:hover::before { transform: scaleY(1); }
+        .stat-value { font-family: 'Syne', sans-serif; font-size: 3rem; font-weight: 800; margin-bottom: 0.5rem; }
+        .stat-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 2px; }
+
+        /* Tables & Lists */
+        .table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+        .search-bar input, .filter-select {
+            background: rgba(0,0,0,0.5); border: 1px solid var(--border-color); color: var(--text-main);
+            padding: 0.5rem 1rem; border-radius: var(--radius-md); font-family: inherit;
+        }
+        
+        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border-color); }
+        th { color: var(--text-muted); font-weight: normal; text-transform: uppercase; letter-spacing: 1px; }
+        tr:hover td { background: rgba(255,255,255,0.02); }
+        
+        .badge {
+            padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.7rem;
+            background: rgba(255,255,255,0.1); display: inline-block;
         }
 
-        button::before {
-            content: '';
-            position: absolute;
-            top: 0; left: -100%;
-            width: 100%; height: 100%;
-            background: var(--text-primary);
-            transition: transform 0.4s cubic-bezier(0.19, 1, 0.22, 1);
-            z-index: -1;
+        /* Buttons */
+        .btn {
+            background: rgba(255,255,255,0.05); border: 1px solid var(--border-color);
+            color: var(--text-main); padding: 0.5rem 1rem; border-radius: var(--radius-md);
+            cursor: pointer; font-family: inherit; transition: all 0.2s;
+            text-transform: uppercase; font-size: 0.8rem; letter-spacing: 1px;
         }
+        .btn:hover { background: rgba(255,255,255,0.1); }
+        .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+        .btn-primary:hover { background: #e62e5c; }
+        .btn-danger { color: #ff4444; border-color: rgba(255,68,68,0.3); }
+        .btn-danger:hover { background: rgba(255,68,68,0.1); }
+        .btn-sm { padding: 0.3rem 0.6rem; font-size: 0.7rem; }
 
-        button:hover {
-            color: var(--bg-color);
-            border-color: var(--text-primary);
+        /* Modals */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.8); backdrop-filter: blur(5px);
+            display: none; justify-content: center; align-items: center; z-index: 100;
         }
-
-        button:hover::before {
-            transform: translateX(100%);
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: #0f0f0f; border: 1px solid var(--border-color); border-radius: var(--radius-lg);
+            width: 100%; max-width: 600px; max-height: 90vh; overflow-y: auto;
+            padding: 2rem; box-shadow: 0 20px 40px rgba(0,0,0,0.5);
         }
-
-        button.primary {
-            border-color: var(--accent);
-            color: var(--accent);
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+        .form-group { margin-bottom: 1.5rem; }
+        .form-group label { display: block; margin-bottom: 0.5rem; font-size: 0.8rem; color: var(--text-muted); }
+        .form-group input, .form-group textarea, .form-group select {
+            width: 100%; background: #000; border: 1px solid var(--border-color); color: var(--text-main);
+            padding: 0.8rem; border-radius: var(--radius-md); font-family: inherit;
         }
+        .form-group textarea { min-height: 100px; resize: vertical; }
+        .modal-footer { display: flex; justify-content: flex-end; gap: 1rem; margin-top: 2rem; }
 
-        button.primary::before {
-            background: var(--accent);
+        /* Toast */
+        #toast-container { position: fixed; bottom: 2rem; right: 2rem; z-index: 1000; display: flex; flex-direction: column; gap: 0.5rem; }
+        .toast {
+            background: var(--glass-bg); backdrop-filter: blur(10px); border: 1px solid var(--border-color);
+            padding: 1rem 1.5rem; border-radius: var(--radius-md);
+            animation: slideIn 0.3s ease forwards;
         }
+        .toast.error { border-left: 3px solid #ff4444; }
+        .toast.success { border-left: 3px solid #00C851; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 
-        button.primary:hover {
-            color: var(--bg-color);
-            box-shadow: 0 0 20px var(--accent-glow);
+        /* Timeline for Events */
+        .timeline { position: relative; padding-left: 1.5rem; }
+        .timeline::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 1px; background: var(--border-color); }
+        .timeline-item { position: relative; padding-bottom: 1.5rem; }
+        .timeline-item::before {
+            content: ''; position: absolute; left: -1.75rem; top: 0.2rem; width: 0.5rem; height: 0.5rem;
+            border-radius: 50%; background: var(--accent);
         }
+        .timeline-time { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.2rem; display: block; }
+        .timeline-content { background: rgba(255,255,255,0.02); padding: 1rem; border-radius: var(--radius-md); border: 1px solid var(--border-color); }
 
-        .log-container {
-            border: var(--border);
-            background: #030303;
-            padding: 1.5rem;
-            font-size: 0.85rem;
-            overflow-y: auto;
-            height: 400px;
-            position: relative;
-        }
-
-        .log-container::before {
-            content: 'SYSTEM_LOGS';
-            position: absolute;
-            top: 0; right: 0;
-            background: rgba(255,255,255,0.1);
-            padding: 0.25rem 0.5rem;
-            font-size: 0.6rem;
-        }
-
-        .log-entry {
-            margin-bottom: 0.5rem;
-            padding-bottom: 0.5rem;
-            border-bottom: 1px dashed rgba(255,255,255,0.05);
-            display: grid;
-            grid-template-columns: 100px 1fr;
-            gap: 1rem;
-            animation: slideIn 0.3s ease-out forwards;
-            opacity: 0;
-            transform: translateY(10px);
-        }
-
-        .log-time { color: #555; }
-        .log-msg { color: #ccc; }
-        .log-msg.highlight { color: var(--accent); }
-
-        @keyframes slideIn {
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        /* Status indicator */
-        .status-dot {
-            width: 12px; height: 12px;
-            background: #0f0;
-            border-radius: 50%;
-            box-shadow: 0 0 10px #0f0;
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0% { opacity: 1; box-shadow: 0 0 10px #0f0; }
-            50% { opacity: 0.4; box-shadow: 0 0 2px #0f0; }
-            100% { opacity: 1; box-shadow: 0 0 10px #0f0; }
-        }
+        .pagination { display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; }
     </style>
 </head>
 <body>
-    <header>
-        <h1>LocalEvomap</h1>
-        <div style="display: flex; align-items: center; gap: 1rem;">
-            <span style="font-size: 0.8rem; color: #888;">SYS_ONLINE</span>
-            <div class="status-dot"></div>
-        </div>
-    </header>
 
-    <div class="stats-panel">
-        <div class="stat-box">
-            <div class="stat-value" id="val-genes">0</div>
-            <div class="stat-label">Active Genes</div>
+    <nav>
+        <div class="nav-brand">
+            <h1 class="title" style="font-size: 1.5rem; margin-bottom: 0;">Evomap</h1>
         </div>
-        <div class="stat-box">
-            <div class="stat-value" id="val-capsules">0</div>
-            <div class="stat-label">Capsules</div>
+        <div class="nav-links">
+            <a href="#dashboard" class="nav-link active">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect><title>Icon</title></svg>
+                Dashboard
+            </a>
+            <a href="#genes" class="nav-link">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path><title>Icon</title></svg>
+                Genes
+            </a>
+            <a href="#capsules" class="nav-link">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path><title>Icon</title></svg>
+                Capsules
+            </a>
+            <a href="#events" class="nav-link">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path><title>Icon</title></svg>
+                Events
+            </a>
         </div>
-        <div class="stat-box">
-            <div class="stat-value" id="val-events">0</div>
-            <div class="stat-label">Total Events</div>
+        <div class="api-key-section">
+            <label style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">API Token</label>
+            <input type="password" id="api-key" value="test-api-key" placeholder="Bearer Token">
+        </div>
+    </nav>
+
+    <main>
+        <!-- Dashboard Page -->
+        <div id="page-dashboard" class="page active">
+            <div class="title">Overview</div>
+            <div class="stats-grid">
+                <div class="glass-card stat-card">
+                    <div class="stat-value" id="stat-genes">-</div>
+                    <div class="stat-label">Total Genes</div>
+                </div>
+                <div class="glass-card stat-card">
+                    <div class="stat-value" id="stat-capsules">-</div>
+                    <div class="stat-label">Active Capsules</div>
+                </div>
+                <div class="glass-card stat-card">
+                    <div class="stat-value" id="stat-events">-</div>
+                    <div class="stat-label">Evolution Events</div>
+                </div>
+            </div>
+            
+            <div class="glass-card">
+                <h3 style="margin-bottom: 1.5rem;">Recent Activity</h3>
+                <div class="timeline" id="dashboard-timeline">
+                    <div style="color:var(--text-muted); font-size: 0.8rem;">Loading...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Genes Page -->
+        <div id="page-genes" class="page">
+            <div class="table-header">
+                <div class="title" style="margin-bottom: 0;">Genes Pool</div>
+                <button type="button" class="btn btn-primary" onclick="openModal('modal-gene')">+ Create Gene</button>
+            </div>
+            <div class="glass-card">
+                <div class="table-header">
+                    <div class="search-bar">
+                        <input type="text" id="gene-search" placeholder="Search ID or signal..." onchange="loadGenes()">
+                    </div>
+                </div>
+                <div style="overflow-x: auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Category</th>
+                                <th>Signals</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="genes-tbody">
+                        </tbody>
+                    </table>
+                </div>
+                <div class="pagination">
+                    <button type="button" class="btn btn-sm" onclick="genePage( -1 )">Prev</button>
+                    <span id="gene-page-info" style="font-size:0.8rem; color:var(--text-muted)">Page 1</span>
+                    <button type="button" class="btn btn-sm" onclick="genePage( 1 )">Next</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Capsules Page -->
+        <div id="page-capsules" class="page">
+            <div class="table-header">
+                <div class="title" style="margin-bottom: 0;">Capsules</div>
+                <button type="button" class="btn btn-primary" onclick="openModal('modal-capsule')">+ Create Capsule</button>
+            </div>
+            <div class="glass-card">
+                <div class="table-header">
+                    <div class="search-bar">
+                        <input type="text" id="capsule-search" placeholder="Search signals or gene..." onchange="loadCapsules()">
+                    </div>
+                </div>
+                <div style="overflow-x: auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Gene</th>
+                                <th>Confidence</th>
+                                <th>Summary</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="capsules-tbody">
+                        </tbody>
+                    </table>
+                </div>
+                <div class="pagination">
+                    <button type="button" class="btn btn-sm" onclick="capsulePage( -1 )">Prev</button>
+                    <span id="capsule-page-info" style="font-size:0.8rem; color:var(--text-muted)">Page 1</span>
+                    <button type="button" class="btn btn-sm" onclick="capsulePage( 1 )">Next</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Events Page -->
+        <div id="page-events" class="page">
+            <div class="title">Evolution Logs</div>
+            <div class="glass-card">
+                <div class="timeline" id="events-timeline">
+                </div>
+                <div class="pagination">
+                    <button type="button" class="btn btn-sm" onclick="eventPage( -1 )">Prev</button>
+                    <span id="event-page-info" style="font-size:0.8rem; color:var(--text-muted)">Page 1</span>
+                    <button type="button" class="btn btn-sm" onclick="eventPage( 1 )">Next</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modals -->
+    <!-- Create Gene Modal -->
+    <div id="modal-gene" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Create Gene</h3>
+                <button type="button" class="btn" style="border:none; padding:0.5rem;" onclick="closeModal('modal-gene')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line><title>Icon</title></svg></button>
+            </div>
+            <form id="form-gene" onsubmit="submitGene(event)">
+                <div class="form-group">
+                    <label>ID</label>
+                    <input type="text" id="g-id" required placeholder="e.g., gene_fix_typo">
+                </div>
+                <div class="form-group">
+                    <label>Category</label>
+                    <select id="g-category">
+                        <option value="repair">Repair</option>
+                        <option value="feature">Feature</option>
+                        <option value="refactor">Refactor</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Signals Match (comma separated)</label>
+                    <input type="text" id="g-signals" required placeholder="error, typeerror">
+                </div>
+                <div class="form-group">
+                    <label>Strategy (JSON array or plain text)</label>
+                    <textarea id="g-strategy" required placeholder='["Step 1", "Step 2"]'></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" onclick="closeModal('modal-gene')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create</button>
+                </div>
+            </form>
         </div>
     </div>
 
-    <div class="main-panel">
-        <div class="controls">
-            <button id="btn-add-gene" onclick="apiCall('/api/gene')">添加基因</button>
-            <button id="btn-add-capsule" onclick="apiCall('/api/capsule')">添加胶囊</button>
-            <button id="btn-evolve" class="primary" onclick="apiCall('/api/evolve')">执行进化</button>
-            <button id="btn-view-events" onclick="fetchEvents()">查看事件</button>
-            <button id="btn-refresh" onclick="fetchStats()">同步状态</button>
-        </div>
-
-        <div class="log-container" id="log-output">
-            <!-- Logs appear here -->
+    <!-- Create Capsule Modal -->
+    <div id="modal-capsule" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>Create Capsule</h3>
+                <button type="button" class="btn" style="border:none; padding:0.5rem;" onclick="closeModal('modal-capsule')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line><title>Icon</title></svg></button>
+            </div>
+            <form id="form-capsule" onsubmit="submitCapsule(event)">
+                <div class="form-group">
+                    <label>Gene Reference ID</label>
+                    <input type="text" id="c-gene" required placeholder="gene_fix_typo">
+                </div>
+                <div class="form-group">
+                    <label>Trigger Signals (comma separated)</label>
+                    <input type="text" id="c-trigger" required placeholder="error, typeerror">
+                </div>
+                <div class="form-group">
+                    <label>Summary</label>
+                    <input type="text" id="c-summary" required placeholder="Fixed the typo in file X">
+                </div>
+                <div class="form-group">
+                    <label>Confidence (0-1)</label>
+                    <input type="number" id="c-confidence" step="0.1" min="0" max="1" value="0.8" required>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" onclick="closeModal('modal-capsule')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create</button>
+                </div>
+            </form>
         </div>
     </div>
+
+    <!-- Confirm Delete Modal -->
+    <div id="modal-confirm" class="modal-overlay">
+        <div class="modal" style="max-width: 400px;">
+            <div class="modal-header">
+                <h3>Confirm Deletion</h3>
+            </div>
+            <p style="margin-bottom: 1rem; color: var(--text-muted); font-size: 0.9rem;">
+                Are you sure you want to delete this item? This is a soft delete operation.
+            </p>
+            <div class="modal-footer">
+                <button type="button" class="btn" onclick="closeModal('modal-confirm')">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirm-delete-btn">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast-container"></div>
 
     <script>
-        const DOM = {
-            genes: document.getElementById('val-genes'),
-            capsules: document.getElementById('val-capsules'),
-            events: document.getElementById('val-events'),
-            logs: document.getElementById('log-output')
+        // --- State ---
+        const API_BASE = '/api/v1';
+        let state = {
+            genePage: 1,
+            capsulePage: 1,
+            eventPage: 1,
+            limit: 10,
+            deleteTarget: null // { type: 'gene'|'capsule', id: string }
         };
 
-        function addLog(msg, isHighlight = false) {
-            const time = new Date().toISOString().split('T')[1].slice(0, 8);
-            const entry = document.createElement('div');
-            entry.className = 'log-entry';
-            entry.innerHTML = `
-                <span class="log-time">[${time}]</span>
-                <span class="log-msg ${isHighlight ? 'highlight' : ''}">${msg}</span>
-            `;
-            DOM.logs.prepend(entry);
+        // --- Routing ---
+        function handleRoute() {
+            let hash = window.location.hash.substring(1) || 'dashboard';
+            for (const el of document.querySelectorAll('.page')) { el.classList.remove('active'); }
+            for (const el of document.querySelectorAll('.nav-link')) { el.classList.remove('active'); }
+            
+            const page = document.getElementById(`page-${hash}`);
+            if(page) page.classList.add('active');
+            
+            const link = document.querySelector(`.nav-link[href="#${hash}"]`);
+            if(link) link.classList.add('active');
+
+            if(hash === 'dashboard') loadDashboard();
+            if(hash === 'genes') loadGenes();
+            if(hash === 'capsules') loadCapsules();
+            if(hash === 'events') loadEvents();
+        }
+        window.addEventListener('hashchange', handleRoute);
+
+        // --- Utils ---
+        function getHeaders() {
+            const token = document.getElementById('api-key').value;
+            return {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            };
         }
 
-        async function fetchStats() {
+        function showToast(msg, type='success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = msg;
+            container.appendChild(toast);
+            setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 3000);
+        }
+
+        function openModal(id) { document.getElementById(id).classList.add('active'); }
+        function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+        // --- API Calls ---
+        async function api(endpoint, options = {}) {
             try {
-                const res = await fetch('/api/stats');
-                const data = await res.json();
-                DOM.genes.textContent = data.genes;
-                DOM.capsules.textContent = data.capsules;
-                DOM.events.textContent = data.events;
-                addLog('State synchronized from core.');
-            } catch (err) {
-                addLog('ERR: Connection to core failed.', true);
+                options.headers = getHeaders();
+                const res = await fetch(`${API_BASE}${endpoint}`, options);
+                if (!res.ok) {
+                    const err = await res.json().catch(()=>({}));
+                    throw new Error(err.error || `HTTP ${res.status}`);
+                }
+                return await res.json();
+            } catch (e) {
+                showToast(e.message, 'error');
+                throw e;
             }
         }
 
-        async function fetchEvents() {
+        // --- Dashboard ---
+        async function loadDashboard() {
             try {
-                const res = await fetch('/api/events');
-                const data = await res.json();
-                DOM.logs.innerHTML = ''; // Clear current
-                addLog('--- SERVER EVENT LOG ---', true);
-                data.forEach(evt => {
-                    const time = evt.time.split('T')[1].slice(0, 8);
-                    const entry = document.createElement('div');
-                    entry.className = 'log-entry';
-                    entry.innerHTML = `
-                        <span class="log-time">[${time}]</span>
-                        <span class="log-msg" style="color: #0ff;">${evt.msg}</span>
-                    `;
-                    DOM.logs.appendChild(entry);
+                const [g, c, e] = await Promise.all([
+                    api('/genes?limit=1'),
+                    api('/capsules/search?limit=1'),
+                    api('/events?limit=5')
+                ]);
+                document.getElementById('stat-genes').textContent = g.pagination?.total || (g.data ? g.data.length : 0);
+                document.getElementById('stat-capsules').textContent = c.pagination?.total || (c.data ? c.data.length : 0);
+                document.getElementById('stat-events').textContent = e.pagination?.total || (e.data ? e.data.length : 0);
+
+                const tl = document.getElementById('dashboard-timeline');
+                tl.innerHTML = '';
+                if(e.data && e.data.length > 0) {
+                    e.data.forEach((ev) => {
+                        tl.innerHTML += `
+                            <div class="timeline-item">
+                                <span class="timeline-time">${new Date(ev.timestamp).toLocaleString()}</span>
+                                <div class="timeline-content">${ev.type}: ${ev.id || 'N/A'}</div>
+                            </div>
+                        `;
+                    });
+                } else {
+                    tl.innerHTML = '<div style="color:var(--text-muted); font-size: 0.8rem;">No events yet.</div>';
+                }
+            } catch(e) { console.error(e); }
+        }
+
+        // --- Genes ---
+        async function loadGenes() {
+            const q = document.getElementById('gene-search').value;
+            const offset = (state.genePage - 1) * state.limit;
+            try {
+                const res = await api(`/genes?q=${encodeURIComponent(q)}&limit=${state.limit}&offset=${offset}`);
+                const tbody = document.getElementById('genes-tbody');
+                tbody.innerHTML = '';
+                if(res.data && res.data.length > 0) {
+                    res.data.forEach((g) => {
+                        tbody.innerHTML += `
+                            <tr>
+                                <td><strong>${g.id}</strong></td>
+                                <td><span class="badge">${g.category}</span></td>
+                                <td>${(g.signals_match || []).join(', ')}</td>
+                                <td>
+                                    <button type="button" class="btn btn-sm btn-danger" onclick="confirmDelete('gene', '${g.id}')">Del</button>
+                                </td>
+                            </tr>
+                        `;
+                    });
+                } else {
+                    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">No genes found</td></tr>`;
+                }
+                document.getElementById('gene-page-info').textContent = `Page ${state.genePage}`;
+            } catch(e) {}
+        }
+        function genePage(dir) {
+            if(state.genePage + dir < 1) return;
+            state.genePage += dir;
+            loadGenes();
+        }
+
+        // --- Capsules ---
+        async function loadCapsules() {
+            const q = document.getElementById('capsule-search').value;
+            const offset = (state.capsulePage - 1) * state.limit;
+            try {
+                const res = await api(`/capsules/search?signals=${encodeURIComponent(q)}&limit=${state.limit}&offset=${offset}`);
+                const tbody = document.getElementById('capsules-tbody');
+                tbody.innerHTML = '';
+                if(res.data && res.data.length > 0) {
+                    res.data.forEach((c) => {
+                        tbody.innerHTML += `
+                            <tr>
+                                <td><strong>${c.id}</strong></td>
+                                <td>${c.gene}</td>
+                                <td>${c.confidence}</td>
+                                <td>${c.summary}</td>
+                                <td>
+                                    <button type="button" class="btn btn-sm btn-danger" onclick="confirmDelete('capsule', '${c.id}')">Del</button>
+                                </td>
+                            </tr>
+                        `;
+                    });
+                } else {
+                    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--text-muted);">No capsules found</td></tr>`;
+                }
+                document.getElementById('capsule-page-info').textContent = `Page ${state.capsulePage}`;
+            } catch(e) {}
+        }
+        function capsulePage(dir) {
+            if(state.capsulePage + dir < 1) return;
+            state.capsulePage += dir;
+            loadCapsules();
+        }
+
+        // --- Events ---
+        async function loadEvents() {
+            const offset = (state.eventPage - 1) * state.limit;
+            try {
+                const res = await api(`/events?limit=${state.limit}&offset=${offset}`);
+                const tl = document.getElementById('events-timeline');
+                tl.innerHTML = '';
+                if(res.data && res.data.length > 0) {
+                    res.data.forEach((ev) => {
+                        tl.innerHTML += `
+                            <div class="timeline-item">
+                                <span class="timeline-time">${new Date(ev.timestamp).toLocaleString()}</span>
+                                <div class="timeline-content">
+                                    <strong>${ev.type}</strong> [${ev.id || 'N/A'}]<br>
+                                    <pre style="font-size:0.75rem; margin-top:0.5rem; color:var(--text-muted); white-space: pre-wrap; font-family: inherit;">${JSON.stringify(ev.details || ev, null, 2)}</pre>
+                                </div>
+                            </div>
+                        `;
+                    });
+                } else {
+                    tl.innerHTML = '<div style="color:var(--text-muted); font-size: 0.8rem;">No events found.</div>';
+                }
+                document.getElementById('event-page-info').textContent = `Page ${state.eventPage}`;
+            } catch(e) {}
+        }
+        function eventPage(dir) {
+            if(state.eventPage + dir < 1) return;
+            state.eventPage += dir;
+            loadEvents();
+        }
+
+        // --- Forms ---
+        async function submitGene(e) {
+            e.preventDefault();
+            const id = document.getElementById('g-id').value;
+            const category = document.getElementById('g-category').value;
+            const signals = document.getElementById('g-signals').value.split(',').map(s=>s.trim()).filter(Boolean);
+            
+            let strategy;
+            try { strategy = JSON.parse(document.getElementById('g-strategy').value); }
+            catch { strategy = [document.getElementById('g-strategy').value]; }
+
+            try {
+                await api('/genes', {
+                    method: 'POST',
+                    body: JSON.stringify({ type: 'Gene', id, category, signals_match: signals, strategy, preconditions: [], constraints: {} })
                 });
-            } catch (err) {
-                addLog('ERR: Failed to fetch events', true);
-            }
+                showToast('Gene created successfully');
+                closeModal('modal-gene');
+                document.getElementById('form-gene').reset();
+                loadGenes();
+                loadDashboard();
+            } catch(e) {}
         }
 
-        async function apiCall(endpoint) {
+        async function submitCapsule(e) {
+            e.preventDefault();
+            const gene = document.getElementById('c-gene').value;
+            const trigger = document.getElementById('c-trigger').value.split(',').map(s=>s.trim()).filter(Boolean);
+            const summary = document.getElementById('c-summary').value;
+            const confidence = parseFloat(document.getElementById('c-confidence').value);
+
             try {
-                const res = await fetch(endpoint, { method: 'POST' });
-                const data = await res.json();
-                addLog(`CMD EXECUTED: ${endpoint} -> ${data.message}`, endpoint === '/api/evolve');
-                fetchStats();
-            } catch (err) {
-                addLog(`ERR: Command failed ${endpoint}`, true);
-            }
+                await api('/capsules', {
+                    method: 'POST',
+                    body: JSON.stringify({ type: 'Capsule', schema_version: '1.0', id: 'cap_' + Date.now(), gene, trigger, summary, confidence, blast_radius: {files:0, lines:0}, outcome: {success:true} })
+                });
+                showToast('Capsule created successfully');
+                closeModal('modal-capsule');
+                document.getElementById('form-capsule').reset();
+                loadCapsules();
+                loadDashboard();
+            } catch(e) {}
         }
 
-        // Init
-        addLog('UI INITIALIZED. CONNECTING TO EVOMAP CORE...');
-        fetchStats();
-        
-        // Auto-poll
-        setInterval(fetchStats, 5000);
+        // --- Delete ---
+        function confirmDelete(type, id) {
+            state.deleteTarget = { type, id };
+            openModal('modal-confirm');
+        }
+
+        document.getElementById('confirm-delete-btn').addEventListener('click', async () => {
+            if(!state.deleteTarget) return;
+            const { type, id } = state.deleteTarget;
+            try {
+                await api(`/${type}s/${id}`, { method: 'DELETE' });
+                showToast(`${type} deleted successfully`);
+                if(type === 'gene') loadGenes();
+                if(type === 'capsule') loadCapsules();
+                loadDashboard();
+            } catch(e) {}
+            closeModal('modal-confirm');
+        });
+
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', () => {
+            handleRoute();
+        });
     </script>
 </body>
 </html>

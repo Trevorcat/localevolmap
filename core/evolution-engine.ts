@@ -17,6 +17,8 @@ import { extractSignals, prioritizeSignals } from './signal-extractor';
 import { selectGene } from './gene-selector';
 import { selectCapsule, shouldReuseCapsule } from './capsule-manager';
 import { isValidationCommandAllowed, estimateBlastRadius, requiresApproval } from './validation-gate';
+import { LLMProvider } from './llm-provider';
+import type { CapsuleStore } from '../storage/capsule-store';
 
 // ============================================================================
 // 进化引擎配置
@@ -27,6 +29,7 @@ export interface EvolutionEngineConfig extends EvolutionConfig {
   llmProvider?: 'openai' | 'anthropic' | 'local';
   llmModel?: string;
   llmApiKey?: string;
+  llmBaseURL?: string;  // 本地模型端点（Ollama/LM Studio）
   
   // 回滚策略
   rollbackEnabled: boolean;
@@ -41,13 +44,20 @@ export interface EvolutionEngineConfig extends EvolutionConfig {
 // 进化状态
 // ============================================================================
 
+export interface EvolutionChange {
+  file: string;
+  operation: 'create' | 'modify' | 'delete';
+  content: string;
+  reasoning: string;
+}
+
 export interface EvolutionState {
   sessionId: string;
   iteration: number;
   signals: Signal[];
   selectedGene: Gene | null;
   selectedCapsule: Capsule | null;
-  changes: Array<{ file: string; content: string }>;
+  changes: EvolutionChange[];
   validationPassed: boolean;
   startTime: number;
   endTime?: number;
@@ -61,10 +71,12 @@ export class EvolutionEngine {
   private state: EvolutionState;
   private genePool: Gene[] = [];
   private capsulePool: Capsule[] = [];
+  private llmProvider?: LLMProvider;
   
   constructor(
     private config: EvolutionEngineConfig,
-    private eventLogger: EventLogger
+    private eventLogger: EventLogger,
+    private capsuleStore?: CapsuleStore  // 可选：用于持久化胶囊
   ) {
     this.state = {
       sessionId: config.session_scope || `session_${Date.now()}`,
@@ -76,6 +88,16 @@ export class EvolutionEngine {
       validationPassed: false,
       startTime: Date.now()
     };
+    
+    // 初始化 LLM Provider（如果配置了）
+    if (config.llmProvider && config.llmModel) {
+      this.llmProvider = new LLMProvider({
+        provider: config.llmProvider,
+        model: config.llmModel,
+        apiKey: config.llmApiKey,
+        baseURL: config.llmBaseURL
+      });
+    }
   }
   
   /**
@@ -256,23 +278,53 @@ export class EvolutionEngine {
   /**
    * 执行进化（调用 LLM）
    * 
-   * 实际实现需要：
-   * 1. 集成 LLM API
-   * 2. 解析返回的更改
-   * 3. 格式化为结构化数据
+   * 实现：
+   * 1. 调用 LLM Provider
+   * 2. 解析结构化输出
+   * 3. 路径安全验证
+   * 4. dry-run 支持
    */
-  private async executeEvolution(prompt: string): Promise<Array<{ file: string; content: string }>> {
-    // TODO: 实际 LLM 调用
-    // 这里返回空数组作为占位
-    
-    // 模拟返回
-    return [];
+  private async executeEvolution(prompt: string): Promise<EvolutionChange[]> {
+    // 如果没有配置 LLM，返回空变更（dry-run 模式）
+    if (!this.llmProvider) {
+      console.warn('[EvolutionEngine] No LLM provider configured, returning empty changes');
+      return [];
+    }
+
+    try {
+      // 调用 LLM 生成进化方案
+      const output = await this.llmProvider.generateEvolution(prompt);
+      
+      console.log(`[EvolutionEngine] LLM generated ${output.changes.length} changes, confidence: ${output.confidence}`);
+      
+      // 路径安全验证：过滤掉 forbidden_paths
+      const safeChanges = output.changes.filter(change => {
+        const isSafe = !this.config.forbidden_paths.some(fp => 
+          change.file.includes(fp)
+        );
+        if (!isSafe) {
+          console.warn(`[Security] Blocked forbidden path: ${change.file}`);
+        }
+        return isSafe;
+      });
+      
+      // dry-run 模式：只记录，不写磁盘
+      if (this.config.dryRun) {
+        console.log('[DryRun] Would apply changes:', safeChanges.map(c => `${c.operation} ${c.file}`));
+      }
+      
+      return safeChanges;
+    } catch (error) {
+      console.error('[EvolutionEngine] LLM generation failed:', error);
+      // 失败时返回空变更，而不是抛出异常
+      return [];
+    }
   }
   
   /**
    * 估算影响范围
    */
-  private estimateBlastRadius(changes: Array<{ file: string; content: string }>) {
+  private estimateBlastRadius(changes: EvolutionChange[]) {
     const linesPerFile = new Map<string, number>();
     changes.forEach(c => {
       linesPerFile.set(c.file, c.content.split('\n').length);
@@ -288,7 +340,7 @@ export class EvolutionEngine {
   /**
    * 验证更改
    */
-  private validateChanges(gene: Gene, changes: Array<{ file: string; content: string }>): boolean {
+  private validateChanges(gene: Gene, changes: EvolutionChange[]): boolean {
     // 1. 命令白名单检查
     if (gene.validation) {
       const allAllowed = gene.validation.every(cmd => 
@@ -314,7 +366,7 @@ export class EvolutionEngine {
   private buildEvolutionEvent(opts: {
     gene: Gene;
     capsule: Capsule | null;
-    changes: Array<{ file: string; content: string }>;
+    changes: EvolutionChange[];
     blastRadius: ReturnType<typeof estimateBlastRadius>;
     validationPassed: boolean;
   }): EvolutionEvent {
@@ -385,10 +437,9 @@ export class EvolutionEngine {
    */
   private async createCapsuleFromSuccess(
     gene: Gene,
-    changes: Array<{ file: string; content: string }>,
+    changes: EvolutionChange[],
     signals: Signal[]
   ): Promise<void> {
-    // TODO: 实现胶囊创建和存储
     const capsule: Capsule = {
       type: 'Capsule',
       schema_version: '1.5.0',
@@ -412,8 +463,17 @@ export class EvolutionEngine {
       }
     };
     
-    // TODO: 保存到胶囊存储
-    console.log('Created new capsule:', capsule.id);
+    // 实际持久化到胶囊存储
+    if (this.capsuleStore) {
+      try {
+        await this.capsuleStore.add(capsule);
+        console.log(`[EvolutionEngine] Capsule persisted: ${capsule.id}`);
+      } catch (error) {
+        console.error(`[EvolutionEngine] Failed to persist capsule:`, error);
+      }
+    } else {
+      console.warn(`[EvolutionEngine] No capsule store configured, capsule not persisted: ${capsule.id}`);
+    }
   }
   
   /**

@@ -20,9 +20,11 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  webServer: {
-    command: 'node dist/server.js',
-    url: process.env.BASE_URL || 'http://localhost:3000',
-    reuseExistingServer: process.env.PW_REUSE_SERVER ? process.env.PW_REUSE_SERVER !== 'false' : !process.env.CI,
-  },
+  webServer: process.env.DISABLE_WEBSERVER 
+    ? undefined
+    : {
+        command: 'node dist/server.js',
+        url: process.env.BASE_URL || 'http://localhost:3000',
+        reuseExistingServer: process.env.PW_REUSE_SERVER ? process.env.PW_REUSE_SERVER !== 'false' : !process.env.CI,
+      },
 });

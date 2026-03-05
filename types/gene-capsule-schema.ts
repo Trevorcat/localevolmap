@@ -82,6 +82,10 @@ export interface Gene {
     description?: string;
     tags?: string[];
   };
+  
+  /** 软删除标记 (internal use) */
+  _deleted?: boolean;
+  _deleted_at?: string;
 }
 
 // ============================================================================
@@ -133,6 +137,10 @@ export interface Capsule {
     source?: 'local' | 'external' | 'hub';
     validated?: boolean;
   };
+  
+  /** 软删除标记 (internal use) */
+  _deleted?: boolean;
+  _deleted_at?: string;
 }
 
 // ============================================================================
@@ -277,6 +285,9 @@ export interface EvolutionConfig {
   /** 缓存策略配置 */
   cacheEnabled: boolean;
   cacheTtlMs: number;
+  
+  /** Dry-run 模式：只记录 changes 但不写磁盘 */
+  dryRun?: boolean;
 }
 
 // ============================================================================
