@@ -368,6 +368,52 @@ export class LocalEvomap {
   }
   
   /**
+   * 获取所有胶囊（公共 API）
+   */
+  async getAllCapsules(): Promise<Capsule[]> {
+    if (!this.initialized) {
+      await this.init();
+    }
+    
+    return await this.capsuleStore.getAll();
+  }
+  
+  /**
+   * 获取所有基因（公共 API）
+   */
+  async getAllGenes(): Promise<Gene[]> {
+    if (!this.initialized) {
+      await this.init();
+    }
+    
+    return await this.geneStore.getAll();
+  }
+  
+  /**
+   * 根据 ID 获取胶囊
+   */
+  async getCapsuleById(id: string): Promise<Capsule | undefined> {
+    if (!this.initialized) {
+      await this.init();
+    }
+    
+    const capsules = await this.capsuleStore.getAll();
+    return capsules.find(c => c.id === id);
+  }
+  
+  /**
+   * 根据 ID 获取基因
+   */
+  async getGeneById(id: string): Promise<Gene | undefined> {
+    if (!this.initialized) {
+      await this.init();
+    }
+    
+    const genes = await this.geneStore.getAll();
+    return genes.find(g => g.id === id);
+  }
+  
+  /**
    * 获取事件统计
    */
   async getEventStats(): Promise<any> {

@@ -303,18 +303,35 @@ async function handleCapsuleSearch(
     const signals = params.get('signals')?.split(',').filter(s => s.trim()) || [];
     const gene = params.get('gene');
     const minConfidence = params.get('minConfidence') ? parseFloat(params.get('minConfidence')!) : 0;
-    const limit = params.get('limit') ? parseInt(params.get('limit')!) : 20;
+    const limit = params.get('limit') ? parseInt(params.get('limit')!) : 100;
+    const offset = params.get('offset') ? parseInt(params.get('offset')!) : 0;
     
-    // Get all capsules and filter
-    const allCapsules = await evomap.getCapsulePoolStats();
-    // TODO: Implement proper filtering through LocalEvomap API
-    // For now, return empty result
+    // Get all capsules from store
+    const allCapsules = await evomap.getAllCapsules();
+    
+    // Filter by signals if provided
+    let filtered = allCapsules.filter(c => {
+        if (c._deleted) return false;
+        if (signals.length > 0 && !c.trigger.some(t => signals.some(s => t.includes(s)))) return false;
+        if (gene && c.gene !== gene) return false;
+        if (c.confidence < minConfidence) return false;
+        return true;
+    });
+    
+    // Paginate
+    const total = filtered.length;
+    filtered = filtered.slice(offset, offset + limit);
+    
+    // Extract unique tags and genes
+    const tags = [...new Set(filtered.flatMap(c => c.trigger))];
+    const genes = [...new Set(filtered.map(c => c.gene))];
+    
     res.writeHead(200);
     res.end(JSON.stringify({
-        total: 0,
-        capsules: [],
-        tags: [],
-        genes: []
+        total,
+        capsules: filtered,
+        tags,
+        genes
     }));
 }
 
@@ -327,9 +344,16 @@ async function handleCapsuleGet(
     evomap: LocalEvomap,
     capsuleId: string
 ): Promise<void> {
-    // TODO: Implement capsule lookup
-    res.writeHead(404);
-    res.end(JSON.stringify({ error: 'Capsule not found' }));
+    const capsule = await evomap.getCapsuleById(capsuleId);
+    
+    if (!capsule || capsule._deleted) {
+        res.writeHead(404);
+        res.end(JSON.stringify({ error: 'Capsule not found' }));
+        return;
+    }
+    
+    res.writeHead(200);
+    res.end(JSON.stringify(capsule));
 }
 
 /**
@@ -480,7 +504,7 @@ async function handleGeneGet(
     evomap: LocalEvomap,
     geneId: string
 ): Promise<void> {
-    const gene = await evomap['geneStore'].get(geneId);
+    const gene = await evomap.getGeneById(geneId);
     if (!gene || gene._deleted) {
         res.writeHead(404);
         res.end(JSON.stringify({ error: 'Gene not found' }));
