@@ -1,0 +1,25 @@
+{
+  "project": "local-evomap",
+  "environment": "remote-dev",
+  "server": {
+    "host": "10.0.0.8",
+    "port": 3000,
+    "baseUrl": "http://10.0.0.8:3000"
+  },
+  "ssh": {
+    "user": "ubuntu",
+    "host": "10.0.0.8",
+    "port": 22,
+    "appDir": "/opt/local-evomap",
+    "envFile": "/opt/local-evomap/.env.production"
+  },
+  "playwright": {
+    "baseUrl": "http://10.0.0.8:3000",
+    "headless": true,
+    "outputDir": "test-results/playwright"
+  },
+  "api": {
+    "healthEndpoint": "/api/stats",
+    "resetEndpoint": "/api/reset"
+  }
+}

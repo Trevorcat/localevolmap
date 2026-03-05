@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# Test output
+coverage/
+playwright-report/
+test-results/
+test-report.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# PM2
+.pm2/
+
+# Data directory (if needed)
+data/genes/*.json
+data/capsules/*.json
+data/events/*.json

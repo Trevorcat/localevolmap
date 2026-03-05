@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LocalEvomap Core</title>
+    <style>
+        :root {
+            --bg-color: #050505;
+            --text-primary: #f0f0f0;
+            --accent: #ff3366;
+            --accent-glow: rgba(255, 51, 102, 0.4);
+            --border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        @import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;800&display=swap');
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            font-family: 'Space Mono', monospace;
+            min-height: 100vh;
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            grid-template-rows: auto 1fr;
+            gap: 2px;
+            padding: 2px;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(255, 51, 102, 0.05) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(51, 204, 255, 0.05) 0%, transparent 40%);
+        }
+
+        /* Noise overlay */
+        body::before {
+            content: "";
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            pointer-events: none;
+            background: url('data:image/svg+xml,%3Csvg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"%3E%3Cfilter id="noiseFilter"%3E%3CfeTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch"/%3E%3C/filter%3E%3Crect width="100%25" height="100%25" filter="url(%23noiseFilter)"/%3E%3C/svg%3E');
+            opacity: 0.03;
+            z-index: 50;
+        }
+
+        header {
+            grid-column: 1 / -1;
+            padding: 2rem;
+            background: rgba(10, 10, 10, 0.8);
+            border-bottom: var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            backdrop-filter: blur(10px);
+        }
+
+        h1 {
+            font-family: 'Syne', sans-serif;
+            font-size: 3.5rem;
+            font-weight: 800;
+            letter-spacing: -2px;
+            text-transform: uppercase;
+            position: relative;
+        }
+        
+        h1::after {
+            content: 'EVOLUTION_MATRIX';
+            position: absolute;
+            bottom: -15px;
+            left: 2px;
+            font-size: 0.8rem;
+            font-family: 'Space Mono', monospace;
+            color: var(--accent);
+            letter-spacing: 4px;
+        }
+
+        .stats-panel {
+            background: #0a0a0a;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+            border-right: var(--border);
+        }
+
+        .stat-box {
+            position: relative;
+            padding: 1.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            background: linear-gradient(135deg, rgba(255,255,255,0.02) 0%, transparent 100%);
+        }
+
+        .stat-box::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0;
+            width: 3px; height: 100%;
+            background: var(--accent);
+            transform: scaleY(0);
+            transition: transform 0.3s ease;
+            transform-origin: bottom;
+        }
+
+        .stat-box:hover::before {
+            transform: scaleY(1);
+        }
+
+        .stat-value {
+            font-family: 'Syne', sans-serif;
+            font-size: 4rem;
+            font-weight: 600;
+            line-height: 1;
+            margin-bottom: 0.5rem;
+            text-shadow: 0 0 20px rgba(255,255,255,0.1);
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: #888;
+        }
+
+        .main-panel {
+            padding: 2rem;
+            background: #080808;
+            display: grid;
+            grid-template-rows: auto 1fr;
+            gap: 2rem;
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        button {
+            background: transparent;
+            color: var(--text-primary);
+            font-family: 'Space Mono', monospace;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 1rem 2rem;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        button::before {
+            content: '';
+            position: absolute;
+            top: 0; left: -100%;
+            width: 100%; height: 100%;
+            background: var(--text-primary);
+            transition: transform 0.4s cubic-bezier(0.19, 1, 0.22, 1);
+            z-index: -1;
+        }
+
+        button:hover {
+            color: var(--bg-color);
+            border-color: var(--text-primary);
+        }
+
+        button:hover::before {
+            transform: translateX(100%);
+        }
+
+        button.primary {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        button.primary::before {
+            background: var(--accent);
+        }
+
+        button.primary:hover {
+            color: var(--bg-color);
+            box-shadow: 0 0 20px var(--accent-glow);
+        }
+
+        .log-container {
+            border: var(--border);
+            background: #030303;
+            padding: 1.5rem;
+            font-size: 0.85rem;
+            overflow-y: auto;
+            height: 400px;
+            position: relative;
+        }
+
+        .log-container::before {
+            content: 'SYSTEM_LOGS';
+            position: absolute;
+            top: 0; right: 0;
+            background: rgba(255,255,255,0.1);
+            padding: 0.25rem 0.5rem;
+            font-size: 0.6rem;
+        }
+
+        .log-entry {
+            margin-bottom: 0.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px dashed rgba(255,255,255,0.05);
+            display: grid;
+            grid-template-columns: 100px 1fr;
+            gap: 1rem;
+            animation: slideIn 0.3s ease-out forwards;
+            opacity: 0;
+            transform: translateY(10px);
+        }
+
+        .log-time { color: #555; }
+        .log-msg { color: #ccc; }
+        .log-msg.highlight { color: var(--accent); }
+
+        @keyframes slideIn {
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Status indicator */
+        .status-dot {
+            width: 12px; height: 12px;
+            background: #0f0;
+            border-radius: 50%;
+            box-shadow: 0 0 10px #0f0;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; box-shadow: 0 0 10px #0f0; }
+            50% { opacity: 0.4; box-shadow: 0 0 2px #0f0; }
+            100% { opacity: 1; box-shadow: 0 0 10px #0f0; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>LocalEvomap</h1>
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <span style="font-size: 0.8rem; color: #888;">SYS_ONLINE</span>
+            <div class="status-dot"></div>
+        </div>
+    </header>
+
+    <div class="stats-panel">
+        <div class="stat-box">
+            <div class="stat-value" id="val-genes">0</div>
+            <div class="stat-label">Active Genes</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-value" id="val-capsules">0</div>
+            <div class="stat-label">Capsules</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-value" id="val-events">0</div>
+            <div class="stat-label">Total Events</div>
+        </div>
+    </div>
+
+    <div class="main-panel">
+        <div class="controls">
+            <button id="btn-add-gene" onclick="apiCall('/api/gene')">添加基因</button>
+            <button id="btn-add-capsule" onclick="apiCall('/api/capsule')">添加胶囊</button>
+            <button id="btn-evolve" class="primary" onclick="apiCall('/api/evolve')">执行进化</button>
+            <button id="btn-view-events" onclick="fetchEvents()">查看事件</button>
+            <button id="btn-refresh" onclick="fetchStats()">同步状态</button>
+        </div>
+
+        <div class="log-container" id="log-output">
+            <!-- Logs appear here -->
+        </div>
+    </div>
+
+    <script>
+        const DOM = {
+            genes: document.getElementById('val-genes'),
+            capsules: document.getElementById('val-capsules'),
+            events: document.getElementById('val-events'),
+            logs: document.getElementById('log-output')
+        };
+
+        function addLog(msg, isHighlight = false) {
+            const time = new Date().toISOString().split('T')[1].slice(0, 8);
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `
+                <span class="log-time">[${time}]</span>
+                <span class="log-msg ${isHighlight ? 'highlight' : ''}">${msg}</span>
+            `;
+            DOM.logs.prepend(entry);
+        }
+
+        async function fetchStats() {
+            try {
+                const res = await fetch('/api/stats');
+                const data = await res.json();
+                DOM.genes.textContent = data.genes;
+                DOM.capsules.textContent = data.capsules;
+                DOM.events.textContent = data.events;
+                addLog('State synchronized from core.');
+            } catch (err) {
+                addLog('ERR: Connection to core failed.', true);
+            }
+        }
+
+        async function fetchEvents() {
+            try {
+                const res = await fetch('/api/events');
+                const data = await res.json();
+                DOM.logs.innerHTML = ''; // Clear current
+                addLog('--- SERVER EVENT LOG ---', true);
+                data.forEach(evt => {
+                    const time = evt.time.split('T')[1].slice(0, 8);
+                    const entry = document.createElement('div');
+                    entry.className = 'log-entry';
+                    entry.innerHTML = `
+                        <span class="log-time">[${time}]</span>
+                        <span class="log-msg" style="color: #0ff;">${evt.msg}</span>
+                    `;
+                    DOM.logs.appendChild(entry);
+                });
+            } catch (err) {
+                addLog('ERR: Failed to fetch events', true);
+            }
+        }
+
+        async function apiCall(endpoint) {
+            try {
+                const res = await fetch(endpoint, { method: 'POST' });
+                const data = await res.json();
+                addLog(`CMD EXECUTED: ${endpoint} -> ${data.message}`, endpoint === '/api/evolve');
+                fetchStats();
+            } catch (err) {
+                addLog(`ERR: Command failed ${endpoint}`, true);
+            }
+        }
+
+        // Init
+        addLog('UI INITIALIZED. CONNECTING TO EVOMAP CORE...');
+        fetchStats();
+        
+        // Auto-poll
+        setInterval(fetchStats, 5000);
+    </script>
+</body>
+</html>
