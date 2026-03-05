@@ -543,8 +543,8 @@
                 const res = await api(`/genes?q=${encodeURIComponent(q)}&limit=${state.limit}&offset=${offset}`);
                 const tbody = document.getElementById('genes-tbody');
                 tbody.innerHTML = '';
-                if(res.data && res.data.length > 0) {
-                    res.data.forEach((g) => {
+                if(res.genes && res.genes.length > 0) {
+                    res.genes.forEach((g) => {
                         tbody.innerHTML += `
                             <tr>
                                 <td><strong>${g.id}</strong></td>
@@ -576,8 +576,8 @@
                 const res = await api(`/capsules/search?signals=${encodeURIComponent(q)}&limit=${state.limit}&offset=${offset}`);
                 const tbody = document.getElementById('capsules-tbody');
                 tbody.innerHTML = '';
-                if(res.data && res.data.length > 0) {
-                    res.data.forEach((c) => {
+                if(res.capsules && res.capsules.length > 0) {
+                    res.capsules.forEach((c) => {
                         tbody.innerHTML += `
                             <tr>
                                 <td><strong>${c.id}</strong></td>
@@ -609,8 +609,8 @@
                 const res = await api(`/events?limit=${state.limit}&offset=${offset}`);
                 const tl = document.getElementById('events-timeline');
                 tl.innerHTML = '';
-                if(res.data && res.data.length > 0) {
-                    res.data.forEach((ev) => {
+                if(res.events && res.events.length > 0) {
+                    res.events.forEach((ev) => {
                         tl.innerHTML += `
                             <div class="timeline-item">
                                 <span class="timeline-time">${new Date(ev.timestamp).toLocaleString()}</span>

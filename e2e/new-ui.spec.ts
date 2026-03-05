@@ -1,13 +1,11 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('New Multi-Page Dashboard UI E2E', () => {
-    const BASE_URL = process.env.PORT ? `http://localhost:${process.env.PORT}` : 'http://localhost:3000';
-    
     test.beforeEach(async ({ page }) => {
-        // Reset legacy state
-        await page.request.post(`${BASE_URL}/api/reset`);
+        // Reset legacy state using baseURL from config
+        await page.request.post('/api/reset');
         await page.goto('/');
-        await expect(page.locator('h1.title')).toContainText('Evomap');
+        await expect(page.locator('h1.title')).toContainText('LocalEvomap');
     });
 
     test('should show navigation and dashboard page', async ({ page }) => {
@@ -86,9 +84,9 @@ test.describe('New Multi-Page Dashboard UI E2E', () => {
 
     test('should load data from API', async ({ page }) => {
         // Add some genes via legacy API
-        await page.request.post(`${BASE_URL}/api/gene`);
-        await page.request.post(`${BASE_URL}/api/gene`);
-        await page.request.post(`${BASE_URL}/api/capsule`);
+        await page.request.post('/api/gene');
+        await page.request.post('/api/gene');
+        await page.request.post('/api/capsule');
         
         // Go to Genes page and check count (legacy API uses different counting)
         await page.click('.nav-link:has-text("Genes")');
