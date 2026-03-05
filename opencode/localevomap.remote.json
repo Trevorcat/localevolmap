@@ -1,0 +1,27 @@
+{
+  "project": "local-evomap",
+  "environment": "production",
+  "server": {
+    "host": "10.104.11.12",
+    "port": 3000,
+    "baseUrl": "http://10.104.11.12:3000"
+  },
+  "ssh": {
+    "user": "itops",
+    "host": "10.104.11.12",
+    "port": 22,
+    "appDir": "/home/itops/localevolmap",
+    "envFile": "/home/itops/localevolmap/.env"
+  },
+  "playwright": {
+    "baseUrl": "http://10.104.11.12:3000",
+    "headless": true,
+    "outputDir": "test-results/playwright"
+  },
+  "api": {
+    "healthEndpoint": "/api/stats",
+    "resetEndpoint": "/api/reset",
+    "apiV1Prefix": "/api/v1",
+    "apiKey": "test-api-key"
+  }
+}
