@@ -179,6 +179,12 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
+    // Seed data endpoint
+    if (req.method === 'POST' && url.pathname === '/api/v1/seed') {
+        await handleSeed(req, res);
+        return;
+    }
+
     // Hub API v1 endpoints (check first, before legacy /api/)
     if (url.pathname.startsWith('/api/v1/')) {
         console.log('[Server] Hub API request:', req.method, url.pathname);
@@ -874,6 +880,50 @@ async function handleEventGet(
     
     res.writeHead(200);
     res.end(JSON.stringify(event));
+}
+
+/**
+ * Seed the database with initial genes from data/seed-genes.json
+ */
+async function handleSeed(
+    req: http.IncomingMessage,
+    res: http.ServerResponse
+): Promise<void> {
+    res.setHeader('Content-Type', 'application/json');
+
+    if (!checkApiKey(req)) {
+        res.writeHead(401);
+        res.end(JSON.stringify({ error: 'Authentication required' }));
+        return;
+    }
+
+    try {
+        const evomap = await getEvomap();
+        const projectRoot = __dirname.endsWith('dist') ? path.resolve(__dirname, '..') : __dirname;
+        const seedPath = path.join(projectRoot, 'data', 'seed-genes.json');
+
+        const seedData = JSON.parse(fs.readFileSync(seedPath, 'utf-8'));
+        let created = 0;
+        let skipped = 0;
+
+        for (const raw of seedData) {
+            const gene = normalizeGene(raw);
+            const existing = await evomap.getGeneById(gene.id);
+            if (existing && !existing._deleted) {
+                skipped++;
+                continue;
+            }
+            await evomap.addGene(gene);
+            created++;
+        }
+
+        res.writeHead(200);
+        res.end(JSON.stringify({ message: 'Seed complete', created, skipped, total: seedData.length }));
+    } catch (error) {
+        console.error('[Seed] Error:', error);
+        res.writeHead(500);
+        res.end(JSON.stringify({ error: 'Seed failed', detail: (error as Error).message }));
+    }
 }
 
 server.listen(PORT, HOST, () => {

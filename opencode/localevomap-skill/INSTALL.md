@@ -186,6 +186,88 @@ Expected: JSON response with `total` and `genes` fields.
 
 ---
 
+## API Schema (Minimal Required Fields)
+
+The server auto-fills defaults for all optional fields. You only need to provide these:
+
+### Create Gene (POST /api/v1/genes)
+
+**Required**: `category`, `signals_match` (or `signals`), `strategy`
+
+```bash
+# Linux/macOS
+curl -X POST "http://10.104.11.12:3000/api/v1/genes" \
+  -H "Authorization: Bearer test-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{"category":"repair","signals_match":["TypeError","null"],"strategy":["Add null check","Test"]}'
+```
+
+```powershell
+# Windows
+Invoke-WebRequest -Uri "http://10.104.11.12:3000/api/v1/genes" -Method POST `
+  -Headers @{"Authorization"="Bearer test-api-key";"Content-Type"="application/json"} `
+  -Body '{"category":"repair","signals_match":["TypeError","null"],"strategy":["Add null check","Test"]}'
+```
+
+Auto-filled: `id`, `type`, `preconditions`, `constraints`
+
+| Field | Type | Required | Default |
+|-------|------|----------|---------|
+| `category` | string | ✅ | `"repair"` |
+| `signals_match` | string[] | ✅ | `[]` |
+| `signals` | string[] | alias for signals_match | — |
+| `strategy` | string[] | ✅ | `[]` |
+| `id` | string | ❌ | auto-generated |
+| `preconditions` | string[] | ❌ | `[]` |
+| `constraints` | object | ❌ | `{}` |
+
+### Create Capsule (POST /api/v1/capsules)
+
+**Required**: `trigger`, `summary`
+
+```bash
+# Linux/macOS
+curl -X POST "http://10.104.11.12:3000/api/v1/capsules" \
+  -H "Authorization: Bearer test-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{"trigger":["TypeError","null"],"summary":"Fixed by adding optional chaining"}'
+```
+
+```powershell
+# Windows
+Invoke-WebRequest -Uri "http://10.104.11.12:3000/api/v1/capsules" -Method POST `
+  -Headers @{"Authorization"="Bearer test-api-key";"Content-Type"="application/json"} `
+  -Body '{"trigger":["TypeError","null"],"summary":"Fixed by adding optional chaining"}'
+```
+
+Auto-filled: `id`, `type`, `schema_version`, `outcome`, `env_fingerprint`, `blast_radius`, `confidence`, `gene`, `metadata`
+
+| Field | Type | Required | Default |
+|-------|------|----------|---------|
+| `trigger` | string[] | ✅ | `[]` |
+| `summary` | string | ✅ | `""` |
+| `confidence` | number (0-1) | ❌ | `0.7` |
+| `gene` | string | ❌ | `"unknown"` |
+| `outcome` | object | ❌ | `{status:"success",score:0.7}` |
+| `outcome.success` | boolean | alias | converts to `{status,score}` |
+| `id` | string | ❌ | auto-generated |
+
+### Seed Data (POST /api/v1/seed)
+
+Pre-load base genes (repair, refactor, performance, feature, security, test):
+
+```bash
+curl -X POST "http://10.104.11.12:3000/api/v1/seed" -H "Authorization: Bearer test-api-key"
+```
+
+```powershell
+Invoke-WebRequest -Uri "http://10.104.11.12:3000/api/v1/seed" -Method POST -Headers @{"Authorization"="Bearer test-api-key"}
+```
+
+Skips genes that already exist (safe to run multiple times).
+
+---
+
 ## Available Endpoints
 
 | URL | Content-Type | Description |
@@ -197,6 +279,7 @@ Expected: JSON response with `total` and `genes` fields.
 | `http://10.104.11.12:3000/skill/claude` | markdown | Claude Code skill file |
 | `http://10.104.11.12:3000/skill/opencode` | markdown | OpenCode skill file |
 | `http://10.104.11.12:3000/skill/codex` | markdown | Codex/AGENTS.md file |
+| `POST http://10.104.11.12:3000/api/v1/seed` | JSON | Pre-load base genes (auth required) |
 
 ---
 

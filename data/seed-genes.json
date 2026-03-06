@@ -1,0 +1,255 @@
+[
+  {
+    "type": "Gene",
+    "id": "gene_repair_general",
+    "category": "repair",
+    "signals_match": ["error", "exception", "failed", "crash", "bug", "broken", "TypeError", "ReferenceError", "SyntaxError"],
+    "preconditions": ["Error signal detected in logs or output"],
+    "strategy": [
+      "Read the full error message and stack trace",
+      "Identify the root cause (not just the symptom)",
+      "Search for existing capsules matching the error pattern",
+      "Apply minimal fix targeting only the broken code",
+      "Verify fix with existing tests or manual validation",
+      "Record the solution as a new capsule"
+    ],
+    "constraints": {
+      "max_files": 10,
+      "max_lines": 100,
+      "forbidden_paths": [".git", "node_modules", "dist", "build"]
+    },
+    "validation": ["npm test"],
+    "metadata": {
+      "author": "seed",
+      "version": "1.0.0",
+      "description": "General error repair strategy — fix bugs with minimal changes",
+      "tags": ["error-handling", "auto-repair", "general"]
+    }
+  },
+  {
+    "type": "Gene",
+    "id": "gene_repair_type_error",
+    "category": "repair",
+    "signals_match": ["TypeError", "undefined", "null", "Cannot read properties", "is not a function", "is not defined"],
+    "preconditions": ["TypeError or null/undefined access detected"],
+    "strategy": [
+      "Locate the exact line where the TypeError occurs",
+      "Trace back to find where the value becomes null/undefined",
+      "Add null checks, optional chaining (?.), or nullish coalescing (??)",
+      "Verify the fix doesn't mask a deeper issue",
+      "Add type annotations if in TypeScript"
+    ],
+    "constraints": {
+      "max_files": 5,
+      "max_lines": 50
+    },
+    "metadata": {
+      "author": "seed",
+      "version": "1.0.0",
+      "description": "Fix TypeError and null/undefined access errors",
+      "tags": ["TypeError", "null-check", "defensive-coding"]
+    }
+  },
+  {
+    "type": "Gene",
+    "id": "gene_repair_import",
+    "category": "repair",
+    "signals_match": ["ModuleNotFoundError", "Cannot find module", "import", "require", "module not found", "ERR_MODULE_NOT_FOUND"],
+    "preconditions": ["Module import/require failure detected"],
+    "strategy": [
+      "Check if the module is installed (package.json)",
+      "Verify the import path is correct (relative vs absolute)",
+      "Check for typos in module name",
+      "Run npm install if package is missing",
+      "Check tsconfig paths if using TypeScript aliases"
+    ],
+    "constraints": {
+      "max_files": 3,
+      "max_lines": 20
+    },
+    "metadata": {
+      "author": "seed",
+      "version": "1.0.0",
+      "description": "Fix module import and require errors",
+      "tags": ["import", "module", "dependency"]
+    }
+  },
+  {
+    "type": "Gene",
+    "id": "gene_refactor_extract",
+    "category": "refactor",
+    "signals_match": ["refactor", "extract", "split", "decompose", "too long", "complex", "duplication", "DRY"],
+    "preconditions": ["Code identified as overly complex or duplicated"],
+    "strategy": [
+      "Identify the code section to extract",
+      "Determine the right abstraction (function, class, module)",
+      "Extract with clear interface and naming",
+      "Update all call sites to use the new abstraction",
+      "Run tests to verify behavior is preserved",
+      "Remove dead code if any"
+    ],
+    "constraints": {
+      "max_files": 15,
+      "max_lines": 300,
+      "forbidden_paths": [".git", "node_modules"]
+    },
+    "validation": ["npm test"],
+    "metadata": {
+      "author": "seed",
+      "version": "1.0.0",
+      "description": "Extract and decompose complex code into cleaner abstractions",
+      "tags": ["refactor", "extract", "clean-code"]
+    }
+  },
+  {
+    "type": "Gene",
+    "id": "gene_refactor_rename",
+    "category": "refactor",
+    "signals_match": ["rename", "naming", "misleading name", "unclear", "convention"],
+    "preconditions": ["Variable, function, or file name identified as misleading or inconsistent"],
+    "strategy": [
+      "Identify all usages of the symbol to rename",
+      "Choose a name that follows existing conventions",
+      "Use IDE/LSP rename for safe refactoring",
+      "Update related comments and documentation",
+      "Verify no broken references"
+    ],
+    "constraints": {
+      "max_files": 20,
+      "max_lines": 200
+    },
+    "metadata": {
+      "author": "seed",
+      "version": "1.0.0",
+      "description": "Safe symbol renaming across codebase",
+      "tags": ["rename", "naming", "conventions"]
+    }
+  },
+  {
+    "type": "Gene",
+    "id": "gene_performance_optimize",
+    "category": "performance",
+    "signals_match": ["slow", "performance", "timeout", "latency", "bottleneck", "memory", "OOM", "perf_bottleneck"],
+    "preconditions": ["Performance issue identified via profiling, logs, or user report"],
+    "strategy": [
+      "Profile to identify the actual bottleneck (don't guess)",
+      "Check for N+1 queries, unnecessary re-renders, or blocking I/O",
+      "Apply targeted optimization (caching, batching, lazy loading)",
+      "Measure before and after to confirm improvement",
+      "Document the optimization rationale"
+    ],
+    "constraints": {
+      "max_files": 10,
+      "max_lines": 200
+    },
+    "metadata": {
+      "author": "seed",
+      "version": "1.0.0",
+      "description": "Performance optimization through profiling and targeted fixes",
+      "tags": ["performance", "optimization", "profiling"]
+    }
+  },
+  {
+    "type": "Gene",
+    "id": "gene_feature_add",
+    "category": "feature",
+    "signals_match": ["feature", "add", "implement", "create", "new", "user_feature_request", "enhancement"],
+    "preconditions": ["Clear feature requirement or user request"],
+    "strategy": [
+      "Understand the full requirement before coding",
+      "Check for existing patterns in the codebase to follow",
+      "Implement incrementally with tests",
+      "Handle edge cases and error states",
+      "Update documentation if needed",
+      "Record the implementation as a capsule for future reference"
+    ],
+    "constraints": {
+      "max_files": 20,
+      "max_lines": 500
+    },
+    "metadata": {
+      "author": "seed",
+      "version": "1.0.0",
+      "description": "Add new features following existing codebase patterns",
+      "tags": ["feature", "implementation", "new"]
+    }
+  },
+  {
+    "type": "Gene",
+    "id": "gene_security_fix",
+    "category": "security",
+    "signals_match": ["security", "vulnerability", "injection", "XSS", "CSRF", "auth", "CVE", "exposure", "leak"],
+    "preconditions": ["Security vulnerability or concern identified"],
+    "strategy": [
+      "Assess the severity and attack vector",
+      "Apply the principle of least privilege",
+      "Sanitize inputs, escape outputs",
+      "Use parameterized queries for database access",
+      "Add security headers if web-facing",
+      "Verify the fix doesn't introduce new vulnerabilities",
+      "Update dependencies if CVE is in a package"
+    ],
+    "constraints": {
+      "max_files": 10,
+      "max_lines": 100,
+      "forbidden_paths": [".git", "node_modules", ".env"]
+    },
+    "metadata": {
+      "author": "seed",
+      "version": "1.0.0",
+      "description": "Fix security vulnerabilities with defense-in-depth approach",
+      "tags": ["security", "vulnerability", "hardening"]
+    }
+  },
+  {
+    "type": "Gene",
+    "id": "gene_test_add",
+    "category": "test",
+    "signals_match": ["test", "coverage", "untested", "missing test", "regression", "flaky"],
+    "preconditions": ["Code identified as lacking test coverage or having flaky tests"],
+    "strategy": [
+      "Identify the critical paths that need testing",
+      "Write tests for happy path first, then edge cases",
+      "Use existing test patterns and frameworks in the project",
+      "Ensure tests are deterministic (no flaky tests)",
+      "Aim for meaningful assertions, not just coverage numbers"
+    ],
+    "constraints": {
+      "max_files": 10,
+      "max_lines": 300
+    },
+    "validation": ["npm test"],
+    "metadata": {
+      "author": "seed",
+      "version": "1.0.0",
+      "description": "Add missing tests and fix flaky tests",
+      "tags": ["testing", "coverage", "quality"]
+    }
+  },
+  {
+    "type": "Gene",
+    "id": "gene_repair_build",
+    "category": "repair",
+    "signals_match": ["build", "compile", "tsc", "webpack", "vite", "esbuild", "build failed", "compilation error", "TS2"],
+    "preconditions": ["Build or compilation failure detected"],
+    "strategy": [
+      "Read the first error in the build output (subsequent errors may cascade)",
+      "Check for TypeScript type errors (TS2xxx codes)",
+      "Verify imports and exports match",
+      "Check tsconfig.json for configuration issues",
+      "Run npm install if dependencies changed",
+      "Fix one error at a time, rebuild after each fix"
+    ],
+    "constraints": {
+      "max_files": 10,
+      "max_lines": 100
+    },
+    "validation": ["npm run build"],
+    "metadata": {
+      "author": "seed",
+      "version": "1.0.0",
+      "description": "Fix build and compilation failures",
+      "tags": ["build", "compile", "typescript"]
+    }
+  }
+]

@@ -562,8 +562,8 @@
             </div>
             <form id="form-gene" onsubmit="submitGene(event)">
                 <div class="form-group">
-                    <label>ID</label>
-                    <input type="text" id="g-id" required placeholder="e.g., gene_fix_typo">
+                    <label>ID (optional — auto-generated if empty)</label>
+                    <input type="text" id="g-id" placeholder="e.g., gene_fix_typo">
                 </div>
                 <div class="form-group">
                     <label>Category</label>
@@ -571,15 +571,19 @@
                         <option value="repair">Repair</option>
                         <option value="feature">Feature</option>
                         <option value="refactor">Refactor</option>
+                        <option value="performance">Performance</option>
+                        <option value="security">Security</option>
+                        <option value="test">Test</option>
+                        <option value="optimize">Optimize</option>
                     </select>
                 </div>
                 <div class="form-group">
                     <label>Signals Match (comma separated)</label>
-                    <input type="text" id="g-signals" required placeholder="error, typeerror">
+                    <input type="text" id="g-signals" required placeholder="error, TypeError, undefined">
                 </div>
                 <div class="form-group">
-                    <label>Strategy (JSON array or plain text)</label>
-                    <textarea id="g-strategy" required placeholder='["Step 1", "Step 2"]'></textarea>
+                    <label>Strategy (one step per line, or JSON array)</label>
+                    <textarea id="g-strategy" required placeholder="Step 1: Identify the issue&#10;Step 2: Apply fix&#10;Step 3: Verify"></textarea>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn" onclick="closeModal('modal-gene')">Cancel</button>
@@ -598,20 +602,20 @@
             </div>
             <form id="form-capsule" onsubmit="submitCapsule(event)">
                 <div class="form-group">
-                    <label>Gene Reference ID</label>
-                    <input type="text" id="c-gene" required placeholder="gene_fix_typo">
+                    <label>Trigger Signals (comma separated) *</label>
+                    <input type="text" id="c-trigger" required placeholder="TypeError, undefined, null">
                 </div>
                 <div class="form-group">
-                    <label>Trigger Signals (comma separated)</label>
-                    <input type="text" id="c-trigger" required placeholder="error, typeerror">
+                    <label>Summary *</label>
+                    <input type="text" id="c-summary" required placeholder="Fixed by adding null check to the handler">
                 </div>
                 <div class="form-group">
-                    <label>Summary</label>
-                    <input type="text" id="c-summary" required placeholder="Fixed the typo in file X">
+                    <label>Gene Reference ID (optional)</label>
+                    <input type="text" id="c-gene" placeholder="gene_repair_type_error">
                 </div>
                 <div class="form-group">
-                    <label>Confidence (0-1)</label>
-                    <input type="number" id="c-confidence" step="0.1" min="0" max="1" value="0.8" required>
+                    <label>Confidence (0-1, default 0.7)</label>
+                    <input type="number" id="c-confidence" step="0.1" min="0" max="1" value="0.8">
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn" onclick="closeModal('modal-capsule')">Cancel</button>
@@ -1075,18 +1079,23 @@
         // --- Forms ---
         async function submitGene(e) {
             e.preventDefault();
-            const id = document.getElementById('g-id').value;
             const category = document.getElementById('g-category').value;
             const signals = document.getElementById('g-signals').value.split(',').map(s=>s.trim()).filter(Boolean);
             
             let strategy;
-            try { strategy = JSON.parse(document.getElementById('g-strategy').value); }
-            catch { strategy = [document.getElementById('g-strategy').value]; }
+            const strategyRaw = document.getElementById('g-strategy').value;
+            try { strategy = JSON.parse(strategyRaw); }
+            catch { strategy = strategyRaw.split('\n').map(s=>s.trim()).filter(Boolean); }
+
+            // Build payload — server normalizes and fills defaults
+            const payload = { category, signals_match: signals, strategy };
+            const id = document.getElementById('g-id').value.trim();
+            if (id) payload.id = id;
 
             try {
                 await api('/genes', {
                     method: 'POST',
-                    body: JSON.stringify({ type: 'Gene', id, category, signals_match: signals, strategy, preconditions: [], constraints: {} })
+                    body: JSON.stringify(payload)
                 });
                 showToast('Gene created successfully');
                 closeModal('modal-gene');
@@ -1098,15 +1107,20 @@
 
         async function submitCapsule(e) {
             e.preventDefault();
-            const gene = document.getElementById('c-gene').value;
             const trigger = document.getElementById('c-trigger').value.split(',').map(s=>s.trim()).filter(Boolean);
             const summary = document.getElementById('c-summary').value;
+
+            // Build payload — server normalizes and fills defaults
+            const payload = { trigger, summary };
+            const gene = document.getElementById('c-gene').value.trim();
+            if (gene) payload.gene = gene;
             const confidence = parseFloat(document.getElementById('c-confidence').value);
+            if (!isNaN(confidence)) payload.confidence = confidence;
 
             try {
                 await api('/capsules', {
                     method: 'POST',
-                    body: JSON.stringify({ type: 'Capsule', schema_version: '1.0', id: 'cap_' + Date.now(), gene, trigger, summary, confidence, blast_radius: {files:0, lines:0}, outcome: {success:true} })
+                    body: JSON.stringify(payload)
                 });
                 showToast('Capsule created successfully');
                 closeModal('modal-capsule');
