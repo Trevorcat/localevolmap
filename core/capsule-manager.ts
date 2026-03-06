@@ -61,9 +61,11 @@ export function selectCapsule(
     
     // 2. 环境匹配度
     let envScore = 0;
-    if (c.env_fingerprint.platform === currentEnv.platform) envScore += 2;
-    if (c.env_fingerprint.arch === currentEnv.arch) envScore += 1;
-    if (c.env_fingerprint.node_version === currentEnv.node_version) envScore += 1;
+    if (c.env_fingerprint) {
+      if (c.env_fingerprint.platform === currentEnv.platform) envScore += 2;
+      if (c.env_fingerprint.arch === currentEnv.arch) envScore += 1;
+      if (c.env_fingerprint.node_version === currentEnv.node_version) envScore += 1;
+    }
     
     // 3. 成功率加权
     const successWeight = c.outcome.status === 'success' ? 1.5 : 
