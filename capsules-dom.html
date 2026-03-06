@@ -1,6 +1,4 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
+<!DOCTYPE html><html lang="en"><head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LocalEvomap Core Dashboard</title>
@@ -126,15 +124,14 @@
         .stat-card {
             position: relative;
             overflow: hidden;
-            padding: 1.5rem;
         }
         .stat-card::before {
             content: ''; position: absolute; top: 0; left: 0; width: 3px; height: 100%; background: var(--accent);
             transform: scaleY(0); transition: transform 0.3s ease; transform-origin: bottom;
         }
         .stat-card:hover::before { transform: scaleY(1); }
-        .stat-value { font-family: 'Syne', sans-serif; font-size: 3rem; font-weight: 800; margin-bottom: 0.5rem; line-height: 1.2; }
-        .stat-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 2px; line-height: 1.4; }
+        .stat-value { font-family: 'Syne', sans-serif; font-size: 3rem; font-weight: 800; margin-bottom: 0.5rem; }
+        .stat-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 2px; }
 
         /* Tables & Lists */
         .table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
@@ -417,7 +414,7 @@
             <h1 class="title" style="font-size: 1.5rem; margin-bottom: 0;">LocalEvomap</h1>
         </div>
         <div class="nav-links">
-            <a href="#dashboard" class="nav-link active">
+            <a href="#dashboard" class="nav-link">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect><title>Icon</title></svg>
                 Dashboard
             </a>
@@ -425,7 +422,7 @@
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path><title>Icon</title></svg>
                 Genes
             </a>
-            <a href="#capsules" class="nav-link">
+            <a href="#capsules" class="nav-link active">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path><title>Icon</title></svg>
                 Capsules
             </a>
@@ -442,28 +439,26 @@
 
     <main>
         <!-- Dashboard Page -->
-        <div id="page-dashboard" class="page active">
+        <div id="page-dashboard" class="page">
             <div class="title">Overview</div>
             <div class="stats-grid">
                 <div class="glass-card stat-card">
-                    <div class="stat-value" id="stat-genes">-</div>
+                    <div class="stat-value" id="stat-genes">0</div>
                     <div class="stat-label">Total Genes</div>
                 </div>
                 <div class="glass-card stat-card">
-                    <div class="stat-value" id="stat-capsules">-</div>
+                    <div class="stat-value" id="stat-capsules">0</div>
                     <div class="stat-label">Active Capsules</div>
                 </div>
                 <div class="glass-card stat-card">
-                    <div class="stat-value" id="stat-events">-</div>
+                    <div class="stat-value" id="stat-events">0</div>
                     <div class="stat-label">Evolution Events</div>
                 </div>
             </div>
             
             <div class="glass-card">
                 <h3 style="margin-bottom: 1.5rem;">Recent Activity</h3>
-                <div class="timeline" id="dashboard-timeline">
-                    <div style="color:var(--text-muted); font-size: 0.8rem;">Loading...</div>
-                </div>
+                <div class="timeline" id="dashboard-timeline"><div style="color:var(--text-muted); font-size: 0.8rem;">No events yet.</div></div>
             </div>
         </div>
 
@@ -489,8 +484,7 @@
                                 <th>Actions</th>
                             </tr>
                         </thead>
-                        <tbody id="genes-tbody">
-                        </tbody>
+                        <tbody id="genes-tbody"><tr><td colspan="4" style="text-align:center; color:var(--text-muted);">No genes found</td></tr></tbody>
                     </table>
                 </div>
                 <div class="pagination">
@@ -502,7 +496,7 @@
         </div>
 
         <!-- Capsules Page -->
-        <div id="page-capsules" class="page">
+        <div id="page-capsules" class="page active">
             <div class="table-header">
                 <div class="title" style="margin-bottom: 0;">Capsules</div>
                 <button type="button" class="btn btn-primary" onclick="openModal('modal-capsule')">+ Create Capsule</button>
@@ -524,8 +518,7 @@
                                 <th>Actions</th>
                             </tr>
                         </thead>
-                        <tbody id="capsules-tbody">
-                        </tbody>
+                        <tbody id="capsules-tbody"><tr><td colspan="5" style="text-align:center; color:var(--text-muted);">No capsules found</td></tr></tbody>
                     </table>
                 </div>
                 <div class="pagination">
@@ -562,7 +555,7 @@
             <form id="form-gene" onsubmit="submitGene(event)">
                 <div class="form-group">
                     <label>ID</label>
-                    <input type="text" id="g-id" required placeholder="e.g., gene_fix_typo">
+                    <input type="text" id="g-id" required="" placeholder="e.g., gene_fix_typo">
                 </div>
                 <div class="form-group">
                     <label>Category</label>
@@ -574,11 +567,11 @@
                 </div>
                 <div class="form-group">
                     <label>Signals Match (comma separated)</label>
-                    <input type="text" id="g-signals" required placeholder="error, typeerror">
+                    <input type="text" id="g-signals" required="" placeholder="error, typeerror">
                 </div>
                 <div class="form-group">
                     <label>Strategy (JSON array or plain text)</label>
-                    <textarea id="g-strategy" required placeholder='["Step 1", "Step 2"]'></textarea>
+                    <textarea id="g-strategy" required="" placeholder="[&quot;Step 1&quot;, &quot;Step 2&quot;]"></textarea>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn" onclick="closeModal('modal-gene')">Cancel</button>
@@ -598,19 +591,19 @@
             <form id="form-capsule" onsubmit="submitCapsule(event)">
                 <div class="form-group">
                     <label>Gene Reference ID</label>
-                    <input type="text" id="c-gene" required placeholder="gene_fix_typo">
+                    <input type="text" id="c-gene" required="" placeholder="gene_fix_typo">
                 </div>
                 <div class="form-group">
                     <label>Trigger Signals (comma separated)</label>
-                    <input type="text" id="c-trigger" required placeholder="error, typeerror">
+                    <input type="text" id="c-trigger" required="" placeholder="error, typeerror">
                 </div>
                 <div class="form-group">
                     <label>Summary</label>
-                    <input type="text" id="c-summary" required placeholder="Fixed the typo in file X">
+                    <input type="text" id="c-summary" required="" placeholder="Fixed the typo in file X">
                 </div>
                 <div class="form-group">
                     <label>Confidence (0-1)</label>
-                    <input type="number" id="c-confidence" step="0.1" min="0" max="1" value="0.8" required>
+                    <input type="number" id="c-confidence" step="0.1" min="0" max="1" value="0.8" required="">
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn" onclick="closeModal('modal-capsule')">Cancel</button>
@@ -661,7 +654,7 @@
                 <form id="form-gene-edit" onsubmit="saveGene(event)">
                     <div class="detail-section">
                         <div class="detail-label">Gene ID (不可修改)</div>
-                        <input type="text" id="e-g-id" readonly style="width: 100%; padding: 0.5rem; background: var(--bg-secondary);">
+                        <input type="text" id="e-g-id" readonly="" style="width: 100%; padding: 0.5rem; background: var(--bg-secondary);">
                     </div>
                     
                     <div class="detail-section">
@@ -763,7 +756,7 @@
                 <form id="form-capsule-edit" onsubmit="saveCapsule(event)">
                     <div class="detail-section">
                         <div class="detail-label">Capsule ID (不可修改)</div>
-                        <input type="text" id="e-c-id" readonly style="width: 100%; padding: 0.5rem; background: var(--bg-secondary);">
+                        <input type="text" id="e-c-id" readonly="" style="width: 100%; padding: 0.5rem; background: var(--bg-secondary);">
                     </div>
                     
                     <div class="detail-section">
@@ -773,8 +766,7 @@
                     
                     <div class="detail-section">
                         <div class="detail-label">Confidence: <span id="e-c-confidence-value">0.8</span></div>
-                        <input type="range" id="e-c-confidence" min="0" max="1" step="0.01" 
-                               oninput="document.getElementById('e-c-confidence-value').textContent = this.value">
+                        <input type="range" id="e-c-confidence" min="0" max="1" step="0.01" oninput="document.getElementById('e-c-confidence-value').textContent = this.value">
                         <div class="conf-bar"><div id="e-c-confidence-bar" style="width: 80%;"></div></div>
                     </div>
                     
@@ -1520,5 +1512,5 @@
             handleRoute();
         });
     </script>
-</body>
-</html>
+
+</body></html>
