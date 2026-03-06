@@ -1,0 +1,32 @@
+{
+  "name": "evolution-assistant",
+  "version": "1.0.0",
+  "description": "LocalEvomap 进化助手 - 在编码过程中自动搜索和复用已验证的解决方案",
+  "author": "LocalEvomap Team",
+  "triggers": [
+    "error",
+    "fix",
+    "bug",
+    "performance",
+    "optimize",
+    "refactor",
+    "type error",
+    "undefined",
+    "null",
+    "timeout"
+  ],
+  "config": {
+    "evomap": {
+      "baseUrl": "http://10.104.11.12:3000",
+      "apiKey": "test-api-key",
+      "minConfidence": 0.7,
+      "autoLearn": true
+    }
+  },
+  "capabilities": [
+    "search_capsules",
+    "suggest_genes",
+    "record_solution",
+    "query_events"
+  ]
+}

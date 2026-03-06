@@ -514,14 +514,14 @@
                     api('/capsules/search?limit=1'),
                     api('/events?limit=5')
                 ]);
-                document.getElementById('stat-genes').textContent = g.pagination?.total || (g.data ? g.data.length : 0);
-                document.getElementById('stat-capsules').textContent = c.pagination?.total || (c.data ? c.data.length : 0);
-                document.getElementById('stat-events').textContent = e.pagination?.total || (e.data ? e.data.length : 0);
+                document.getElementById('stat-genes').textContent = g.total || 0;
+                document.getElementById('stat-capsules').textContent = c.total || 0;
+                document.getElementById('stat-events').textContent = e.total || 0;
 
                 const tl = document.getElementById('dashboard-timeline');
                 tl.innerHTML = '';
-                if(e.data && e.data.length > 0) {
-                    e.data.forEach((ev) => {
+                if(e.events && e.events.length > 0) {
+                    e.events.forEach((ev) => {
                         tl.innerHTML += `
                             <div class="timeline-item">
                                 <span class="timeline-time">${new Date(ev.timestamp).toLocaleString()}</span>
