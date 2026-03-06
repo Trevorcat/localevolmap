@@ -109,7 +109,8 @@ test.describe('进化流程 E2E', () => {
     await seedTestData(ctx.evomap);
 
     const logs = buildErrorLogs('ReferenceError: foo is not defined');
-    const event = await ctx.evomap.evolve(logs);
+    const result = await ctx.evomap.evolve(logs);
+    const event = result.event;
 
     // 事件完整性验证
     expect(event.id).toBeTruthy();

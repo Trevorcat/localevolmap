@@ -109,6 +109,24 @@ Authorization: Bearer YOUR_API_KEY
 | `outcome.success` | boolean | 别名 | 转换为 `{status,score}` |
 | `id` | string | ❌ | 自动生成 |
 
+### `GET /api/v1/capsules`
+
+列出所有胶囊（不含已删除）。
+
+**响应**:
+```json
+{
+  "total": 5,
+  "capsules": [...]
+}
+```
+
+### `GET /api/v1/capsules/:id/download`
+
+下载胶囊为 JSON 文件（需认证）。
+
+返回 `Content-Disposition: attachment` 头，文件名为 `capsule-{id}.json`。
+
 ### `PUT /api/v1/capsules/:id`
 
 更新胶囊（需认证）。
@@ -116,6 +134,195 @@ Authorization: Bearer YOUR_API_KEY
 ### `DELETE /api/v1/capsules/:id`
 
 软删除胶囊（需认证）。
+
+---
+
+## Evolution API（Tier 1 — 编排接口）
+
+### `POST /api/v1/evolve`
+
+执行完整 12 步进化循环（需认证）。接收日志，串联信号提取 → 基因选择 → 胶囊匹配 → LLM 调用 → 验证 → 记录，返回完整结果。
+
+**请求**:
+```json
+{
+  "logs": [
+    {
+      "type": "tool_result",
+      "error": { "code": "ERR_TYPE", "message": "TypeError: Cannot read properties of undefined" },
+      "timestamp": "2026-03-06T10:00:00Z"
+    }
+  ],
+  "dryRun": false,
+  "strategy": "repair"
+}
+```
+
+| 字段 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `logs` | `LogEntry[]` | ✅ | 原始运行时日志（不能为空数组） |
+| `dryRun` | `boolean` | ❌ | 覆盖全局 dry-run 设置。`true` 时只生成方案不写磁盘 |
+| `strategy` | `string` | ❌ | 覆盖全局策略。可选值: `balanced`, `innovate`, `harden`, `repair-only` |
+
+**成功响应** (200):
+```json
+{
+  "event": {
+    "id": "event_1772791234_1",
+    "timestamp": "2026-03-06T10:00:05Z",
+    "signals": ["log_error", "error_type"],
+    "selected_gene": "gene_gep_repair_from_errors",
+    "used_capsule": null,
+    "outcome": { "status": "success", "score": 0.9, "changes": { "files_modified": 1, "lines_added": 5, "lines_removed": 2 } },
+    "validation": { "passed": true, "commands_run": 2 },
+    "metadata": { "session_id": "local-dev", "iteration": 1 }
+  },
+  "changes": [
+    { "file": "src/index.ts", "operation": "modify", "content": "...", "reasoning": "Added null check" }
+  ],
+  "capsule_created": "capsule_1772791234"
+}
+```
+
+**错误响应**:
+
+| HTTP | error | 场景 |
+|---|---|---|
+| 400 | `invalid_input` | `logs` 缺失或为空数组 |
+| 401 | `Authentication required` | 未提供认证 |
+| 403 | `approval_required` | 高风险操作需审批 |
+| 422 | `no_matching_gene` | 无匹配基因 |
+| 502 | `llm_failed` | LLM 调用失败 |
+
+---
+
+## 调试接口（Tier 3 — 只读，无副作用）
+
+### `POST /api/v1/signals/extract`
+
+从日志中提取结构化信号（无需认证）。
+
+**请求**:
+```json
+{
+  "logs": [
+    { "type": "tool_result", "error": { "message": "TypeError: undefined is not a function" }, "timestamp": "..." }
+  ]
+}
+```
+
+**响应**:
+```json
+{
+  "signals": ["log_error", "error_type", "error_undefined"],
+  "prioritySignals": ["log_error", "error_type", "error_undefined"],
+  "stats": {
+    "total": 3,
+    "byCategory": { "error": 3 },
+    "errorCount": 3,
+    "performanceCount": 0,
+    "userRequestCount": 0
+  }
+}
+```
+
+### `POST /api/v1/genes/select`
+
+根据信号选择最佳基因（无需认证）。
+
+**请求**:
+```json
+{
+  "signals": ["log_error", "error_type", "error_undefined"]
+}
+```
+
+**响应**:
+```json
+{
+  "selected": { "id": "gene_gep_repair_from_errors", "category": "repair", "..." : "..." },
+  "alternatives": [...],
+  "scoring": {
+    "selected_score": 3,
+    "all_scores": { "gene_gep_repair_from_errors": 3, "gene_xxx": 1 }
+  }
+}
+```
+
+### `POST /api/v1/capsules/select`
+
+根据信号选择最佳胶囊 + 复用建议（无需认证）。
+
+与 `GET /api/v1/capsules/search` 的区别：`search` 是模糊过滤返回列表；`select` 使用完整评分算法（信号匹配 + 环境指纹 + 成功率加权）返回最佳单个匹配。
+
+**请求**:
+```json
+{
+  "signals": ["log_error", "error_type", "error_undefined"]
+}
+```
+
+**有匹配响应**:
+```json
+{
+  "capsule": {
+    "id": "capsule_1772790521565",
+    "trigger": ["log_error", "error_type"],
+    "summary": "Fixed by adding optional chaining",
+    "confidence": 0.85
+  },
+  "reuse": {
+    "shouldReuse": true,
+    "reason": "All reuse criteria met",
+    "confidence": 0.85
+  }
+}
+```
+
+**无匹配响应**:
+```json
+{
+  "capsule": null,
+  "reuse": null
+}
+
+---
+
+## Data Management API
+
+### `GET /api/v1/export`
+
+导出所有数据（需认证）。返回基因、胶囊、事件和配置。
+
+**响应**:
+```json
+{
+  "genes": [...],
+  "capsules": [...],
+  "events": [...],
+  "config": { ... }
+}
+```
+
+### `POST /api/v1/import`
+
+导入数据（需认证）。支持导入基因和/或胶囊。
+
+**请求**:
+```json
+{
+  "genes": [...],
+  "capsules": [...]
+}
+```
+
+**响应**:
+```json
+{
+  "message": "Import complete",
+  "imported": { "genes": 3, "capsules": 2 }
+}
+```
 
 ---
 

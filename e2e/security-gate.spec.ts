@@ -190,7 +190,8 @@ test.describe('安全门控 E2E', () => {
         }
       });
 
-      const event = await ctx.evomap.evolve(buildErrorLogs());
+      const result = await ctx.evomap.evolve(buildErrorLogs());
+      const event = result.event;
 
       expect(event).toBeDefined();
       expect(event.outcome).toBeDefined();

@@ -137,7 +137,8 @@ test.describe('evolve() 进化循环', () => {
     await seedTestData(ctx.evomap);
 
     const logs = buildErrorLogs();
-    const event = await ctx.evomap.evolve(logs);
+    const result = await ctx.evomap.evolve(logs);
+    const event = result.event;
 
     // 验证事件结构
     expect(event).toBeDefined();
@@ -155,7 +156,7 @@ test.describe('evolve() 进化循环', () => {
     await seedTestData(ctx.evomap);
 
     const logs = buildErrorLogs('TypeError: Cannot read property of undefined');
-    const event: EvolutionEvent = await ctx.evomap.evolve(logs);
+    const { event }: { event: EvolutionEvent } = await ctx.evomap.evolve(logs);
 
     expect(['success', 'failed', 'partial', 'skipped']).toContain(event.outcome.status);
     expect(typeof event.outcome.score).toBe('number');
@@ -172,7 +173,7 @@ test.describe('evolve() 进化循环', () => {
     await seedTestData(ctx.evomap);
 
     const logs = buildErrorLogs();
-    const event: EvolutionEvent = await ctx.evomap.evolve(logs);
+    const { event }: { event: EvolutionEvent } = await ctx.evomap.evolve(logs);
 
     expect(typeof event.validation.passed).toBe('boolean');
     expect(typeof event.validation.commands_run).toBe('number');
@@ -211,9 +212,9 @@ test.describe('evolve() 进化循环', () => {
 
     // 如果信号提取失败（无法匹配），会抛出错误；成功则返回事件
     try {
-      const event = await ctx.evomap.evolve(logs);
-      expect(event).toBeDefined();
-      expect(event.id).toBeTruthy();
+      const result = await ctx.evomap.evolve(logs);
+      expect(result).toBeDefined();
+      expect(result.event.id).toBeTruthy();
     } catch (e: unknown) {
       // 信号提取可能找不到匹配，这也是有效行为
       const msg = e instanceof Error ? e.message : String(e);
@@ -226,10 +227,10 @@ test.describe('evolve() 进化循环', () => {
     await seedTestData(ctx.evomap);
 
     const logs = buildErrorLogs();
-    const event1 = await ctx.evomap.evolve(logs);
-    const event2 = await ctx.evomap.evolve(logs);
+    const result1 = await ctx.evomap.evolve(logs);
+    const result2 = await ctx.evomap.evolve(logs);
 
-    expect(event1.id).not.toBe(event2.id);
+    expect(result1.event.id).not.toBe(result2.event.id);
   });
 });
 

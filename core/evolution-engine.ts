@@ -16,7 +16,7 @@ import type {
 import { extractSignals, prioritizeSignals } from './signal-extractor';
 import { selectGene } from './gene-selector';
 import { selectCapsule, shouldReuseCapsule } from './capsule-manager';
-import { isValidationCommandAllowed, estimateBlastRadius, requiresApproval } from './validation-gate';
+import { isValidationCommandAllowed, estimateBlastRadius, requiresApproval, executeValidation } from './validation-gate';
 import { LLMProvider } from './llm-provider';
 import type { CapsuleStore } from '../storage/capsule-store';
 
@@ -61,6 +61,19 @@ export interface EvolutionState {
   validationPassed: boolean;
   startTime: number;
   endTime?: number;
+}
+
+export interface EvolutionResult {
+  event: EvolutionEvent;
+  changes: EvolutionChange[];
+  capsule_created: string | null;
+}
+
+export class LLMProviderError extends Error {
+  constructor(message: string, public readonly cause?: unknown) {
+    super(message);
+    this.name = 'LLMProviderError';
+  }
 }
 
 // ============================================================================
@@ -117,7 +130,18 @@ export class EvolutionEngine {
   /**
    * 执行一次进化循环
    */
-  async evolve(logs: any[]): Promise<EvolutionEvent> {
+  async evolve(
+    logs: any[],
+    overrides?: { dryRun?: boolean; strategy?: string }
+  ): Promise<EvolutionResult> {
+    // 保存原始配置，在 finally 中恢复
+    const savedDryRun = this.config.dryRun;
+    const savedStrategy = this.config.strategy;
+    if (overrides?.dryRun !== undefined) this.config.dryRun = overrides.dryRun;
+    if (overrides?.strategy !== undefined) {
+      this.config.strategy = overrides.strategy as EvolutionConfig['strategy'];
+    }
+    
     this.state.iteration++;
     this.state.startTime = Date.now();
     
@@ -165,7 +189,7 @@ export class EvolutionEngine {
       }
       
       // 9. 验证
-      const validationPassed = this.validateChanges(gene, changes);
+      const validationPassed = await this.validateChanges(gene, changes);
       this.state.validationPassed = validationPassed;
       
       // 10. 构建事件
@@ -181,18 +205,22 @@ export class EvolutionEngine {
       await this.eventLogger.append(event);
       
       // 12. 如果成功，创建新胶囊
-      if (validationPassed && !capsule) {
-        await this.createCapsuleFromSuccess(gene, changes, this.state.signals);
-      }
+      const capsule_created = (validationPassed && !capsule)
+        ? await this.createCapsuleFromSuccess(gene, changes, this.state.signals)
+        : null;
       
       this.state.endTime = Date.now();
-      return event;
+      return { event, changes: this.state.changes, capsule_created };
       
     } catch (error) {
       // 失败事件
       const errorEvent = this.buildErrorEvent(error as Error);
       await this.eventLogger.append(errorEvent);
       throw error;
+    } finally {
+      // 恢复原始配置
+      this.config.dryRun = savedDryRun;
+      this.config.strategy = savedStrategy;
     }
   }
   
@@ -316,8 +344,10 @@ export class EvolutionEngine {
       return safeChanges;
     } catch (error) {
       console.error('[EvolutionEngine] LLM generation failed:', error);
-      // 失败时返回空变更，而不是抛出异常
-      return [];
+      throw new LLMProviderError(
+        `LLM generation failed: ${(error as Error).message || 'Unknown error'}`,
+        error
+      );
     }
   }
   
@@ -340,7 +370,7 @@ export class EvolutionEngine {
   /**
    * 验证更改
    */
-  private validateChanges(gene: Gene, changes: EvolutionChange[]): boolean {
+  private async validateChanges(gene: Gene, changes: EvolutionChange[]): Promise<boolean> {
     // 1. 命令白名单检查
     if (gene.validation) {
       const allAllowed = gene.validation.every(cmd => 
@@ -355,7 +385,14 @@ export class EvolutionEngine {
     );
     if (!allPathsSafe) return false;
     
-    // 3. TODO: 实际执行验证命令
+    // 3. 执行验证命令
+    if (gene.validation && gene.validation.length > 0) {
+      const result = await executeValidation(gene.validation, {
+        timeoutMs: 30000,
+        failFast: false
+      });
+      return result.passed;
+    }
     
     return true;
   }
@@ -386,7 +423,7 @@ export class EvolutionEngine {
         changes: {
           files_modified: changes.length,
           lines_added: totalLinesAdded,
-          lines_removed: 0 // TODO: 实际计算
+          lines_removed: changes.filter(c => c.operation === 'delete').reduce((sum, c) => sum + c.content.split('\n').length, 0)
         }
       },
       validation: {
@@ -439,7 +476,7 @@ export class EvolutionEngine {
     gene: Gene,
     changes: EvolutionChange[],
     signals: Signal[]
-  ): Promise<void> {
+  ): Promise<string | null> {
     const capsule: Capsule = {
       type: 'Capsule',
       schema_version: '1.5.0',
@@ -468,11 +505,14 @@ export class EvolutionEngine {
       try {
         await this.capsuleStore.add(capsule);
         console.log(`[EvolutionEngine] Capsule persisted: ${capsule.id}`);
+        return capsule.id;
       } catch (error) {
         console.error(`[EvolutionEngine] Failed to persist capsule:`, error);
+        return null;
       }
     } else {
       console.warn(`[EvolutionEngine] No capsule store configured, capsule not persisted: ${capsule.id}`);
+      return null;
     }
   }
   

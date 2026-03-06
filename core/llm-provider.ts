@@ -92,10 +92,10 @@ export class LLMProvider {
         })(this.config.model);
         
       case 'local':
-        // 兼容 Ollama / LM Studio（OpenAI 协议）
+        // 兼容 Ollama / LM Studio / vLLM / SGLang（OpenAI 协议）
         return createOpenAI({
           baseURL: this.config.baseURL || 'http://localhost:11434/v1',
-          apiKey: 'local'
+          apiKey: apiKey || 'local'
         })(this.config.model);
         
       default:

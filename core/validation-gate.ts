@@ -6,7 +6,11 @@
  */
 
 import * as path from 'path';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import type { BlastRadius } from '../types/gene-capsule-schema';
+
+const execAsync = promisify(exec);
 
 // ============================================================================
 // 命令安全验证
@@ -343,15 +347,18 @@ export async function executeValidation(
     }
   }
   
-  // 执行有效命令（这里简化为模拟）
-  // 实际实现需要使用 child_process
+  // 执行有效命令
   for (const cmd of valid) {
-    // TODO: 实际执行命令
-    // const { exec } = await import('node:child_process');
-    // const result = await exec(cmd, { timeout: opts.timeoutMs });
-    
-    // 模拟成功
-    successes.push(cmd);
+    try {
+      await execAsync(cmd, { timeout: opts.timeoutMs, cwd: process.cwd() });
+      successes.push(cmd);
+    } catch (err: any) {
+      failures.push({
+        command: cmd,
+        error: err.stderr || err.message || 'Command failed'
+      });
+      if (opts.failFast) break;
+    }
   }
   
   return {

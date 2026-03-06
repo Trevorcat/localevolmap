@@ -74,10 +74,18 @@ irm http://YOUR_SERVER/install.ps1 | iex
 |------|------|------|
 | `GET` | `/api/v1/genes` | 列出基因 |
 | `POST` | `/api/v1/genes` | 创建基因（最小字段: `category`, `signals_match`, `strategy`） |
+| `GET` | `/api/v1/capsules` | 列出所有胶囊 |
 | `GET` | `/api/v1/capsules/search` | 搜索胶囊 |
 | `POST` | `/api/v1/capsules` | 创建胶囊（最小字段: `trigger`, `summary`） |
+| `GET` | `/api/v1/capsules/:id/download` | 下载胶囊（需认证） |
+| `POST` | `/api/v1/evolve` | 执行进化（需认证） |
+| `POST` | `/api/v1/signals/extract` | 从日志提取信号 |
+| `POST` | `/api/v1/genes/select` | 根据信号选择基因 |
+| `POST` | `/api/v1/capsules/select` | 根据信号选择胶囊 |
+| `GET` | `/api/v1/export` | 导出所有数据（需认证） |
+| `POST` | `/api/v1/import` | 导入数据（需认证） |
 | `GET` | `/api/v1/events` | 列出进化事件 |
-| `POST` | `/api/v1/seed` | 预加载基础 Gene 策略 |
+| `POST` | `/api/v1/seed` | 预加载基础 Gene 策略（需认证） |
 
 详见 [API Reference](./docs/API_REFERENCE.md)。
 

@@ -1,8 +1,39 @@
 import * as http from 'http';
 import * as fs from 'fs';
 import * as path from 'path';
-import { LocalEvomap } from './index';
+import { LocalEvomap, DEFAULT_CONFIG } from './index';
 import type { Gene, Capsule, EvolutionEvent } from './types/gene-capsule-schema';
+import type { EvolutionResult } from './core/evolution-engine';
+import { LLMProviderError } from './core/evolution-engine';
+import { shouldReuseCapsule } from './core/capsule-manager';
+
+// 加载 .env 文件（无依赖实现，避免引入 dotenv）
+function loadEnvFile(envPath: string): void {
+  try {
+    const content = fs.readFileSync(envPath, 'utf-8');
+    for (const line of content.split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const eqIdx = trimmed.indexOf('=');
+      if (eqIdx === -1) continue;
+      const key = trimmed.slice(0, eqIdx).trim();
+      let value = trimmed.slice(eqIdx + 1).trim();
+      // 移除引号
+      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+        value = value.slice(1, -1);
+      }
+      // 不覆盖已存在的环境变量
+      if (!(key in process.env)) {
+        process.env[key] = value;
+      }
+    }
+  } catch {
+    // .env 文件不存在时静默忽略
+  }
+}
+
+loadEnvFile(path.join(__dirname, '..', '.env'));
+loadEnvFile(path.join(__dirname, '.env'));
 
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0';
@@ -59,9 +90,29 @@ let evomap: LocalEvomap | null = null;
 
 async function getEvomap(): Promise<LocalEvomap> {
     if (!evomap) {
-        evomap = new LocalEvomap();
+        const llmProvider = process.env.EVOMAP_LLM_PROVIDER as 'openai' | 'anthropic' | 'local' | undefined;
+        const llmModel = process.env.EVOMAP_LLM_MODEL;
+        const llmApiKey = process.env.LLM_API_KEY || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY;
+        const llmBaseURL = process.env.LOCAL_LLM_BASE_URL;
+        
+        const config = {
+            ...DEFAULT_CONFIG,
+            ...(llmProvider && { llmProvider }),
+            ...(llmModel && { llmModel }),
+            ...(llmApiKey && { llmApiKey }),
+            ...(llmBaseURL && { llmBaseURL }),
+        };
+        
+        evomap = new LocalEvomap(config);
         await evomap.init();
+        
         console.log('[Server] LocalEvomap initialized');
+        if (llmProvider && llmModel) {
+            console.log(`[Server] LLM: ${llmProvider} / ${llmModel}`);
+            if (llmBaseURL) console.log(`[Server] LLM BaseURL: ${llmBaseURL}`);
+        } else {
+            console.log('[Server] LLM: not configured (dry-run mode)');
+        }
     }
     return evomap;
 }
@@ -280,8 +331,14 @@ async function handleHubApi(
             return;
         }
         
-        // GET /api/v1/capsules/:id or /api/v1/capsules/:id/download
-        if (req.method === 'GET' && pathname.startsWith('/api/v1/capsules/')) {
+        // Capsule selection endpoint (must be before generic /capsules/:id block)
+        if (req.method === 'POST' && pathname === '/api/v1/capsules/select') {
+            await handleSelectCapsule(req, res, evomap);
+            return;
+        }
+        
+        // Capsule individual endpoints: GET/:id, GET/:id/download, PUT/:id, DELETE/:id
+        if (pathname.startsWith('/api/v1/capsules/')) {
             const parts = pathname.split('/');
             if (parts.length >= 5) {
                 const capsuleId = parts[4];
@@ -289,11 +346,30 @@ async function handleHubApi(
                 
                 if (isDownload) {
                     await handleCapsuleDownload(req, res, evomap, capsuleId);
-                } else {
+                } else if (req.method === 'GET') {
                     await handleCapsuleGet(req, res, evomap, capsuleId);
+                } else if (req.method === 'PUT') {
+                    await handleCapsuleUpdate(req, res, evomap, capsuleId);
+                } else if (req.method === 'DELETE') {
+                    await handleCapsuleDelete(req, res, evomap, capsuleId);
+                } else {
+                    res.writeHead(405);
+                    res.end(JSON.stringify({ error: 'Method not allowed' }));
                 }
                 return;
             }
+        }
+        
+        // Capsule list (no search params, all capsules)
+        if (req.method === 'GET' && pathname === '/api/v1/capsules') {
+            await handleCapsulesList(req, res, evomap);
+            return;
+        }
+        
+        // Gene selection endpoint (must be before generic /genes/:id block)
+        if (req.method === 'POST' && pathname === '/api/v1/genes/select') {
+            await handleSelectGene(req, res, evomap);
+            return;
         }
         
         // Gene endpoints
@@ -305,7 +381,6 @@ async function handleHubApi(
                 await handleGeneGet(req, res, evomap, geneId);
             } else if (req.method === 'PUT') {
                 await handleGeneUpdate(req, res, evomap, geneId);
-                return;
             } else if (req.method === 'DELETE') {
                 await handleGeneDelete(req, res, evomap, geneId);
             } else {
@@ -322,33 +397,6 @@ async function handleHubApi(
         
         if (req.method === 'POST' && pathname === '/api/v1/genes') {
             await handleGeneCreate(req, res, evomap);
-            return;
-        }
-        
-        // Capsule endpoints
-        if (pathname.startsWith('/api/v1/capsules/')) {
-            const parts = pathname.split('/');
-            const capsuleId = parts[4];
-            const isDownload = parts[5] === 'download';
-            
-            if (isDownload) {
-                await handleCapsuleDownload(req, res, evomap, capsuleId);
-            } else if (req.method === 'GET') {
-                await handleCapsuleGet(req, res, evomap, capsuleId);
-            } else if (req.method === 'PUT') {
-                await handleCapsuleUpdate(req, res, evomap, capsuleId);
-                return;
-            } else if (req.method === 'DELETE') {
-                await handleCapsuleDelete(req, res, evomap, capsuleId);
-            } else {
-                res.writeHead(405);
-                res.end(JSON.stringify({ error: 'Method not allowed' }));
-            }
-            return;
-        }
-        
-        if (req.method === 'GET' && pathname === '/api/v1/capsules/search') {
-            await handleCapsuleSearch(req, res, evomap, url.searchParams);
             return;
         }
         
@@ -372,6 +420,30 @@ async function handleHubApi(
                 res.writeHead(405);
                 res.end(JSON.stringify({ error: 'Method not allowed' }));
             }
+            return;
+        }
+        
+        // Evolution endpoint
+        if (req.method === 'POST' && pathname === '/api/v1/evolve') {
+            await handleEvolve(req, res, evomap);
+            return;
+        }
+        
+        // Signal extraction endpoint
+        if (req.method === 'POST' && pathname === '/api/v1/signals/extract') {
+            await handleExtractSignals(req, res, evomap);
+            return;
+        }
+        
+        // Export endpoint
+        if (req.method === 'GET' && pathname === '/api/v1/export') {
+            await handleExport(req, res, evomap);
+            return;
+        }
+        
+        // Import endpoint
+        if (req.method === 'POST' && pathname === '/api/v1/import') {
+            await handleImport(req, res, evomap);
             return;
         }
         
@@ -451,7 +523,7 @@ async function handleCapsuleGet(
 }
 
 /**
- * Download capsule by ID
+ * Download capsule by ID (returns as file attachment)
  */
 async function handleCapsuleDownload(
     req: http.IncomingMessage,
@@ -466,9 +538,23 @@ async function handleCapsuleDownload(
         return;
     }
     
-    // TODO: Implement actual capsule lookup and download
-    res.writeHead(404);
-    res.end(JSON.stringify({ error: 'Capsule not found' }));
+    const capsule = await evomap.getCapsuleById(capsuleId);
+    
+    if (!capsule || capsule._deleted) {
+        res.writeHead(404);
+        res.end(JSON.stringify({ error: 'Capsule not found' }));
+        return;
+    }
+    
+    const content = JSON.stringify(capsule, null, 2);
+    const filename = `capsule-${capsuleId}.json`;
+    
+    res.writeHead(200, {
+        'Content-Type': 'application/json',
+        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Content-Length': Buffer.byteLength(content)
+    });
+    res.end(content);
 }
 
 /**
@@ -923,6 +1009,296 @@ async function handleSeed(
         console.error('[Seed] Error:', error);
         res.writeHead(500);
         res.end(JSON.stringify({ error: 'Seed failed', detail: (error as Error).message }));
+    }
+}
+
+/**
+ * List all capsules (no search filter)
+ */
+async function handleCapsulesList(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    evomap: LocalEvomap
+): Promise<void> {
+    const allCapsules = await evomap.getAllCapsules();
+    const activeCapsules = allCapsules.filter(c => !c._deleted);
+    
+    res.writeHead(200);
+    res.end(JSON.stringify({
+        total: activeCapsules.length,
+        capsules: activeCapsules
+    }));
+}
+
+/**
+ * Execute evolution from logs
+ */
+async function handleEvolve(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    evomap: LocalEvomap
+): Promise<void> {
+    if (!checkApiKey(req)) {
+        res.writeHead(401);
+        res.end(JSON.stringify({ error: 'Authentication required' }));
+        return;
+    }
+    
+    const body = await readRequestBody(req);
+    let parsed: any;
+    try {
+        parsed = JSON.parse(body);
+    } catch (e) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: 'Invalid JSON', detail: (e as Error).message }));
+        return;
+    }
+    
+    const logs = parsed.logs;
+    if (!Array.isArray(logs)) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: 'invalid_input', message: 'logs array is required and must not be empty' }));
+        return;
+    }
+    if (logs.length === 0) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: 'invalid_input', message: 'logs array is required and must not be empty' }));
+        return;
+    }
+    
+    // 提取 per-request 覆盖参数
+    const overrides: { dryRun?: boolean; strategy?: string } = {};
+    if (typeof parsed.dryRun === 'boolean') overrides.dryRun = parsed.dryRun;
+    if (typeof parsed.strategy === 'string') overrides.strategy = parsed.strategy;
+    
+    try {
+        const result: EvolutionResult = await evomap.evolve(
+            logs,
+            Object.keys(overrides).length > 0 ? overrides : undefined
+        );
+        res.writeHead(200);
+        res.end(JSON.stringify({
+            event: result.event,
+            changes: result.changes,
+            capsule_created: result.capsule_created
+        }));
+    } catch (error) {
+        console.error('[Hub API] Evolve error:', error);
+        const msg = (error as Error).message;
+        
+        if (error instanceof LLMProviderError) {
+            res.writeHead(502);
+            res.end(JSON.stringify({ error: 'llm_failed', message: msg }));
+        } else if (msg.includes('Approval required')) {
+            res.writeHead(403);
+            res.end(JSON.stringify({ error: 'approval_required', message: msg }));
+        } else if (msg.includes('No matching genes')) {
+            res.writeHead(422);
+            res.end(JSON.stringify({ error: 'no_matching_gene', message: msg }));
+        } else {
+            res.writeHead(500);
+            res.end(JSON.stringify({ error: 'Evolution failed', detail: msg }));
+        }
+    }
+}
+
+/**
+ * Extract signals from logs
+ */
+async function handleExtractSignals(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    evomap: LocalEvomap
+): Promise<void> {
+    const body = await readRequestBody(req);
+    let parsed: any;
+    try {
+        parsed = JSON.parse(body);
+    } catch (e) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: 'Invalid JSON', detail: (e as Error).message }));
+        return;
+    }
+    
+    const logs = parsed.logs;
+    if (!Array.isArray(logs)) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: 'Missing or invalid "logs" array' }));
+        return;
+    }
+    
+    try {
+        const result = evomap.extractSignalsDetailed(logs);
+        res.writeHead(200);
+        res.end(JSON.stringify({
+            signals: result.signals,
+            prioritySignals: result.prioritySignals,
+            stats: result.stats
+        }));
+    } catch (error) {
+        console.error('[Hub API] ExtractSignals error:', error);
+        res.writeHead(500);
+        res.end(JSON.stringify({ error: 'Signal extraction failed', detail: (error as Error).message }));
+    }
+}
+
+/**
+ * Select best gene for given signals
+ */
+async function handleSelectGene(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    evomap: LocalEvomap
+): Promise<void> {
+    const body = await readRequestBody(req);
+    let parsed: any;
+    try {
+        parsed = JSON.parse(body);
+    } catch (e) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: 'Invalid JSON', detail: (e as Error).message }));
+        return;
+    }
+    
+    const signals = parsed.signals;
+    if (!Array.isArray(signals)) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: 'Missing or invalid "signals" array' }));
+        return;
+    }
+    
+    try {
+        const result = await evomap.selectGene(signals);
+        // scoring.all_scores 可能是 Map，需要转换为普通对象以支持 JSON 序列化
+        const scoring = result.scoring;
+        const serialized = {
+            ...result,
+            scoring: {
+                ...scoring,
+                all_scores: scoring?.all_scores instanceof Map
+                    ? Object.fromEntries(scoring.all_scores)
+                    : scoring?.all_scores
+            }
+        };
+        res.writeHead(200);
+        res.end(JSON.stringify(serialized));
+    } catch (error) {
+        console.error('[Hub API] SelectGene error:', error);
+        res.writeHead(500);
+        res.end(JSON.stringify({ error: 'Gene selection failed', detail: (error as Error).message }));
+    }
+}
+
+/**
+ * Select best capsule for given signals
+ */
+async function handleSelectCapsule(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    evomap: LocalEvomap
+): Promise<void> {
+    const body = await readRequestBody(req);
+    let parsed: any;
+    try {
+        parsed = JSON.parse(body);
+    } catch (e) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: 'Invalid JSON', detail: (e as Error).message }));
+        return;
+    }
+    
+    const signals = parsed.signals;
+    if (!Array.isArray(signals)) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: 'Missing or invalid "signals" array' }));
+        return;
+    }
+    
+    try {
+        const capsule = await evomap.selectCapsule(signals);
+        if (!capsule) {
+            res.writeHead(200);
+            res.end(JSON.stringify({ capsule: null, reuse: null }));
+            return;
+        }
+        const reuse = shouldReuseCapsule(capsule, signals);
+        res.writeHead(200);
+        res.end(JSON.stringify({ capsule, reuse }));
+    } catch (error) {
+        console.error('[Hub API] SelectCapsule error:', error);
+        res.writeHead(500);
+        res.end(JSON.stringify({ error: 'Capsule selection failed', detail: (error as Error).message }));
+    }
+}
+
+/**
+ * Export all data (genes, capsules, events, config)
+ */
+async function handleExport(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    evomap: LocalEvomap
+): Promise<void> {
+    if (!checkApiKey(req)) {
+        res.writeHead(401);
+        res.end(JSON.stringify({ error: 'Authentication required' }));
+        return;
+    }
+    
+    try {
+        const data = await evomap.exportData();
+        res.writeHead(200);
+        res.end(JSON.stringify(data));
+    } catch (error) {
+        console.error('[Hub API] Export error:', error);
+        res.writeHead(500);
+        res.end(JSON.stringify({ error: 'Export failed', detail: (error as Error).message }));
+    }
+}
+
+/**
+ * Import data (genes and/or capsules)
+ */
+async function handleImport(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    evomap: LocalEvomap
+): Promise<void> {
+    if (!checkApiKey(req)) {
+        res.writeHead(401);
+        res.end(JSON.stringify({ error: 'Authentication required' }));
+        return;
+    }
+    
+    const body = await readRequestBody(req);
+    let parsed: any;
+    try {
+        parsed = JSON.parse(body);
+    } catch (e) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: 'Invalid JSON', detail: (e as Error).message }));
+        return;
+    }
+    
+    if (!parsed.genes && !parsed.capsules) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: 'Request must include "genes" and/or "capsules" arrays' }));
+        return;
+    }
+    
+    try {
+        await evomap.importData(parsed);
+        const genesCount = parsed.genes?.length || 0;
+        const capsulesCount = parsed.capsules?.length || 0;
+        res.writeHead(200);
+        res.end(JSON.stringify({
+            message: 'Import complete',
+            imported: { genes: genesCount, capsules: capsulesCount }
+        }));
+    } catch (error) {
+        console.error('[Hub API] Import error:', error);
+        res.writeHead(500);
+        res.end(JSON.stringify({ error: 'Import failed', detail: (error as Error).message }));
     }
 }
 

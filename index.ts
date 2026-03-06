@@ -16,8 +16,8 @@ import { CapsuleHubClient, HubRegistry, PUBLIC_HUBS } from './core/capsule-hub-c
 import { GeneStore } from './storage/gene-store';
 import { CapsuleStore } from './storage/capsule-store';
 import { EventLogger } from './storage/event-logger';
-import { EvolutionEngine, type EventLogger as EventLoggerInterface } from './core/evolution-engine';
-import { extractSignals, prioritizeSignals } from './core/signal-extractor';
+import { EvolutionEngine, type EvolutionEngineConfig, type EventLogger as EventLoggerInterface, type EvolutionResult } from './core/evolution-engine';
+import { extractSignals, prioritizeSignals, analyzeSignals } from './core/signal-extractor';
 import { selectGene, computeDriftIntensity, analyzeGenePool } from './core/gene-selector';
 import { selectCapsule, shouldReuseCapsule, analyzeCapsules } from './core/capsule-manager';
 import { isValidationCommandAllowed, estimateBlastRadius, requiresApproval } from './core/validation-gate';
@@ -55,6 +55,15 @@ export const DEFAULT_CONFIG: EvolutionConfig & { externalSources?: CapsuleHubCon
 // Local Evomap 主类
 // ============================================================================
 
+export type LocalEvomapConfig = EvolutionConfig & { 
+  externalSources?: CapsuleHubConfig[];
+  // LLM 配置（透传给 EvolutionEngine）
+  llmProvider?: 'openai' | 'anthropic' | 'local';
+  llmModel?: string;
+  llmApiKey?: string;
+  llmBaseURL?: string;
+};
+
 export class LocalEvomap {
   private geneStore: GeneStore;
   private capsuleStore: CapsuleStore;
@@ -64,7 +73,7 @@ export class LocalEvomap {
   
   private initialized = false;
   
-  constructor(private config: EvolutionConfig & { externalSources?: CapsuleHubConfig[] } = DEFAULT_CONFIG) {
+  constructor(private config: LocalEvomapConfig = DEFAULT_CONFIG) {
     this.geneStore = new GeneStore(config.genes_path);
     this.capsuleStore = new CapsuleStore(config.capsules_path);
     this.eventLogger = new EventLogger(config.events_path);
@@ -122,7 +131,10 @@ export class LocalEvomap {
   /**
    * 执行进化
    */
-  async evolve(logs: any[]): Promise<EvolutionEvent> {
+  async evolve(
+    logs: any[],
+    overrides?: { dryRun?: boolean; strategy?: string }
+  ): Promise<EvolutionResult> {
     if (!this.initialized) {
       await this.init();
     }
@@ -131,7 +143,7 @@ export class LocalEvomap {
       throw new Error('Evolution engine not initialized');
     }
     
-    return this.engine.evolve(logs);
+    return this.engine.evolve(logs, overrides);
   }
   
   /**
@@ -173,11 +185,40 @@ export class LocalEvomap {
   }
   
   /**
-   * 提取信号
+   * 提取信号（简版，返回优先信号列表）
    */
   extractSignals(logs: any[]): Signal[] {
     const { prioritySignals } = extractSignals({ logs });
     return prioritySignals;
+  }
+  
+  /**
+   * 提取信号（详版，含统计信息）
+   */
+  extractSignalsDetailed(logs: any[]): {
+    signals: Signal[];
+    prioritySignals: Signal[];
+    stats: {
+      total: number;
+      byCategory: Record<string, number>;
+      errorCount: number;
+      performanceCount: number;
+      userRequestCount: number;
+    };
+  } {
+    const { signals, prioritySignals } = extractSignals({ logs });
+    const raw = analyzeSignals(signals);
+    return {
+      signals,
+      prioritySignals,
+      stats: {
+        total: raw.total,
+        byCategory: Object.fromEntries(raw.byCategory),
+        errorCount: raw.errorCount,
+        performanceCount: raw.performanceCount,
+        userRequestCount: raw.userRequestCount
+      }
+    };
   }
   
   /**
