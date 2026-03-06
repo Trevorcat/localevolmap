@@ -510,9 +510,9 @@
         async function loadDashboard() {
             try {
                 const [g, c, e] = await Promise.all([
-                    api('/genes?limit=1'),
-                    api('/capsules/search?limit=1'),
-                    api('/events?limit=5')
+                    api('/api/v1/genes?limit=1'),
+                    api('/api/v1/capsules/search?limit=1'),
+                    api('/api/v1/events?limit=5')
                 ]);
                 document.getElementById('stat-genes').textContent = g.total || 0;
                 document.getElementById('stat-capsules').textContent = c.total || 0;
@@ -540,7 +540,7 @@
             const q = document.getElementById('gene-search').value;
             const offset = (state.genePage - 1) * state.limit;
             try {
-                const res = await api(`/genes?q=${encodeURIComponent(q)}&limit=${state.limit}&offset=${offset}`);
+                const res = await api(`/api/v1/genes?q=${encodeURIComponent(q)}&limit=${state.limit}&offset=${offset}`);
                 const tbody = document.getElementById('genes-tbody');
                 tbody.innerHTML = '';
                 if(res.genes && res.genes.length > 0) {
@@ -573,7 +573,7 @@
             const q = document.getElementById('capsule-search').value;
             const offset = (state.capsulePage - 1) * state.limit;
             try {
-                const res = await api(`/capsules/search?signals=${encodeURIComponent(q)}&limit=${state.limit}&offset=${offset}`);
+                const res = await api(`/api/v1/capsules/search?signals=${encodeURIComponent(q)}&limit=${state.limit}&offset=${offset}`);
                 const tbody = document.getElementById('capsules-tbody');
                 tbody.innerHTML = '';
                 if(res.capsules && res.capsules.length > 0) {
@@ -606,7 +606,7 @@
         async function loadEvents() {
             const offset = (state.eventPage - 1) * state.limit;
             try {
-                const res = await api(`/events?limit=${state.limit}&offset=${offset}`);
+                const res = await api(`/api/v1/events?limit=${state.limit}&offset=${offset}`);
                 const tl = document.getElementById('events-timeline');
                 tl.innerHTML = '';
                 if(res.events && res.events.length > 0) {
@@ -645,7 +645,7 @@
             catch { strategy = [document.getElementById('g-strategy').value]; }
 
             try {
-                await api('/genes', {
+                await api('/api/v1/genes', {
                     method: 'POST',
                     body: JSON.stringify({ type: 'Gene', id, category, signals_match: signals, strategy, preconditions: [], constraints: {} })
                 });
@@ -665,7 +665,7 @@
             const confidence = parseFloat(document.getElementById('c-confidence').value);
 
             try {
-                await api('/capsules', {
+                await api('/api/v1/capsules', {
                     method: 'POST',
                     body: JSON.stringify({ type: 'Capsule', schema_version: '1.0', id: 'cap_' + Date.now(), gene, trigger, summary, confidence, blast_radius: {files:0, lines:0}, outcome: {success:true} })
                 });
@@ -687,7 +687,7 @@
             if(!state.deleteTarget) return;
             const { type, id } = state.deleteTarget;
             try {
-                await api(`/${type}s/${id}`, { method: 'DELETE' });
+                await api(`/api/v1/${type}s/${id}`, { method: 'DELETE' });
                 showToast(`${type} deleted successfully`);
                 if(type === 'gene') loadGenes();
                 if(type === 'capsule') loadCapsules();
