@@ -98,16 +98,23 @@ const server = http.createServer(async (req, res) => {
     }
 
     // Skill distribution endpoints
-    if (url.pathname === '/install.sh') {
+    if (url.pathname === '/install.sh' || url.pathname === '/install.ps1' || url.pathname === '/INSTALL.md') {
         const projectRoot = __dirname.endsWith('dist') ? path.resolve(__dirname, '..') : __dirname;
-        const filePath = path.join(projectRoot, 'opencode', 'localevomap-skill', 'install.sh');
+        const fileName = url.pathname.slice(1); // remove leading /
+        const filePath = path.join(projectRoot, 'opencode', 'localevomap-skill', fileName);
+        const mimeMap: Record<string, string> = {
+            '.sh': 'text/x-shellscript; charset=utf-8',
+            '.ps1': 'text/plain; charset=utf-8',
+            '.md': 'text/markdown; charset=utf-8',
+        };
+        const ext = path.extname(fileName);
         fs.readFile(filePath, (err, data) => {
             if (err) {
                 res.writeHead(404);
-                res.end('Install script not found');
+                res.end('Not found');
                 return;
             }
-            res.writeHead(200, { 'Content-Type': 'text/x-shellscript' });
+            res.writeHead(200, { 'Content-Type': mimeMap[ext] || 'text/plain' });
             res.end(data);
         });
         return;
