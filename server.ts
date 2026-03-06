@@ -70,7 +70,7 @@ const server = http.createServer(async (req, res) => {
     // CORS & Headers
     const reqOrigin = req.headers.origin;
     res.setHeader('Access-Control-Allow-Origin', resolveCorsOrigin(reqOrigin));
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     res.setHeader('Vary', 'Origin');
 
@@ -215,6 +215,9 @@ async function handleHubApi(
             
             if (req.method === 'GET') {
                 await handleGeneGet(req, res, evomap, geneId);
+            } else if (req.method === 'PUT') {
+                await handleGeneUpdate(req, res, evomap, geneId);
+                return;
             } else if (req.method === 'DELETE') {
                 await handleGeneDelete(req, res, evomap, geneId);
             } else {
@@ -244,6 +247,9 @@ async function handleHubApi(
                 await handleCapsuleDownload(req, res, evomap, capsuleId);
             } else if (req.method === 'GET') {
                 await handleCapsuleGet(req, res, evomap, capsuleId);
+            } else if (req.method === 'PUT') {
+                await handleCapsuleUpdate(req, res, evomap, capsuleId);
+                return;
             } else if (req.method === 'DELETE') {
                 await handleCapsuleDelete(req, res, evomap, capsuleId);
             } else {
@@ -515,6 +521,42 @@ async function handleGeneGet(
 }
 
 /**
+ * Update gene by ID
+ */
+async function handleGeneUpdate(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    evomap: LocalEvomap,
+    geneId: string
+): Promise<void> {
+    // API Key authentication required for write operations
+    if (!checkApiKey(req)) {
+        res.writeHead(401);
+        res.end(JSON.stringify({ error: 'Authentication required' }));
+        return;
+    }
+    
+    const existing = await evomap['geneStore'].get(geneId);
+    if (!existing || existing._deleted) {
+        res.writeHead(404);
+        res.end(JSON.stringify({ error: 'Gene not found' }));
+        return;
+    }
+    
+    const body = await readRequestBody(req);
+    try {
+        const updates = JSON.parse(body);
+        const updated = { ...existing, ...updates, id: geneId };
+        await evomap['geneStore'].update(updated);
+        res.writeHead(200);
+        res.end(JSON.stringify({ message: 'Gene updated', id: geneId }));
+    } catch (error) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: 'Invalid gene data' }));
+    }
+}
+
+/**
  * Soft delete gene
  */
 async function handleGeneDelete(
@@ -544,6 +586,42 @@ async function handleGeneDelete(
     
     res.writeHead(200);
     res.end(JSON.stringify({ message: 'Gene deleted', id: geneId }));
+}
+
+/**
+ * Update capsule by ID
+ */
+async function handleCapsuleUpdate(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    evomap: LocalEvomap,
+    capsuleId: string
+): Promise<void> {
+    // API Key authentication required for write operations
+    if (!checkApiKey(req)) {
+        res.writeHead(401);
+        res.end(JSON.stringify({ error: 'Authentication required' }));
+        return;
+    }
+    
+    const existing = await evomap['capsuleStore'].get(capsuleId);
+    if (!existing || existing._deleted) {
+        res.writeHead(404);
+        res.end(JSON.stringify({ error: 'Capsule not found' }));
+        return;
+    }
+    
+    const body = await readRequestBody(req);
+    try {
+        const updates = JSON.parse(body);
+        const updated = { ...existing, ...updates, id: capsuleId };
+        await evomap['capsuleStore'].update(updated);
+        res.writeHead(200);
+        res.end(JSON.stringify({ message: 'Capsule updated', id: capsuleId }));
+    } catch (error) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: 'Invalid capsule data' }));
+    }
 }
 
 /**

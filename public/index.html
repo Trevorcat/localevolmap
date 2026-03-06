@@ -209,6 +209,202 @@
         .timeline-content { background: rgba(255,255,255,0.02); padding: 1rem; border-radius: var(--radius-md); border: 1px solid var(--border-color); }
 
         .pagination { display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; }
+
+        /* 按钮样式 */
+        .btn-info {
+            background: var(--primary);
+            color: white;
+            border: none;
+        }
+        .btn-info:hover {
+            background: var(--primary-dark);
+        }
+
+        /* 可点击 ID */
+        .clickable-id {
+            cursor: pointer;
+            text-decoration: underline dotted;
+            color: var(--accent);
+        }
+        .clickable-id:hover {
+            color: var(--primary);
+        }
+
+        /* 标签云 */
+        .tag-cloud {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.375rem;
+            margin: 0.25rem 0;
+        }
+        .tag-chip {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.125rem 0.5rem;
+            background: var(--secondary);
+            border-radius: 9999px;
+            font-size: 0.75rem;
+        }
+        .tag-chip.editable {
+            margin-right: 0.25rem;
+            margin-bottom: 0.25rem;
+        }
+        .tag-chip.editable button {
+            margin-left: 0.25rem;
+            padding: 0;
+            background: transparent;
+            border: none;
+            color: inherit;
+            cursor: pointer;
+            font-size: 1rem;
+            line-height: 1;
+        }
+
+        /* Tag 编辑器 */
+        .tag-editor {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.25rem;
+            padding: 0.5rem;
+            background: var(--bg-secondary);
+            border-radius: 0.375rem;
+            min-height: 2.5rem;
+            align-items: center;
+        }
+        .tag-input {
+            flex: 1;
+            min-width: 8rem;
+            padding: 0.25rem 0.5rem;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 0.25rem;
+            color: var(--text-primary);
+        }
+
+        /* JSON 编辑器 */
+        .json-block {
+            background: var(--bg-secondary);
+            padding: 0.75rem;
+            border-radius: 0.375rem;
+            overflow-x: auto;
+            font-size: 0.75rem;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .json-editor {
+            width: 100%;
+            min-height: 8rem;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 0.375rem;
+            padding: 0.5rem;
+            color: var(--text-primary);
+        }
+        .json-status {
+            font-size: 0.75rem;
+            margin-top: 0.25rem;
+        }
+        .json-status.valid {
+            color: var(--success);
+        }
+        .json-status.error {
+            color: var(--danger);
+        }
+
+        /* 折叠切换 */
+        .collapse-toggle {
+            cursor: pointer;
+            color: var(--primary);
+            font-size: 0.875rem;
+            padding: 0.25rem 0;
+        }
+        .collapse-toggle:hover {
+            text-decoration: underline;
+        }
+
+        /* 详情区块 */
+        .detail-section {
+            margin-bottom: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .detail-section:last-child {
+            border-bottom: none;
+        }
+        .detail-label {
+            font-weight: 600;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+        }
+        .detail-value {
+            padding: 0.25rem 0;
+        }
+
+        /* Constraints 网格 */
+        .constraints-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 0.75rem;
+        }
+        .constraints-grid label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-bottom: 0.25rem;
+        }
+        .constraints-grid input {
+            width: 100%;
+            padding: 0.375rem 0.5rem;
+        }
+
+        /* 置信度进度条 */
+        .conf-bar {
+            height: 0.5rem;
+            background: var(--bg-secondary);
+            border-radius: 9999px;
+            overflow: hidden;
+            margin: 0.5rem 0;
+        }
+        .conf-bar > div {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+            transition: width 0.3s ease;
+        }
+
+        /* 模态框 Tabs */
+        .modal-tabs {
+            display: flex;
+            gap: 0;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 1rem;
+        }
+        .modal-tab {
+            padding: 0.75rem 1.5rem;
+            background: var(--bg-secondary);
+            border: none;
+            cursor: pointer;
+            color: var(--text-muted);
+            font-weight: 500;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+        }
+        .modal-tab:hover {
+            background: var(--bg-tertiary);
+        }
+        .modal-tab.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+            background: var(--bg-primary);
+        }
+
+        /* 宽版模态框 */
+        .modal-wide {
+            max-width: 800px;
+        }
     </style>
 </head>
 <body>
@@ -437,6 +633,203 @@
         </div>
     </div>
 
+    <!-- Gene 详情/编辑模态框 -->
+    <div id="modal-gene-detail" class="modal-overlay" onclick="if(event.target === this) closeModal('modal-gene-detail')">
+        <div class="modal modal-wide" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <span id="gene-detail-title">Gene Details</span>
+                <button class="modal-close" onclick="closeModal('modal-gene-detail')">×</button>
+            </div>
+            
+            <div class="modal-tabs">
+                <button class="modal-tab active" onclick="switchGeneTab('view')">查看</button>
+                <button class="modal-tab" onclick="switchGeneTab('edit')">编辑</button>
+            </div>
+            
+            <!-- 查看面板 -->
+            <div id="gene-view-panel" class="modal-body">
+                <div id="gene-view-content">
+                    <p style="color: var(--text-muted);">Loading...</p>
+                </div>
+            </div>
+            
+            <!-- 编辑面板 -->
+            <div id="gene-edit-panel" class="modal-body" style="display: none;">
+                <form id="form-gene-edit" onsubmit="saveGene(event)">
+                    <div class="detail-section">
+                        <div class="detail-label">Gene ID (不可修改)</div>
+                        <input type="text" id="e-g-id" readonly style="width: 100%; padding: 0.5rem; background: var(--bg-secondary);">
+                    </div>
+                    
+                    <div class="detail-section">
+                        <div class="detail-label">Category</div>
+                        <select id="e-g-category" style="width: 100%; padding: 0.5rem;">
+                            <option value="repair">Repair</option>
+                            <option value="optimize">Optimize</option>
+                            <option value="feature">Feature</option>
+                            <option value="security">Security</option>
+                            <option value="performance">Performance</option>
+                            <option value="refactor">Refactor</option>
+                            <option value="test">Test</option>
+                        </select>
+                    </div>
+                    
+                    <div class="detail-section">
+                        <div class="detail-label">Signals Match (逗号分隔)</div>
+                        <textarea id="e-g-signals" rows="3" style="width: 100%;" placeholder="error, exception, failed"></textarea>
+                    </div>
+                    
+                    <div class="detail-section">
+                        <div class="detail-label">Preconditions (每行一条)</div>
+                        <textarea id="e-g-preconditions" rows="3" style="width: 100%;"></textarea>
+                    </div>
+                    
+                    <div class="detail-section">
+                        <div class="detail-label">Strategy (每行一步)</div>
+                        <textarea id="e-g-strategy" rows="5" style="width: 100%;"></textarea>
+                    </div>
+                    
+                    <div class="detail-section">
+                        <div class="detail-label">Constraints</div>
+                        <div class="constraints-grid">
+                            <div>
+                                <label>Max Files</label>
+                                <input type="number" id="e-g-max-files" min="0">
+                            </div>
+                            <div>
+                                <label>Max Lines</label>
+                                <input type="number" id="e-g-max-lines" min="0">
+                            </div>
+                            <div>
+                                <label>Timeout (ms)</label>
+                                <input type="number" id="e-g-timeout" min="0" step="1000">
+                            </div>
+                        </div>
+                        <div style="margin-top: 0.75rem;">
+                            <label>Forbidden Paths</label>
+                            <div class="tag-editor" id="e-g-forbidden-paths"></div>
+                        </div>
+                        <div style="margin-top: 0.75rem;">
+                            <label>Required Paths</label>
+                            <div class="tag-editor" id="e-g-required-paths"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="detail-section">
+                        <div class="detail-label">Validation Commands (每行一条)</div>
+                        <textarea id="e-g-validation" rows="3" style="width: 100%;"></textarea>
+                    </div>
+                    
+                    <div class="detail-section">
+                        <div class="detail-label">Metadata (JSON)</div>
+                        <textarea id="e-g-metadata" class="json-editor" rows="4"></textarea>
+                        <span id="e-g-metadata-status" class="json-status"></span>
+                    </div>
+                    
+                    <div class="modal-footer">
+                        <button type="button" class="btn" onclick="closeModal('modal-gene-detail')">取消</button>
+                        <button type="submit" class="btn btn-primary">保存</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Capsule 详情/编辑模态框 -->
+    <div id="modal-capsule-detail" class="modal-overlay" onclick="if(event.target === this) closeModal('modal-capsule-detail')">
+        <div class="modal modal-wide" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <span id="capsule-detail-title">Capsule Details</span>
+                <button class="modal-close" onclick="closeModal('modal-capsule-detail')">×</button>
+            </div>
+            
+            <div class="modal-tabs">
+                <button class="modal-tab active" onclick="switchCapsuleTab('view')">查看</button>
+                <button class="modal-tab" onclick="switchCapsuleTab('edit')">编辑</button>
+            </div>
+            
+            <!-- 查看面板 -->
+            <div id="capsule-view-panel" class="modal-body">
+                <div id="capsule-view-content">
+                    <p style="color: var(--text-muted);">Loading...</p>
+                </div>
+            </div>
+            
+            <!-- 编辑面板 -->
+            <div id="capsule-edit-panel" class="modal-body" style="display: none;">
+                <form id="form-capsule-edit" onsubmit="saveCapsule(event)">
+                    <div class="detail-section">
+                        <div class="detail-label">Capsule ID (不可修改)</div>
+                        <input type="text" id="e-c-id" readonly style="width: 100%; padding: 0.5rem; background: var(--bg-secondary);">
+                    </div>
+                    
+                    <div class="detail-section">
+                        <div class="detail-label">Gene Reference</div>
+                        <input type="text" id="e-c-gene" style="width: 100%; padding: 0.5rem;">
+                    </div>
+                    
+                    <div class="detail-section">
+                        <div class="detail-label">Confidence: <span id="e-c-confidence-value">0.8</span></div>
+                        <input type="range" id="e-c-confidence" min="0" max="1" step="0.01" 
+                               oninput="document.getElementById('e-c-confidence-value').textContent = this.value">
+                        <div class="conf-bar"><div id="e-c-confidence-bar" style="width: 80%;"></div></div>
+                    </div>
+                    
+                    <div class="detail-section">
+                        <div class="detail-label">Summary</div>
+                        <input type="text" id="e-c-summary" style="width: 100%; padding: 0.5rem;">
+                    </div>
+                    
+                    <div class="detail-section">
+                        <div class="detail-label">Trigger Signals (逗号分隔)</div>
+                        <textarea id="e-c-trigger" rows="3" style="width: 100%;"></textarea>
+                    </div>
+                    
+                    <div class="detail-section">
+                        <div class="detail-label">Blast Radius</div>
+                        <div class="constraints-grid">
+                            <div>
+                                <label>Files</label>
+                                <input type="number" id="e-c-br-files" min="0">
+                            </div>
+                            <div>
+                                <label>Lines</label>
+                                <input type="number" id="e-c-br-lines" min="0">
+                            </div>
+                        </div>
+                        <div style="margin-top: 0.75rem;">
+                            <label>Directories</label>
+                            <div class="tag-editor" id="e-c-br-dirs"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="detail-section">
+                        <div class="detail-label">Outcome (JSON)</div>
+                        <textarea id="e-c-outcome" class="json-editor" rows="4"></textarea>
+                        <span id="e-c-outcome-status" class="json-status"></span>
+                    </div>
+                    
+                    <div class="detail-section">
+                        <div class="detail-label">Env Fingerprint (JSON)</div>
+                        <textarea id="e-c-env" class="json-editor" rows="4"></textarea>
+                        <span id="e-c-env-status" class="json-status"></span>
+                    </div>
+                    
+                    <div class="detail-section">
+                        <div class="detail-label">Metadata (JSON)</div>
+                        <textarea id="e-c-metadata" class="json-editor" rows="4"></textarea>
+                        <span id="e-c-metadata-status" class="json-status"></span>
+                    </div>
+                    
+                    <div class="modal-footer">
+                        <button type="button" class="btn" onclick="closeModal('modal-capsule-detail')">取消</button>
+                        <button type="submit" class="btn btn-primary">保存</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <div id="toast-container"></div>
 
     <script>
@@ -447,7 +840,9 @@
             capsulePage: 1,
             eventPage: 1,
             limit: 10,
-            deleteTarget: null // { type: 'gene'|'capsule', id: string }
+            deleteTarget: null, // { type: 'gene'|'capsule', id: string }
+            currentGene: null,
+            currentCapsule: null
         };
 
         // --- Routing ---
@@ -506,6 +901,42 @@
             }
         }
 
+        // --- Tag Editor Component ---
+        function initTagEditor(containerId, values = []) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            container.innerHTML = '';
+            for (const v of values) { addTagChip(container, v); }
+            
+            const input = document.createElement('input');
+            input.placeholder = '输入后回车添加...';
+            input.className = 'tag-input';
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && input.value.trim()) {
+                    e.preventDefault();
+                    addTagChip(container, input.value.trim());
+                    input.value = '';
+                }
+            });
+            container.appendChild(input);
+        }
+
+        function addTagChip(container, value) {
+            const chip = document.createElement('span');
+            chip.className = 'tag-chip editable';
+            chip.innerHTML = `${value} <button type="button" onclick="this.parentElement.remove()">×</button>`;
+            chip.dataset.value = value;
+            container.insertBefore(chip, container.lastChild);
+        }
+
+        function getTagEditorValues(containerId) {
+            const container = document.getElementById(containerId);
+            if (!container) return [];
+            return Array.from(container.querySelectorAll('.tag-chip'))
+                .map(chip => chip.dataset.value)
+                .filter(Boolean);
+        }
+
         // --- Dashboard ---
         async function loadDashboard() {
             try {
@@ -547,10 +978,12 @@
                     res.genes.forEach((g) => {
                         tbody.innerHTML += `
                             <tr>
-                                <td><strong>${g.id}</strong></td>
+                                <td><strong class="clickable-id" onclick="openGeneDetail('${g.id}', 'view')">${g.id}</strong></td>
                                 <td><span class="badge">${g.category}</span></td>
                                 <td>${(g.signals_match || []).join(', ')}</td>
                                 <td>
+                                    <button type="button" class="btn btn-sm btn-info" onclick="openGeneDetail('${g.id}', 'view')">View</button>
+                                    <button type="button" class="btn btn-sm" onclick="openGeneDetail('${g.id}', 'edit')">Edit</button>
                                     <button type="button" class="btn btn-sm btn-danger" onclick="confirmDelete('gene', '${g.id}')">Del</button>
                                 </td>
                             </tr>
@@ -580,11 +1013,13 @@
                     res.capsules.forEach((c) => {
                         tbody.innerHTML += `
                             <tr>
-                                <td><strong>${c.id}</strong></td>
+                                <td><strong class="clickable-id" onclick="openCapsuleDetail('${c.id}', 'view')">${c.id}</strong></td>
                                 <td>${c.gene}</td>
                                 <td>${c.confidence}</td>
                                 <td>${c.summary}</td>
                                 <td>
+                                    <button type="button" class="btn btn-sm btn-info" onclick="openCapsuleDetail('${c.id}', 'view')">View</button>
+                                    <button type="button" class="btn btn-sm" onclick="openCapsuleDetail('${c.id}', 'edit')">Edit</button>
                                     <button type="button" class="btn btn-sm btn-danger" onclick="confirmDelete('capsule', '${c.id}')">Del</button>
                                 </td>
                             </tr>
@@ -675,6 +1110,387 @@
                 loadCapsules();
                 loadDashboard();
             } catch(e) {}
+        }
+
+        // --- Gene Detail ---
+        async function openGeneDetail(id, mode) {
+            try {
+                const data = await api(`/api/v1/genes/${id}`);
+                state.currentGene = data;
+
+                // 渲染查看面板
+                renderGeneView(data);
+                // 填充编辑面板
+                populateGeneEdit(data);
+                // 切换模式
+                switchGeneTab(mode);
+                // 更新标题
+                document.getElementById('gene-detail-title').textContent =
+                    mode === 'edit' ? 'Edit Gene: ' + id : 'Gene Details: ' + id;
+                // 打开模态框
+                openModal('modal-gene-detail');
+            } catch(e) {
+                showToast('Failed to load gene: ' + e.message, 'error');
+            }
+        }
+
+        function renderGeneView(gene) {
+            const html = `
+                <div class="detail-section">
+                    <div class="detail-label">ID</div>
+                    <div class="detail-value"><code>${gene.id}</code></div>
+                </div>
+                <div class="detail-section">
+                    <div class="detail-label">Category</div>
+                    <div class="detail-value"><span class="badge">${gene.category}</span></div>
+                </div>
+                <div class="detail-section">
+                    <div class="detail-label">Signals Match</div>
+                    <div class="tag-cloud">
+                        ${(gene.signals_match || []).map(s => `<span class="tag-chip">${s}</span>`).join('')}
+                    </div>
+                </div>
+                <div class="detail-section">
+                    <div class="detail-label">Preconditions</div>
+                    <ul>${(gene.preconditions || []).map(p => `<li>${p}</li>`).join('')}</ul>
+                </div>
+                <div class="detail-section">
+                    <div class="detail-label">Strategy</div>
+                    <ol>${(gene.strategy || []).map(s => `<li>${s}</li>`).join('')}</ol>
+                </div>
+                <div class="detail-section">
+                    <div class="detail-label">Constraints</div>
+                    <div class="detail-value">
+                        ${gene.constraints ? `
+                            <div><strong>Max Files:</strong> ${gene.constraints.max_files || '∞'}</div>
+                            <div><strong>Max Lines:</strong> ${gene.constraints.max_lines || '∞'}</div>
+                            <div><strong>Timeout:</strong> ${gene.constraints.timeout_ms ? gene.constraints.timeout_ms + 'ms' : '∞'}</div>
+                            ${gene.constraints.forbidden_paths ? `
+                                <div style="margin-top: 0.5rem;"><strong>Forbidden Paths:</strong></div>
+                                <div class="tag-cloud">${gene.constraints.forbidden_paths.map(p => `<span class="tag-chip">${p}</span>`).join('')}</div>
+                            ` : ''}
+                        ` : '<em>None</em>'}
+                    </div>
+                </div>
+                ${gene.validation && gene.validation.length ? `
+                    <div class="detail-section">
+                        <div class="detail-label">Validation Commands</div>
+                        <ul>${gene.validation.map(v => `<li><code>${v}</code></li>`).join('')}</ul>
+                    </div>
+                ` : ''}
+                ${gene.metadata ? `
+                    <div class="detail-section">
+                        <div class="detail-label">Metadata</div>
+                        <pre class="json-block">${JSON.stringify(gene.metadata, null, 2)}</pre>
+                    </div>
+                ` : ''}
+            `;
+            document.getElementById('gene-view-content').innerHTML = html;
+        }
+
+        function populateGeneEdit(gene) {
+            document.getElementById('e-g-id').value = gene.id;
+            document.getElementById('e-g-category').value = gene.category;
+            document.getElementById('e-g-signals').value = (gene.signals_match || []).join(', ');
+            document.getElementById('e-g-preconditions').value = (gene.preconditions || []).join('\n');
+            document.getElementById('e-g-strategy').value = (gene.strategy || []).join('\n');
+            document.getElementById('e-g-validation').value = (gene.validation || []).join('\n');
+
+            // Constraints
+            if (gene.constraints) {
+                document.getElementById('e-g-max-files').value = gene.constraints.max_files || '';
+                document.getElementById('e-g-max-lines').value = gene.constraints.max_lines || '';
+                document.getElementById('e-g-timeout').value = gene.constraints.timeout_ms || '';
+                initTagEditor('e-g-forbidden-paths', gene.constraints.forbidden_paths || []);
+                initTagEditor('e-g-required-paths', gene.constraints.required_paths || []);
+            } else {
+                document.getElementById('e-g-max-files').value = '';
+                document.getElementById('e-g-max-lines').value = '';
+                document.getElementById('e-g-timeout').value = '';
+                initTagEditor('e-g-forbidden-paths', []);
+                initTagEditor('e-g-required-paths', []);
+            }
+
+            // Metadata
+            document.getElementById('e-g-metadata').value = gene.metadata ? JSON.stringify(gene.metadata, null, 2) : '{}';
+            validateJsonEditor('e-g-metadata', 'e-g-metadata-status');
+        }
+
+        function switchGeneTab(mode) {
+            const viewPanel = document.getElementById('gene-view-panel');
+            const editPanel = document.getElementById('gene-edit-panel');
+            const tabs = document.querySelectorAll('#modal-gene-detail .modal-tab');
+
+            if (mode === 'view') {
+                viewPanel.style.display = 'block';
+                editPanel.style.display = 'none';
+                tabs[0].classList.add('active');
+                tabs[1].classList.remove('active');
+            } else {
+                viewPanel.style.display = 'none';
+                editPanel.style.display = 'block';
+                tabs[0].classList.remove('active');
+                tabs[1].classList.add('active');
+            }
+        }
+
+        async function saveGene(event) {
+            event.preventDefault();
+
+            const id = state.currentGene.id;
+            const signals = document.getElementById('e-g-signals').value.split(',').map(s => s.trim()).filter(Boolean);
+            const preconditions = document.getElementById('e-g-preconditions').value.split('\n').map(s => s.trim()).filter(Boolean);
+            const strategy = document.getElementById('e-g-strategy').value.split('\n').map(s => s.trim()).filter(Boolean);
+            const validation = document.getElementById('e-g-validation').value.split('\n').map(s => s.trim()).filter(Boolean);
+
+            // Constraints
+            const constraints = {
+                max_files: parseInt(document.getElementById('e-g-max-files').value) || undefined,
+                max_lines: parseInt(document.getElementById('e-g-max-lines').value) || undefined,
+                timeout_ms: parseInt(document.getElementById('e-g-timeout').value) || undefined,
+                forbidden_paths: getTagEditorValues('e-g-forbidden-paths'),
+                required_paths: getTagEditorValues('e-g-required-paths')
+            };
+            Object.keys(constraints).forEach(k => constraints[k] === undefined && delete constraints[k]);
+
+            // Metadata
+            let metadata;
+            try {
+                metadata = JSON.parse(document.getElementById('e-g-metadata').value);
+                metadata.updated_at = new Date().toISOString();
+            } catch(e) {
+                showToast('Metadata JSON 格式错误：' + e.message, 'error');
+                return;
+            }
+
+            const updated = {
+                ...state.currentGene,
+                category: document.getElementById('e-g-category').value,
+                signals_match: signals,
+                preconditions,
+                strategy,
+                validation,
+                constraints,
+                metadata
+            };
+
+            try {
+                await api(`/api/v1/genes/${id}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(updated)
+                });
+                showToast('Gene 已更新');
+                closeModal('modal-gene-detail');
+                loadGenes();
+                loadDashboard();
+            } catch(e) {
+                showToast('保存失败：' + e.message, 'error');
+            }
+        }
+
+        // === Capsule Detail Logic ===
+
+        async function openCapsuleDetail(id, mode) {
+            try {
+                const data = await api(`/api/v1/capsules/${id}`);
+                state.currentCapsule = data;
+
+                renderCapsuleView(data);
+                populateCapsuleEdit(data);
+                switchCapsuleTab(mode);
+
+                document.getElementById('capsule-detail-title').textContent =
+                    mode === 'edit' ? 'Edit Capsule: ' + id : 'Capsule Details: ' + id;
+
+                openModal('modal-capsule-detail');
+            } catch(e) {
+                showToast('Failed to load capsule: ' + e.message, 'error');
+            }
+        }
+
+        function renderCapsuleView(capsule) {
+            const statusColors = { success: '#22c55e', failed: '#ef4444', partial: '#f59e0b', skipped: '#6b7280' };
+            const statusColor = statusColors[capsule.outcome?.status] || '#6b7280';
+
+            const html = `
+                <div class="detail-section">
+                    <div class="detail-label">ID</div>
+                    <div class="detail-value"><code>${capsule.id}</code></div>
+                </div>
+                <div class="detail-section">
+                    <div class="detail-label">Gene Reference</div>
+                    <div class="detail-value">
+                        <code>${capsule.gene}</code>
+                        <button class="btn btn-sm btn-info" style="margin-left: 0.5rem;" onclick="openGeneDetail('${capsule.gene}', 'view')">→ View Gene</button>
+                    </div>
+                </div>
+                <div class="detail-section">
+                    <div class="detail-label">Confidence</div>
+                    <div class="detail-value">
+                        <div class="conf-bar"><div style="width: ${capsule.confidence * 100}%;"></div></div>
+                        <div>${(capsule.confidence * 100).toFixed(0)}%</div>
+                    </div>
+                </div>
+                <div class="detail-section">
+                    <div class="detail-label">Summary</div>
+                    <div class="detail-value">${capsule.summary || '<em>None</em>'}</div>
+                </div>
+                <div class="detail-section">
+                    <div class="detail-label">Trigger Signals</div>
+                    <div class="tag-cloud">
+                        ${(capsule.trigger || []).map(s => '<span class="tag-chip">' + s + '</span>').join('')}
+                    </div>
+                </div>
+                <div class="detail-section">
+                    <div class="detail-label">Blast Radius</div>
+                    <div class="detail-value">
+                        <div><strong>Files:</strong> ${capsule.blast_radius?.files || 0}</div>
+                        <div><strong>Lines:</strong> ${capsule.blast_radius?.lines || 0}</div>
+                        ${capsule.blast_radius?.directories && capsule.blast_radius.directories.length ? `
+                            <div style="margin-top: 0.5rem;"><strong>Directories:</strong></div>
+                            <div class="tag-cloud">${capsule.blast_radius.directories.map(d => '<span class="tag-chip">' + d + '</span>').join('')}</div>
+                        ` : ''}
+                    </div>
+                </div>
+                <div class="detail-section">
+                    <div class="detail-label">Outcome</div>
+                    <div class="detail-value">
+                        <span class="tag-chip" style="background: ${statusColor}; color: white;">${capsule.outcome?.status || 'unknown'}</span>
+                        ${capsule.outcome?.score ? '<div><strong>Score:</strong> ' + (capsule.outcome.score * 100).toFixed(0) + '%</div>' : ''}
+                        ${capsule.outcome?.duration_ms ? '<div><strong>Duration:</strong> ' + capsule.outcome.duration_ms + 'ms</div>' : ''}
+                    </div>
+                </div>
+                <div class="detail-section">
+                    <div class="detail-label">Env Fingerprint</div>
+                    <pre class="json-block">${JSON.stringify(capsule.env_fingerprint || {}, null, 2)}</pre>
+                </div>
+                ${capsule.metadata ? `
+                    <div class="detail-section">
+                        <div class="detail-label">Metadata</div>
+                        <pre class="json-block">${JSON.stringify(capsule.metadata, null, 2)}</pre>
+                    </div>
+                ` : ''}
+            `;
+            document.getElementById('capsule-view-content').innerHTML = html;
+        }
+
+        function populateCapsuleEdit(capsule) {
+            document.getElementById('e-c-id').value = capsule.id;
+            document.getElementById('e-c-gene').value = capsule.gene;
+            document.getElementById('e-c-confidence').value = capsule.confidence;
+            document.getElementById('e-c-confidence-value').textContent = capsule.confidence;
+            document.getElementById('e-c-confidence-bar').style.width = (capsule.confidence * 100) + '%';
+            document.getElementById('e-c-summary').value = capsule.summary || '';
+            document.getElementById('e-c-trigger').value = (capsule.trigger || []).join(', ');
+
+            // Blast radius
+            document.getElementById('e-c-br-files').value = capsule.blast_radius?.files || 0;
+            document.getElementById('e-c-br-lines').value = capsule.blast_radius?.lines || 0;
+            initTagEditor('e-c-br-dirs', capsule.blast_radius?.directories || []);
+
+            // JSON fields
+            document.getElementById('e-c-outcome').value = JSON.stringify(capsule.outcome || {}, null, 2);
+            validateJsonEditor('e-c-outcome', 'e-c-outcome-status');
+
+            document.getElementById('e-c-env').value = JSON.stringify(capsule.env_fingerprint || {}, null, 2);
+            validateJsonEditor('e-c-env', 'e-c-env-status');
+
+            document.getElementById('e-c-metadata').value = JSON.stringify(capsule.metadata || {}, null, 2);
+            validateJsonEditor('e-c-metadata', 'e-c-metadata-status');
+        }
+
+        function switchCapsuleTab(mode) {
+            const viewPanel = document.getElementById('capsule-view-panel');
+            const editPanel = document.getElementById('capsule-edit-panel');
+            const tabs = document.querySelectorAll('#modal-capsule-detail .modal-tab');
+
+            if (mode === 'view') {
+                viewPanel.style.display = 'block';
+                editPanel.style.display = 'none';
+                tabs[0].classList.add('active');
+                tabs[1].classList.remove('active');
+            } else {
+                viewPanel.style.display = 'none';
+                editPanel.style.display = 'block';
+                tabs[0].classList.remove('active');
+                tabs[1].classList.add('active');
+            }
+        }
+
+        async function saveCapsule(event) {
+            event.preventDefault();
+
+            const id = state.currentCapsule.id;
+
+            // Validate JSON fields
+            if (!validateJsonEditor('e-c-outcome', 'e-c-outcome-status')) return;
+            if (!validateJsonEditor('e-c-env', 'e-c-env-status')) return;
+            if (!validateJsonEditor('e-c-metadata', 'e-c-metadata-status')) return;
+
+            let outcome, env_fingerprint, metadata;
+            try {
+                outcome = JSON.parse(document.getElementById('e-c-outcome').value);
+            } catch(e) {
+                showToast('Outcome JSON 格式错误：' + e.message, 'error');
+                return;
+            }
+            try {
+                env_fingerprint = JSON.parse(document.getElementById('e-c-env').value);
+            } catch(e) {
+                showToast('Env Fingerprint JSON 格式错误：' + e.message, 'error');
+                return;
+            }
+            try {
+                metadata = JSON.parse(document.getElementById('e-c-metadata').value);
+                metadata.applied_at = new Date().toISOString();
+            } catch(e) {
+                showToast('Metadata JSON 格式错误：' + e.message, 'error');
+                return;
+            }
+
+            const updated = {
+                ...state.currentCapsule,
+                gene: document.getElementById('e-c-gene').value.trim(),
+                confidence: parseFloat(document.getElementById('e-c-confidence').value),
+                summary: document.getElementById('e-c-summary').value.trim(),
+                trigger: document.getElementById('e-c-trigger').value.split(',').map(s => s.trim()).filter(Boolean),
+                blast_radius: {
+                    files: parseInt(document.getElementById('e-c-br-files').value) || 0,
+                    lines: parseInt(document.getElementById('e-c-br-lines').value) || 0,
+                    directories: getTagEditorValues('e-c-br-dirs')
+                },
+                outcome,
+                env_fingerprint,
+                metadata
+            };
+
+            try {
+                await api(`/api/v1/capsules/${id}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(updated)
+                });
+                showToast('Capsule 已更新');
+                closeModal('modal-capsule-detail');
+                loadCapsules();
+                loadDashboard();
+            } catch(e) {
+                showToast('保存失败：' + e.message, 'error');
+            }
+        }
+
+        function validateJsonEditor(editorId, statusId) {
+            const editor = document.getElementById(editorId);
+            const status = document.getElementById(statusId);
+            try {
+                JSON.parse(editor.value);
+                status.textContent = '✓ Valid JSON';
+                status.className = 'json-status valid';
+                return true;
+            } catch(e) {
+                status.textContent = '✗ ' + e.message;
+                status.className = 'json-status error';
+                return false;
+            }
         }
 
         // --- Delete ---
