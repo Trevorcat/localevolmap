@@ -4,10 +4,8 @@ This project integrates with a LocalEvomap evolution knowledge base server.
 
 ## Operational Policy
 
-When encountering errors, bugs, or performance issues:
-
-1. **ALWAYS search for existing solutions first** before writing a fix from scratch.
-2. After successfully fixing an issue, **record the solution** for future reuse.
+1. **BEFORE starting any task**, search LocalEvomap for existing solutions and strategies.
+2. After fixing an issue, **always record the solution** for future reuse.
 
 ## Server
 
@@ -20,7 +18,7 @@ When encountering errors, bugs, or performance issues:
 ### Search for solutions (capsules)
 
 ```bash
-curl -s "http://10.104.11.12:3000/api/v1/capsules/search?signals=TypeError,undefined&minConfidence=0.7" \
+curl -s "http://10.104.11.12:3000/api/v1/capsules/search?signals=TypeError,undefined&minConfidence=0.5" \
   -H "Authorization: Bearer test-api-key"
 ```
 
@@ -35,31 +33,44 @@ curl -s "http://10.104.11.12:3000/api/v1/genes?category=repair" \
 
 Use the gene's `strategy` array as step-by-step guidance.
 
-### Record a new solution
+### Record a new solution (minimal)
+
+Server auto-fills missing fields. Only `trigger` and `summary` are required:
 
 ```bash
 curl -X POST "http://10.104.11.12:3000/api/v1/capsules" \
   -H "Authorization: Bearer test-api-key" \
   -H "Content-Type: application/json" \
-  -d '{"type":"Capsule","schema_version":"1.0.0","id":"capsule_TIMESTAMP","trigger":["SIGNAL"],"gene":"GENE_ID","summary":"FIX_DESCRIPTION","confidence":0.85,"blast_radius":{"files":1,"lines":5},"outcome":{"status":"success","score":0.9}}'
+  -d "{\"trigger\":[\"TypeError\",\"undefined\"],\"summary\":\"Fixed by adding null check\",\"confidence\":0.85}"
 ```
+
+### Record a new strategy (minimal)
+
+Only `category`, `signals_match`, and `strategy` are required:
+
+```bash
+curl -X POST "http://10.104.11.12:3000/api/v1/genes" \
+  -H "Authorization: Bearer test-api-key" \
+  -H "Content-Type: application/json" \
+  -d "{\"category\":\"repair\",\"signals_match\":[\"TypeError\"],\"strategy\":[\"Check nulls\",\"Add guards\"]}"
+```
+
+Note: `signals` is accepted as alias for `signals_match`.
 
 ## API Endpoints
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
 | GET | `/api/v1/genes` | No | List genes |
-| GET | `/api/v1/genes/:id` | No | Get gene |
-| POST | `/api/v1/genes` | Yes | Create gene |
+| POST | `/api/v1/genes` | Yes | Create gene (flexible schema, auto-fills defaults) |
 | PUT | `/api/v1/genes/:id` | Yes | Update gene |
 | GET | `/api/v1/capsules/search` | No | Search capsules |
-| GET | `/api/v1/capsules/:id` | No | Get capsule |
-| POST | `/api/v1/capsules` | Yes | Create capsule |
+| POST | `/api/v1/capsules` | Yes | Create capsule (flexible schema, auto-fills defaults) |
 | PUT | `/api/v1/capsules/:id` | Yes | Update capsule |
 | GET | `/api/v1/events` | No | List events |
 
 ## Concepts
 
-- **Genes**: Abstract knowledge patterns — how to respond to specific error signals
-- **Capsules**: Concrete verified solutions — reusable across environments
-- **Signals**: Error patterns extracted from runtime (TypeError, undefined, timeout, etc.)
+- **Genes**: Strategy patterns — "when you see X signals, try Y approach"
+- **Capsules**: Verified solutions — reusable fixes with confidence scores
+- **Signals**: Patterns from errors, logs, or user intent

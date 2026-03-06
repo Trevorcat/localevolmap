@@ -518,6 +518,76 @@ async function handleGenesList(
 }
 
 /**
+ * Normalize capsule data: accept multiple formats and fill defaults
+ */
+function normalizeCapsule(raw: any): any {
+    const capsule = { ...raw };
+    // Default type
+    if (!capsule.type) capsule.type = 'Capsule';
+    // Default schema_version
+    if (!capsule.schema_version) capsule.schema_version = '1.0.0';
+    // Default id
+    if (!capsule.id) capsule.id = `cap_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    // Normalize outcome: accept {success:true} or {status,score}
+    if (capsule.outcome) {
+        if (capsule.outcome.success !== undefined && !capsule.outcome.status) {
+            capsule.outcome = {
+                status: capsule.outcome.success ? 'success' : 'failed',
+                score: capsule.confidence || 0.7,
+                ...capsule.outcome
+            };
+            delete capsule.outcome.success;
+        }
+        if (!capsule.outcome.status) capsule.outcome.status = 'success';
+        if (capsule.outcome.score === undefined) capsule.outcome.score = capsule.confidence || 0.7;
+    } else {
+        capsule.outcome = { status: 'success', score: capsule.confidence || 0.7 };
+    }
+    // Default env_fingerprint
+    if (!capsule.env_fingerprint) {
+        capsule.env_fingerprint = { platform: 'linux', arch: 'x64' };
+    }
+    // Default blast_radius
+    if (!capsule.blast_radius) capsule.blast_radius = { files: 0, lines: 0 };
+    // Default trigger
+    if (!capsule.trigger) capsule.trigger = [];
+    // Default confidence
+    if (capsule.confidence === undefined) capsule.confidence = 0.7;
+    // Default gene
+    if (!capsule.gene) capsule.gene = 'unknown';
+    // Default summary
+    if (!capsule.summary) capsule.summary = '';
+    // Default metadata
+    if (!capsule.metadata) {
+        capsule.metadata = { created_at: new Date().toISOString(), source: 'api', validated: false };
+    }
+    return capsule;
+}
+
+/**
+ * Normalize gene data: accept multiple formats and fill defaults
+ */
+function normalizeGene(raw: any): any {
+    const gene = { ...raw };
+    // Default type
+    if (!gene.type) gene.type = 'Gene';
+    // Default id
+    if (!gene.id) gene.id = `gene_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    // Accept "signals" as alias for "signals_match"
+    if (gene.signals && !gene.signals_match) {
+        gene.signals_match = gene.signals;
+        delete gene.signals;
+    }
+    // Defaults
+    if (!gene.signals_match) gene.signals_match = [];
+    if (!gene.preconditions) gene.preconditions = [];
+    if (!gene.strategy) gene.strategy = [];
+    if (!gene.constraints) gene.constraints = {};
+    if (!gene.category) gene.category = 'repair';
+    return gene;
+}
+
+/**
  * Create capsule
  */
 async function handleCapsuleCreate(
@@ -533,14 +603,23 @@ async function handleCapsuleCreate(
     }
     
     const body = await readRequestBody(req);
+    let parsed: any;
     try {
-        const capsule = JSON.parse(body);
+        parsed = JSON.parse(body);
+    } catch (e) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: 'Invalid JSON', detail: (e as Error).message, received: body.substring(0, 200) }));
+        return;
+    }
+    try {
+        const capsule = normalizeCapsule(parsed);
         await evomap.addCapsule(capsule);
         res.writeHead(201);
         res.end(JSON.stringify({ message: 'Capsule created', id: capsule.id }));
     } catch (error) {
+        console.error('[Hub API] Capsule create error:', error);
         res.writeHead(400);
-        res.end(JSON.stringify({ error: 'Invalid capsule data' }));
+        res.end(JSON.stringify({ error: 'Failed to create capsule', detail: (error as Error).message }));
     }
 }
 
@@ -560,14 +639,23 @@ async function handleGeneCreate(
     }
     
     const body = await readRequestBody(req);
+    let parsed: any;
     try {
-        const gene = JSON.parse(body);
+        parsed = JSON.parse(body);
+    } catch (e) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: 'Invalid JSON', detail: (e as Error).message, received: body.substring(0, 200) }));
+        return;
+    }
+    try {
+        const gene = normalizeGene(parsed);
         await evomap.addGene(gene);
         res.writeHead(201);
         res.end(JSON.stringify({ message: 'Gene created', id: gene.id }));
     } catch (error) {
+        console.error('[Hub API] Gene create error:', error);
         res.writeHead(400);
-        res.end(JSON.stringify({ error: 'Invalid gene data' }));
+        res.end(JSON.stringify({ error: 'Failed to create gene', detail: (error as Error).message }));
     }
 }
 
