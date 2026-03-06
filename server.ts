@@ -97,6 +97,81 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
+    // Skill distribution endpoints
+    if (url.pathname === '/install.sh') {
+        const projectRoot = __dirname.endsWith('dist') ? path.resolve(__dirname, '..') : __dirname;
+        const filePath = path.join(projectRoot, 'opencode', 'localevomap-skill', 'install.sh');
+        fs.readFile(filePath, (err, data) => {
+            if (err) {
+                res.writeHead(404);
+                res.end('Install script not found');
+                return;
+            }
+            res.writeHead(200, { 'Content-Type': 'text/x-shellscript' });
+            res.end(data);
+        });
+        return;
+    }
+
+    if (url.pathname.startsWith('/skill/') || url.pathname === '/skill') {
+        const projectRoot = __dirname.endsWith('dist') ? path.resolve(__dirname, '..') : __dirname;
+        const skillDir = path.join(projectRoot, 'opencode', 'localevomap-skill');
+        
+        // Map client types to files
+        const clientFileMap: Record<string, string> = {
+            'claude': 'claude-code.md',
+            'opencode': 'opencode-skill.md',
+            'codex': 'codex-agents.md',
+        };
+        
+        // /skill or /skill/ → return skill.json (manifest)
+        const subPath = url.pathname.replace(/^\/skill\/?/, '');
+        
+        if (!subPath || subPath === '') {
+            const filePath = path.join(skillDir, 'skill.json');
+            fs.readFile(filePath, (err, data) => {
+                if (err) { res.writeHead(404); res.end('Not found'); return; }
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(data);
+            });
+            return;
+        }
+        
+        // /skill/claude, /skill/opencode, /skill/codex → client-specific markdown
+        if (clientFileMap[subPath]) {
+            const filePath = path.join(skillDir, clientFileMap[subPath]);
+            fs.readFile(filePath, (err, data) => {
+                if (err) { res.writeHead(404); res.end('Not found'); return; }
+                res.writeHead(200, { 'Content-Type': 'text/markdown; charset=utf-8' });
+                res.end(data);
+            });
+            return;
+        }
+        
+        // /skill/<filename> → serve any file in skill dir (with traversal protection)
+        const filePath = path.join(skillDir, subPath);
+        if (!filePath.startsWith(skillDir)) {
+            res.writeHead(403);
+            res.end('Forbidden');
+            return;
+        }
+        
+        fs.readFile(filePath, (err, data) => {
+            if (err) { res.writeHead(404); res.end('Not found'); return; }
+            const ext = path.extname(filePath);
+            const mimeTypes: Record<string, string> = {
+                '.json': 'application/json',
+                '.ts': 'text/plain; charset=utf-8',
+                '.js': 'application/javascript',
+                '.md': 'text/markdown; charset=utf-8',
+                '.sh': 'text/x-shellscript',
+            };
+            res.writeHead(200, { 'Content-Type': mimeTypes[ext] || 'text/plain' });
+            res.end(data);
+        });
+        return;
+    }
+
     // Hub API v1 endpoints (check first, before legacy /api/)
     if (url.pathname.startsWith('/api/v1/')) {
         console.log('[Server] Hub API request:', req.method, url.pathname);
