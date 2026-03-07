@@ -72,10 +72,10 @@
         .title::after { content: 'SYSTEM_CORE'; position: absolute; bottom: -12px; left: 0; font-size: 0.7rem; font-family: 'Space Mono', monospace; color: var(--accent); letter-spacing: 2px; }
 
         /* Navigation */
-        .nav-brand { margin-bottom: 4rem; padding-left: 1rem; }
-        .nav-links { display: flex; flex-direction: column; gap: 0.5rem; flex: 1; }
+        .nav-brand { margin-bottom: 2rem; padding-left: 1rem; }
+        .nav-links { display: flex; flex-direction: column; gap: 0.25rem; flex: 1; overflow-y: auto; }
         .nav-link {
-            padding: 1rem;
+            padding: 0.75rem 1rem;
             color: var(--text-muted);
             text-decoration: none;
             border-radius: var(--radius-md);
@@ -409,6 +409,273 @@
         .modal-wide {
             max-width: 800px;
         }
+
+        /* Analytics - Trend Chart */
+        .trend-chart-container {
+            display: flex;
+            align-items: flex-end;
+            gap: 3px;
+            height: 80px;
+            padding: 0.5rem 0;
+        }
+        .trend-bar {
+            flex: 1;
+            min-width: 6px;
+            max-width: 24px;
+            border-radius: 3px 3px 0 0;
+            transition: height 0.3s ease, opacity 0.2s;
+            cursor: default;
+            position: relative;
+        }
+        .trend-bar:hover { opacity: 0.8; }
+        .trend-bar[data-status="success"] { background: #22c55e; }
+        .trend-bar[data-status="failed"] { background: #ef4444; }
+        .trend-bar[data-status="partial"] { background: #f59e0b; }
+        .trend-bar[data-status="skipped"] { background: #6b7280; }
+
+        /* Analytics - Effectiveness Bar */
+        .eff-bar {
+            width: 100%;
+            height: 6px;
+            background: rgba(255,255,255,0.08);
+            border-radius: 9999px;
+            overflow: hidden;
+            position: relative;
+        }
+        .eff-bar-fill {
+            height: 100%;
+            border-radius: 9999px;
+            transition: width 0.4s ease;
+        }
+        .eff-bar-fill.high { background: linear-gradient(90deg, #22c55e, #4ade80); }
+        .eff-bar-fill.mid { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+        .eff-bar-fill.low { background: linear-gradient(90deg, #ef4444, #f87171); }
+
+        /* Analytics - Signal Frequency */
+        .signal-freq-row {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 0.75rem;
+        }
+        .signal-freq-label {
+            min-width: 180px;
+            font-size: 0.8rem;
+            font-family: 'Space Mono', monospace;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .signal-freq-bar-container {
+            flex: 1;
+            height: 8px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 9999px;
+            overflow: hidden;
+        }
+        .signal-freq-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), #ff6b9d);
+            border-radius: 9999px;
+            transition: width 0.4s ease;
+        }
+        .signal-freq-count {
+            min-width: 40px;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-align: right;
+        }
+
+        /* Approval styles */
+        .approval-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.2rem;
+            margin-bottom: 1rem;
+            transition: border-color 0.2s;
+        }
+        .approval-card:hover { border-color: var(--primary); }
+        .approval-card.status-approved { border-left: 4px solid var(--status-success); }
+        .approval-card.status-rejected { border-left: 4px solid var(--status-failed); }
+        .approval-card.status-pending { border-left: 4px solid #f59e0b; }
+        .approval-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+        .approval-gene { font-weight: 600; font-size: 0.95rem; }
+        .approval-risk {
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .risk-low { background: rgba(52,211,153,0.15); color: #34d399; }
+        .risk-medium { background: rgba(251,191,36,0.15); color: #fbbf24; }
+        .risk-high { background: rgba(251,113,133,0.15); color: #fb7185; }
+        .risk-critical { background: rgba(239,68,68,0.2); color: #ef4444; }
+        .approval-meta {
+            display: flex;
+            gap: 1.5rem;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-bottom: 0.75rem;
+        }
+        .approval-signals {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.4rem;
+            margin-bottom: 0.75rem;
+        }
+        .approval-signal-tag {
+            background: rgba(99,102,241,0.12);
+            color: var(--primary);
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-size: 0.72rem;
+        }
+        .approval-changes-summary {
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            margin-bottom: 0.75rem;
+        }
+        .approval-actions {
+            display: flex;
+            gap: 0.75rem;
+            justify-content: flex-end;
+        }
+        .btn-approve {
+            background: var(--status-success);
+            color: #fff;
+            border: none;
+            padding: 6px 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.82rem;
+        }
+        .btn-approve:hover { filter: brightness(1.15); }
+        .btn-reject {
+            background: transparent;
+            color: var(--status-failed);
+            border: 1px solid var(--status-failed);
+            padding: 6px 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.82rem;
+        }
+        .btn-reject:hover { background: rgba(239,68,68,0.1); }
+        .btn-view {
+            background: transparent;
+            color: var(--primary);
+            border: 1px solid var(--primary);
+            padding: 6px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.82rem;
+        }
+        .btn-view:hover { background: rgba(99,102,241,0.1); }
+
+        /* Modal */
+        .approval-modal {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .approval-modal-content {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            width: 90%;
+            max-width: 800px;
+            max-height: 85vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .approval-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.2rem 1.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+        .approval-modal-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+        .approval-modal-body {
+            padding: 1.5rem;
+            overflow-y: auto;
+            flex: 1;
+        }
+        .approval-modal-footer {
+            padding: 1rem 1.5rem;
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 0.75rem;
+            justify-content: flex-end;
+        }
+        .change-file-block {
+            margin-bottom: 1.2rem;
+        }
+        .change-file-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0.8rem;
+            background: rgba(99,102,241,0.08);
+            border-radius: 8px 8px 0 0;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        .change-file-op {
+            font-size: 0.72rem;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+        .change-file-op.op-create { background: rgba(52,211,153,0.2); color: #34d399; }
+        .change-file-op.op-modify { background: rgba(251,191,36,0.2); color: #fbbf24; }
+        .change-file-op.op-delete { background: rgba(239,68,68,0.2); color: #ef4444; }
+        .change-code {
+            background: #1a1b2e;
+            border: 1px solid var(--border);
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            padding: 0.8rem;
+            overflow-x: auto;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-size: 0.75rem;
+            line-height: 1.5;
+            color: #e2e8f0;
+            max-height: 300px;
+            white-space: pre;
+        }
+        .change-reasoning {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-style: italic;
+            margin-top: 0.3rem;
+            padding-left: 0.8rem;
+        }
+        .approval-none {
+            text-align: center;
+            color: var(--text-muted);
+            padding: 3rem 1rem;
+            font-size: 0.95rem;
+        }
     </style>
 </head>
 <body>
@@ -433,6 +700,14 @@
             <a href="#events" class="nav-link">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path><title>Icon</title></svg>
                 Events
+            </a>
+            <a href="#approvals" class="nav-link">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path><title>Icon</title></svg>
+                Approvals
+            </a>
+            <a href="#analytics" class="nav-link">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"></path><title>Icon</title></svg>
+                Analytics
             </a>
         </div>
         <div class="api-key-section">
@@ -533,6 +808,130 @@
                     <button type="button" class="btn btn-sm" onclick="capsulePage( -1 )">Prev</button>
                     <span id="capsule-page-info" style="font-size:0.8rem; color:var(--text-muted)">Page 1</span>
                     <button type="button" class="btn btn-sm" onclick="capsulePage( 1 )">Next</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Approvals Page -->
+        <div id="page-approvals" class="page">
+            <div class="title" style="margin-bottom: 1rem;">Pending Approvals</div>
+            <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1.5rem;">
+                Review and approve/reject evolution changes that exceed automatic approval thresholds.
+            </p>
+            <div id="approvals-summary" style="display: flex; gap: 1rem; margin-bottom: 1.5rem;">
+                <div class="kpi-card" style="flex:1">
+                    <div class="kpi-label">Pending</div>
+                    <div class="kpi-value" id="approvals-pending-count">0</div>
+                </div>
+                <div class="kpi-card" style="flex:1">
+                    <div class="kpi-label">Approved</div>
+                    <div class="kpi-value" id="approvals-approved-count" style="color: var(--status-success)">0</div>
+                </div>
+                <div class="kpi-card" style="flex:1">
+                    <div class="kpi-label">Rejected</div>
+                    <div class="kpi-value" id="approvals-rejected-count" style="color: var(--status-failed)">0</div>
+                </div>
+            </div>
+            <div id="approvals-list"></div>
+        </div>
+
+        <!-- Approval Detail Modal -->
+        <div id="approval-modal" class="approval-modal" style="display:none">
+            <div class="approval-modal-content">
+                <div class="approval-modal-header">
+                    <span class="title" style="font-size:1.1rem" id="modal-title">Change Details</span>
+                    <button class="approval-modal-close" onclick="closeApprovalModal()">&times;</button>
+                </div>
+                <div id="modal-body" class="approval-modal-body"></div>
+                <div class="approval-modal-footer" id="modal-footer"></div>
+            </div>
+        </div>
+
+        <!-- Analytics Page -->
+        <div id="page-analytics" class="page">
+            <div class="title" style="margin-bottom: 1rem;">Effectiveness Analytics</div>
+            <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 2rem;">
+                System effectiveness metrics — aggregated from all evolution events.
+            </p>
+
+            <!-- KPI Cards -->
+            <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+                <div class="glass-card stat-card">
+                    <div class="stat-value" id="kpi-total">-</div>
+                    <div class="stat-label">Total Evolutions</div>
+                </div>
+                <div class="glass-card stat-card">
+                    <div class="stat-value" style="color:#22c55e;" id="kpi-success-rate">-</div>
+                    <div class="stat-label">Success Rate</div>
+                </div>
+                <div class="glass-card stat-card">
+                    <div class="stat-value" id="kpi-avg-score">-</div>
+                    <div class="stat-label">Avg Score</div>
+                </div>
+                <div class="glass-card stat-card">
+                    <div class="stat-value" style="color:#38bdf8;" id="kpi-capsule-reuse">-</div>
+                    <div class="stat-label">Capsule Reuse Rate</div>
+                </div>
+                <div class="glass-card stat-card">
+                    <div class="stat-value" id="kpi-genes-active">-</div>
+                    <div class="stat-label">Active Genes</div>
+                </div>
+            </div>
+
+            <!-- Trend Chart -->
+            <div class="glass-card">
+                <h3 style="margin-bottom: 0.5rem;">Evolution Trend</h3>
+                <p style="color: var(--text-muted); font-size: 0.75rem; margin-bottom: 1rem;">Last 30 evolutions — green = success, red = failed, yellow = partial</p>
+                <div id="trend-chart" class="trend-chart-container"></div>
+            </div>
+
+            <!-- Gene Effectiveness Table -->
+            <div class="glass-card">
+                <h3 style="margin-bottom: 1rem;">Gene Effectiveness</h3>
+                <div style="overflow-x: auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Gene ID</th>
+                                <th>Hits</th>
+                                <th>Success</th>
+                                <th>Failed</th>
+                                <th>Rate</th>
+                                <th>Avg Score</th>
+                                <th>Effectiveness</th>
+                            </tr>
+                        </thead>
+                        <tbody id="gene-eff-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Signal Frequency -->
+            <div class="glass-card">
+                <h3 style="margin-bottom: 1rem;">Top Signals</h3>
+                <p style="color: var(--text-muted); font-size: 0.75rem; margin-bottom: 1rem;">Most frequently triggered signals across all evolutions</p>
+                <div id="signal-freq-container"></div>
+            </div>
+
+            <!-- Capsule Reuse Table -->
+            <div class="glass-card">
+                <h3 style="margin-bottom: 1rem;">Capsule Reuse</h3>
+                <div style="overflow-x: auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Capsule ID</th>
+                                <th>Gene</th>
+                                <th>Reuse Count</th>
+                                <th>Success When Reused</th>
+                                <th>Confidence</th>
+                            </tr>
+                        </thead>
+                        <tbody id="capsule-reuse-tbody"></tbody>
+                    </table>
+                </div>
+                <div id="capsule-reuse-empty" style="display:none; color: var(--text-muted); text-align: center; padding: 1.5rem; font-size: 0.85rem;">
+                    No capsule reuse events recorded yet.
                 </div>
             </div>
         </div>
@@ -888,12 +1287,18 @@
             if(hash === 'genes') loadGenes();
             if(hash === 'capsules') loadCapsules();
             if(hash === 'events') loadEvents();
+            if(hash === 'approvals') loadApprovals();
+            if(hash === 'analytics') loadAnalytics();
         }
         window.addEventListener('hashchange', handleRoute);
 
         // --- Utils ---
+        function getApiKey() {
+            return document.getElementById('api-key').value || '';
+        }
+
         function getHeaders() {
-            const token = document.getElementById('api-key').value;
+            const token = getApiKey();
             return {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`
@@ -1558,6 +1963,353 @@
             } catch(e) {}
             closeModal('modal-confirm');
         });
+
+        // --- Approvals ---
+        let approvalsCache = [];
+
+        async function loadApprovals() {
+            const container = document.getElementById('approvals-list');
+            container.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-muted)">Loading...</div>';
+            try {
+                const res = await fetch('/api/v1/pending', {
+                    headers: { 'Authorization': 'Bearer ' + getApiKey() }
+                });
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    container.innerHTML = '<div class="approval-none">' + (err.error || 'Request failed: ' + res.status) + '</div>';
+                    return;
+                }
+                const data = await res.json();
+                approvalsCache = data.items || [];
+                renderApprovals(data);
+            } catch(e) {
+                container.innerHTML = '<div class="approval-none">Failed to load approvals: ' + e.message + '</div>';
+            }
+        }
+
+        function renderApprovals(data) {
+            const items = data.items || [];
+            const pending = items.filter(i => i.status === 'pending');
+            const approved = items.filter(i => i.status === 'approved');
+            const rejected = items.filter(i => i.status === 'rejected');
+
+            document.getElementById('approvals-pending-count').textContent = pending.length;
+            document.getElementById('approvals-approved-count').textContent = approved.length;
+            document.getElementById('approvals-rejected-count').textContent = rejected.length;
+
+            const container = document.getElementById('approvals-list');
+            if (items.length === 0) {
+                container.innerHTML = '<div class="approval-none">No approval requests yet.<br><span style="font-size:0.82rem">Evolution requests that exceed risk thresholds will appear here for review.</span></div>';
+                return;
+            }
+
+            container.innerHTML = items.map(item => {
+                const riskClass = 'risk-' + (item.blastRadius?.riskLevel || 'low');
+                const statusClass = 'status-' + item.status;
+                const signals = (item.signals || []).slice(0, 5);
+                const time = new Date(item.timestamp).toLocaleString();
+
+                return `<div class="approval-card ${statusClass}">
+                    <div class="approval-card-header">
+                        <span class="approval-gene">${escapeHtml(item.geneId)}</span>
+                        <div style="display:flex;gap:0.5rem;align-items:center">
+                            <span class="approval-risk ${riskClass}">${item.blastRadius?.riskLevel || 'unknown'}</span>
+                            <span style="font-size:0.75rem;padding:2px 8px;border-radius:12px;background:${item.status==='pending'?'rgba(245,158,11,0.15)':item.status==='approved'?'rgba(52,211,153,0.15)':'rgba(239,68,68,0.15)'};color:${item.status==='pending'?'#f59e0b':item.status==='approved'?'#34d399':'#ef4444'};font-weight:600">${item.status}</span>
+                        </div>
+                    </div>
+                    <div class="approval-meta">
+                        <span>📅 ${time}</span>
+                        <span>📁 ${item.changes_count || 0} files</span>
+                        <span>📊 ${item.blastRadius?.files || 0} files / ${item.blastRadius?.lines || 0} lines</span>
+                    </div>
+                    ${signals.length > 0 ? '<div class="approval-signals">' + signals.map(s => '<span class="approval-signal-tag">' + escapeHtml(s) + '</span>').join('') + '</div>' : ''}
+                    <div class="approval-actions">
+                        <button class="btn-view" onclick="viewApprovalDetail('${item.id}')">View Details</button>
+                        ${item.status === 'pending' ? `
+                            <button class="btn-reject" onclick="rejectApproval('${item.id}')">Reject</button>
+                            <button class="btn-approve" onclick="approveApproval('${item.id}')">Approve</button>
+                        ` : ''}
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        async function viewApprovalDetail(id) {
+            const modal = document.getElementById('approval-modal');
+            const body = document.getElementById('modal-body');
+            const footer = document.getElementById('modal-footer');
+            const title = document.getElementById('modal-title');
+
+            body.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-muted)">Loading details...</div>';
+            footer.innerHTML = '';
+            modal.style.display = 'flex';
+
+            try {
+                const res = await fetch('/api/v1/pending/' + id, {
+                    headers: { 'Authorization': 'Bearer ' + getApiKey() }
+                });
+                const item = await res.json();
+
+                title.textContent = 'Evolution: ' + (item.geneId || 'Unknown');
+
+                let html = '';
+                html += '<div style="margin-bottom:1rem">';
+                html += '<div style="display:flex;gap:1.5rem;flex-wrap:wrap;font-size:0.85rem;color:var(--text-muted);margin-bottom:0.75rem">';
+                html += '<span><strong>Status:</strong> ' + item.status + '</span>';
+                html += '<span><strong>Risk:</strong> <span class="approval-risk risk-' + (item.blastRadius?.riskLevel||'low') + '">' + (item.blastRadius?.riskLevel||'?') + '</span></span>';
+                html += '<span><strong>Files:</strong> ' + (item.blastRadius?.files||0) + '</span>';
+                html += '<span><strong>Lines:</strong> ' + (item.blastRadius?.lines||0) + '</span>';
+                html += '<span><strong>Confidence:</strong> ' + ((item.confidence||0)*100).toFixed(0) + '%</span>';
+                html += '</div>';
+
+                if (item.signals && item.signals.length) {
+                    html += '<div class="approval-signals">';
+                    item.signals.forEach(s => {
+                        html += '<span class="approval-signal-tag">' + escapeHtml(s) + '</span>';
+                    });
+                    html += '</div>';
+                }
+                html += '</div>';
+
+                html += '<div class="title" style="font-size:0.95rem;margin-bottom:0.75rem">Code Changes (' + (item.changes||[]).length + ' files)</div>';
+                (item.changes || []).forEach(c => {
+                    html += '<div class="change-file-block">';
+                    html += '<div class="change-file-header">';
+                    html += '<span>' + escapeHtml(c.file) + '</span>';
+                    html += '<span class="change-file-op op-' + c.operation + '">' + c.operation + '</span>';
+                    html += '</div>';
+                    html += '<div class="change-code">' + escapeHtml(c.content) + '</div>';
+                    if (c.reasoning) {
+                        html += '<div class="change-reasoning">💡 ' + escapeHtml(c.reasoning) + '</div>';
+                    }
+                    html += '</div>';
+                });
+
+                body.innerHTML = html;
+
+                if (item.status === 'pending') {
+                    footer.innerHTML = `
+                        <button class="btn-reject" onclick="rejectApproval('${id}');closeApprovalModal()">Reject</button>
+                        <button class="btn-approve" onclick="approveApproval('${id}');closeApprovalModal()">Approve</button>
+                    `;
+                } else {
+                    footer.innerHTML = '<span style="color:var(--text-muted);font-size:0.85rem">Resolved at: ' + (item.resolvedAt || '-') + '</span>';
+                }
+            } catch(e) {
+                body.innerHTML = '<div class="approval-none">Failed to load details: ' + e.message + '</div>';
+            }
+        }
+
+        function closeApprovalModal() {
+            document.getElementById('approval-modal').style.display = 'none';
+        }
+
+        document.getElementById('approval-modal').addEventListener('click', function(e) {
+            if (e.target === this) closeApprovalModal();
+        });
+
+        async function approveApproval(id) {
+            if (!confirm('Approve this evolution? Changes will be recorded.')) return;
+            try {
+                const res = await fetch('/api/v1/pending/' + id + '/approve', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + getApiKey() }
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    alert('Approved! Event: ' + data.event_id);
+                    loadApprovals();
+                } else {
+                    alert('Error: ' + (data.error || data.message));
+                }
+            } catch(e) {
+                alert('Failed: ' + e.message);
+            }
+        }
+
+        async function rejectApproval(id) {
+            if (!confirm('Reject this evolution?')) return;
+            try {
+                const res = await fetch('/api/v1/pending/' + id + '/reject', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + getApiKey() }
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    loadApprovals();
+                } else {
+                    alert('Error: ' + (data.error || data.message));
+                }
+            } catch(e) {
+                alert('Failed: ' + e.message);
+            }
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        }
+
+        // --- Analytics ---
+        async function loadAnalytics() {
+            try {
+                const allEvents = await fetchAllEvents();
+                const capsules = await fetchAllCapsulesForAnalytics();
+                renderAnalytics(allEvents, capsules);
+            } catch(e) {
+                console.error('Analytics load error:', e);
+            }
+        }
+
+        async function fetchAllEvents() {
+            const events = [];
+            let offset = 0;
+            const batchSize = 500;
+            while (true) {
+                const res = await api(`/events?limit=${batchSize}&offset=${offset}`);
+                if (!res.events || res.events.length === 0) break;
+                events.push(...res.events);
+                if (events.length >= res.total) break;
+                offset += batchSize;
+            }
+            return events;
+        }
+
+        async function fetchAllCapsulesForAnalytics() {
+            try {
+                const res = await api('/capsules');
+                return res.capsules || [];
+            } catch { return []; }
+        }
+
+        function renderAnalytics(events, capsules) {
+            if (!events.length) {
+                document.getElementById('kpi-total').textContent = '0';
+                document.getElementById('kpi-success-rate').textContent = '-';
+                document.getElementById('kpi-avg-score').textContent = '-';
+                document.getElementById('kpi-capsule-reuse').textContent = '-';
+                document.getElementById('kpi-genes-active').textContent = '0';
+                document.getElementById('trend-chart').innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;padding:1rem;">No evolution events yet. Run some evolutions to see analytics.</div>';
+                document.getElementById('gene-eff-tbody').innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);">No data</td></tr>';
+                document.getElementById('signal-freq-container').innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;">No data</div>';
+                document.getElementById('capsule-reuse-tbody').innerHTML = '';
+                document.getElementById('capsule-reuse-empty').style.display = 'block';
+                return;
+            }
+
+            // --- KPIs ---
+            const total = events.length;
+            const successes = events.filter(e => e.outcome?.status === 'success').length;
+            const successRate = total > 0 ? (successes / total * 100).toFixed(1) : '0';
+            const avgScore = total > 0
+                ? (events.reduce((sum, e) => sum + (e.outcome?.score || 0), 0) / total * 100).toFixed(0)
+                : '0';
+            const capsuleReuses = events.filter(e => e.used_capsule).length;
+            const reuseRate = total > 0 ? (capsuleReuses / total * 100).toFixed(0) : '0';
+            const activeGenes = new Set(events.map(e => e.selected_gene)).size;
+
+            document.getElementById('kpi-total').textContent = total;
+            document.getElementById('kpi-success-rate').textContent = successRate + '%';
+            document.getElementById('kpi-avg-score').textContent = avgScore + '%';
+            document.getElementById('kpi-capsule-reuse').textContent = reuseRate + '%';
+            document.getElementById('kpi-genes-active').textContent = activeGenes;
+
+            // --- Trend Chart (last 30 events, chronological) ---
+            const trendEvents = events.slice(-30).reverse();
+            const maxScore = Math.max(...trendEvents.map(e => e.outcome?.score || 0), 0.01);
+            const chartHtml = trendEvents.map(e => {
+                const score = e.outcome?.score || 0;
+                const pct = Math.max(10, (score / maxScore) * 100);
+                const status = e.outcome?.status || 'skipped';
+                const title = `${e.selected_gene || 'N/A'}\nStatus: ${status}\nScore: ${(score * 100).toFixed(0)}%\n${new Date(e.timestamp).toLocaleString()}`;
+                return `<div class="trend-bar" data-status="${status}" style="height:${pct}%;" title="${title}"></div>`;
+            }).join('');
+            document.getElementById('trend-chart').innerHTML = chartHtml;
+
+            // --- Gene Effectiveness ---
+            const geneMap = {};
+            events.forEach(e => {
+                const gid = e.selected_gene || 'unknown';
+                if (!geneMap[gid]) geneMap[gid] = { hits: 0, success: 0, failed: 0, partial: 0, skipped: 0, totalScore: 0 };
+                geneMap[gid].hits++;
+                geneMap[gid][e.outcome?.status || 'skipped']++;
+                geneMap[gid].totalScore += (e.outcome?.score || 0);
+            });
+
+            const geneRows = Object.entries(geneMap)
+                .sort((a, b) => b[1].hits - a[1].hits)
+                .map(([gid, g]) => {
+                    const rate = g.hits > 0 ? (g.success / g.hits * 100).toFixed(0) : '0';
+                    const avg = g.hits > 0 ? (g.totalScore / g.hits * 100).toFixed(0) : '0';
+                    const rateNum = parseFloat(rate);
+                    const effClass = rateNum >= 70 ? 'high' : rateNum >= 40 ? 'mid' : 'low';
+                    return `<tr>
+                        <td><strong class="clickable-id" onclick="openGeneDetail('${gid}','view')">${gid}</strong></td>
+                        <td>${g.hits}</td>
+                        <td style="color:#22c55e;">${g.success}</td>
+                        <td style="color:#ef4444;">${g.failed}</td>
+                        <td>${rate}%</td>
+                        <td>${avg}%</td>
+                        <td style="min-width:120px;">
+                            <div class="eff-bar"><div class="eff-bar-fill ${effClass}" style="width:${rate}%;"></div></div>
+                        </td>
+                    </tr>`;
+                }).join('');
+            document.getElementById('gene-eff-tbody').innerHTML = geneRows || '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);">No data</td></tr>';
+
+            // --- Signal Frequency ---
+            const signalCount = {};
+            events.forEach(e => {
+                (e.signals || []).forEach(s => {
+                    signalCount[s] = (signalCount[s] || 0) + 1;
+                });
+            });
+            const topSignals = Object.entries(signalCount).sort((a, b) => b[1] - a[1]).slice(0, 15);
+            const maxSignalCount = topSignals.length > 0 ? topSignals[0][1] : 1;
+            const signalHtml = topSignals.map(([sig, count]) => {
+                const pct = (count / maxSignalCount * 100).toFixed(0);
+                return `<div class="signal-freq-row">
+                    <span class="signal-freq-label" title="${sig}">${sig}</span>
+                    <div class="signal-freq-bar-container"><div class="signal-freq-bar" style="width:${pct}%;"></div></div>
+                    <span class="signal-freq-count">${count}</span>
+                </div>`;
+            }).join('');
+            document.getElementById('signal-freq-container').innerHTML = signalHtml || '<div style="color:var(--text-muted);font-size:0.85rem;">No signals recorded</div>';
+
+            // --- Capsule Reuse ---
+            const capsuleUseMap = {};
+            events.forEach(e => {
+                if (e.used_capsule) {
+                    if (!capsuleUseMap[e.used_capsule]) capsuleUseMap[e.used_capsule] = { count: 0, success: 0, gene: e.selected_gene };
+                    capsuleUseMap[e.used_capsule].count++;
+                    if (e.outcome?.status === 'success') capsuleUseMap[e.used_capsule].success++;
+                }
+            });
+
+            const capsuleLookup = {};
+            capsules.forEach(c => { capsuleLookup[c.id] = c; });
+
+            const capsuleReuseEntries = Object.entries(capsuleUseMap).sort((a, b) => b[1].count - a[1].count);
+            if (capsuleReuseEntries.length > 0) {
+                document.getElementById('capsule-reuse-empty').style.display = 'none';
+                const capsuleRows = capsuleReuseEntries.map(([cid, info]) => {
+                    const cap = capsuleLookup[cid];
+                    const conf = cap ? (cap.confidence * 100).toFixed(0) + '%' : '-';
+                    const successWhenReused = info.count > 0 ? (info.success / info.count * 100).toFixed(0) + '%' : '-';
+                    return `<tr>
+                        <td><strong class="clickable-id" onclick="openCapsuleDetail('${cid}','view')">${cid.length > 28 ? cid.slice(0, 28) + '…' : cid}</strong></td>
+                        <td>${info.gene}</td>
+                        <td>${info.count}</td>
+                        <td>${successWhenReused}</td>
+                        <td>${conf}</td>
+                    </tr>`;
+                }).join('');
+                document.getElementById('capsule-reuse-tbody').innerHTML = capsuleRows;
+            } else {
+                document.getElementById('capsule-reuse-tbody').innerHTML = '';
+                document.getElementById('capsule-reuse-empty').style.display = 'block';
+            }
+        }
 
         // Initialize on load
         document.addEventListener('DOMContentLoaded', () => {

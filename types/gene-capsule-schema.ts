@@ -436,6 +436,9 @@ export interface EvolutionConfig {
   
   /** 低风险变更自动审批（跳过 approval gate） */
   autoApproveLowRisk?: boolean;
+  
+  /** 中等风险变更自动审批（测试环境用） */
+  autoApproveMediumRisk?: boolean;
 }
 
 // ============================================================================

@@ -179,6 +179,7 @@ export function requiresApproval(
     reviewMode: boolean;
     maxBlastRadius: { files: number; lines: number };
     autoApproveLowRisk: boolean;
+    autoApproveMediumRisk?: boolean;
   }
 ): boolean {
   if (config.reviewMode) return true;
@@ -187,6 +188,7 @@ export function requiresApproval(
   if (blastRadius.files > config.maxBlastRadius.files) return true;
   if (blastRadius.lines > config.maxBlastRadius.lines) return true;
   if (config.autoApproveLowRisk && blastRadius.riskLevel === 'low') return false;
+  if (config.autoApproveMediumRisk && blastRadius.riskLevel === 'medium') return false;
   return blastRadius.riskLevel !== 'low';
 }
 

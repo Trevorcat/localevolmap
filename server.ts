@@ -3,8 +3,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { LocalEvomap, DEFAULT_CONFIG } from './index';
 import type { Gene, Capsule, EvolutionEvent } from './types/gene-capsule-schema';
-import type { EvolutionResult } from './core/evolution-engine';
+import type { EvolutionResult, EvolutionChange } from './core/evolution-engine';
 import { LLMProviderError, ApprovalRequiredError } from './core/evolution-engine';
+import type { BlastRadiusEstimate } from './core/validation-gate';
 import { shouldReuseCapsule } from './core/capsule-manager';
 import { InvalidSignalContextError } from './core/signal-extractor';
 import { matchPatternToSignals, NoMatchingGeneError, AllGenesBannedError } from './core/gene-selector';
@@ -55,6 +56,24 @@ let dashboardState = {
 };
 
 let dashboardEventLog: Array<{time: string, msg: string}> = [];
+
+// Pending approval store
+interface PendingApproval {
+    id: string;
+    timestamp: string;
+    signals: string[];
+    geneId: string;
+    capsuleId?: string;
+    changes: EvolutionChange[];
+    blastRadius: BlastRadiusEstimate;
+    confidence: number;
+    logs: any[];
+    status: 'pending' | 'approved' | 'rejected';
+    resolvedAt?: string;
+    resolvedBy?: string;
+}
+
+const pendingApprovals = new Map<string, PendingApproval>();
 
 function logDashboardEvent(msg: string) {
     dashboardState.events++;
@@ -108,6 +127,7 @@ async function getEvomap(): Promise<LocalEvomap> {
             ? process.env.EVOMAP_REVIEW_MODE === 'true'
             : DEFAULT_CONFIG.review_mode;
         const autoApproveLowRisk = process.env.AUTO_APPROVE_LOW_RISK === 'true';
+        const autoApproveMediumRisk = process.env.AUTO_APPROVE_MEDIUM_RISK === 'true';
         const dryRun = process.env.EVOMAP_DRY_RUN === 'true';
         
         const config = {
@@ -117,6 +137,7 @@ async function getEvomap(): Promise<LocalEvomap> {
             events_path: eventsPath,
             review_mode: reviewMode,
             autoApproveLowRisk,
+            autoApproveMediumRisk,
             dryRun,
             ...(llmProvider && { llmProvider }),
             ...(llmModel && { llmModel }),
@@ -448,6 +469,31 @@ async function handleHubApi(
         if (req.method === 'POST' && pathname === '/api/v1/evolve') {
             await handleEvolve(req, res, evomap);
             return;
+        }
+        
+        // Pending approval endpoints
+        if (req.method === 'GET' && pathname === '/api/v1/pending') {
+            handlePendingList(req, res);
+            return;
+        }
+        
+        if (pathname.startsWith('/api/v1/pending/')) {
+            const parts = pathname.split('/');
+            const pendingId = parts[4];
+            const action = parts[5];
+            
+            if (req.method === 'GET' && !action) {
+                handlePendingGet(req, res, pendingId);
+                return;
+            }
+            if (req.method === 'POST' && action === 'approve') {
+                await handlePendingApprove(req, res, evomap, pendingId);
+                return;
+            }
+            if (req.method === 'POST' && action === 'reject') {
+                handlePendingReject(req, res, pendingId);
+                return;
+            }
         }
         
         // Signal extraction endpoint
@@ -1156,8 +1202,31 @@ async function handleEvolve(
             res.writeHead(502);
             res.end(JSON.stringify({ error: 'llm_failed', message: msg }));
         } else if (error instanceof ApprovalRequiredError) {
-            res.writeHead(403);
-            res.end(JSON.stringify({ error: 'approval_required', message: msg, blastRadius: error.blastRadius, changes: error.pendingChanges }));
+            const pendingId = `pending_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+            pendingApprovals.set(pendingId, {
+                id: pendingId,
+                timestamp: new Date().toISOString(),
+                signals: error.context?.signals || [],
+                geneId: error.context?.geneId || 'unknown',
+                capsuleId: error.context?.capsuleId,
+                changes: error.pendingChanges,
+                blastRadius: error.blastRadius,
+                confidence: error.context?.confidence || 0,
+                logs: parsed.logs,
+                status: 'pending'
+            });
+            res.writeHead(202);
+            res.end(JSON.stringify({
+                status: 'pending_approval',
+                pending_id: pendingId,
+                message: msg,
+                blastRadius: error.blastRadius,
+                changes_summary: error.pendingChanges.map(c => ({
+                    file: c.file, operation: c.operation,
+                    lines: c.content.split('\n').length,
+                    reasoning: c.reasoning
+                }))
+            }));
         } else if (error instanceof NoMatchingGeneError || error instanceof AllGenesBannedError) {
             res.writeHead(422);
             res.end(JSON.stringify({ error: 'no_matching_gene', message: msg }));
@@ -1470,6 +1539,201 @@ async function handleDistillStatus(
         res.writeHead(500);
         res.end(JSON.stringify({ error: 'Status check failed', detail: (error as Error).message }));
     }
+}
+
+/**
+ * List pending approvals
+ */
+function handlePendingList(
+    req: http.IncomingMessage,
+    res: http.ServerResponse
+): void {
+    if (!checkApiKey(req)) {
+        res.writeHead(401);
+        res.end(JSON.stringify({ error: 'Authentication required' }));
+        return;
+    }
+    
+    const items = Array.from(pendingApprovals.values())
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    
+    res.writeHead(200);
+    res.end(JSON.stringify({
+        total: items.length,
+        pending: items.filter(i => i.status === 'pending').length,
+        items: items.map(item => ({
+            id: item.id,
+            timestamp: item.timestamp,
+            status: item.status,
+            geneId: item.geneId,
+            signals: item.signals.slice(0, 5),
+            blastRadius: item.blastRadius,
+            changes_count: item.changes.length,
+            resolvedAt: item.resolvedAt
+        }))
+    }));
+}
+
+/**
+ * Get pending approval details
+ */
+function handlePendingGet(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    pendingId: string
+): void {
+    if (!checkApiKey(req)) {
+        res.writeHead(401);
+        res.end(JSON.stringify({ error: 'Authentication required' }));
+        return;
+    }
+    
+    const item = pendingApprovals.get(pendingId);
+    if (!item) {
+        res.writeHead(404);
+        res.end(JSON.stringify({ error: 'Pending approval not found' }));
+        return;
+    }
+    
+    res.writeHead(200);
+    res.end(JSON.stringify(item));
+}
+
+/**
+ * Approve a pending evolution
+ */
+async function handlePendingApprove(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    evomap: LocalEvomap,
+    pendingId: string
+): Promise<void> {
+    if (!checkApiKey(req)) {
+        res.writeHead(401);
+        res.end(JSON.stringify({ error: 'Authentication required' }));
+        return;
+    }
+    
+    const item = pendingApprovals.get(pendingId);
+    if (!item) {
+        res.writeHead(404);
+        res.end(JSON.stringify({ error: 'Pending approval not found' }));
+        return;
+    }
+    if (item.status !== 'pending') {
+        res.writeHead(409);
+        res.end(JSON.stringify({ error: `Already ${item.status}`, resolvedAt: item.resolvedAt }));
+        return;
+    }
+    
+    try {
+        const totalLinesAdded = item.changes.reduce(
+            (sum, c) => sum + c.content.split('\n').length, 0
+        );
+        const totalLinesRemoved = item.changes
+            .filter(c => c.operation === 'delete')
+            .reduce((sum, c) => sum + c.content.split('\n').length, 0);
+        
+        const outcomeScore = Math.max(0, Math.min(0.95,
+            (item.confidence * 0.6) + (1 * 0.4) -
+            (item.blastRadius.riskLevel === 'high' ? 0.15 : item.blastRadius.riskLevel === 'medium' ? 0.05 : 0)
+        ));
+        
+        const event: EvolutionEvent = {
+            id: `event_approved_${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            signals: item.signals,
+            selected_gene: item.geneId,
+            used_capsule: item.capsuleId,
+            outcome: {
+                status: 'success',
+                score: Number(outcomeScore.toFixed(4)),
+                changes: {
+                    files_modified: item.changes.length,
+                    lines_added: totalLinesAdded,
+                    lines_removed: totalLinesRemoved
+                }
+            },
+            validation: {
+                passed: true,
+                commands_run: 0
+            },
+            metadata: {
+                session_id: 'approval',
+                iteration: 0,
+                blast_radius: {
+                    files: item.blastRadius.files,
+                    lines: item.blastRadius.lines,
+                    risk_level: item.blastRadius.riskLevel
+                },
+                approved_from: pendingId,
+                warnings: []
+            }
+        };
+        
+        await evomap['eventLogger'].append(event);
+        
+        const capsule = normalizeCapsule({
+            trigger: item.signals.slice(0, 10),
+            gene: item.geneId,
+            summary: `Approved evolution (${item.blastRadius.riskLevel} risk)`,
+            confidence: Math.max(0.7, outcomeScore),
+            blast_radius: {
+                files: item.changes.length,
+                lines: totalLinesAdded
+            },
+            outcome: { status: 'success', score: outcomeScore }
+        });
+        await evomap.addCapsule(capsule);
+        
+        item.status = 'approved';
+        item.resolvedAt = new Date().toISOString();
+        
+        res.writeHead(200);
+        res.end(JSON.stringify({
+            message: 'Evolution approved and recorded',
+            event_id: event.id,
+            capsule_id: capsule.id,
+            outcome_score: outcomeScore
+        }));
+    } catch (error) {
+        console.error('[Hub API] Approve error:', error);
+        res.writeHead(500);
+        res.end(JSON.stringify({ error: 'Approval failed', detail: (error as Error).message }));
+    }
+}
+
+/**
+ * Reject a pending evolution
+ */
+function handlePendingReject(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    pendingId: string
+): void {
+    if (!checkApiKey(req)) {
+        res.writeHead(401);
+        res.end(JSON.stringify({ error: 'Authentication required' }));
+        return;
+    }
+    
+    const item = pendingApprovals.get(pendingId);
+    if (!item) {
+        res.writeHead(404);
+        res.end(JSON.stringify({ error: 'Pending approval not found' }));
+        return;
+    }
+    if (item.status !== 'pending') {
+        res.writeHead(409);
+        res.end(JSON.stringify({ error: `Already ${item.status}`, resolvedAt: item.resolvedAt }));
+        return;
+    }
+    
+    item.status = 'rejected';
+    item.resolvedAt = new Date().toISOString();
+    
+    res.writeHead(200);
+    res.end(JSON.stringify({ message: 'Evolution rejected', id: pendingId }));
 }
 
 server.listen(PORT, HOST, () => {

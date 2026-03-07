@@ -565,7 +565,8 @@ export class LocalEvomap {
     return requiresApproval(blastRadius, {
       reviewMode: this.config.review_mode,
       maxBlastRadius: this.config.max_blast_radius,
-      autoApproveLowRisk: this.config.autoApproveLowRisk ?? false
+      autoApproveLowRisk: this.config.autoApproveLowRisk ?? false,
+      autoApproveMediumRisk: this.config.autoApproveMediumRisk ?? false
     });
   }
   
