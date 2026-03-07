@@ -496,15 +496,12 @@ describe('Signal Extractor', () => {
   // ============================================================================
   
   describe('extractSignals - Edge Cases', () => {
-    it('should handle empty logs', () => {
+    it('should reject completely empty context', () => {
       const context: SignalContext = {
         logs: []
       };
-      
-      const result = extractSignals(context);
-      expect(result.signals).toHaveLength(0);
-      expect(result.prioritySignals).toHaveLength(0);
-      expect(result.rawSignals).toHaveLength(0);
+
+      expect(() => extractSignals(context)).toThrow('logs or history is required');
     });
 
     it('should handle logs with no errors or signals', () => {

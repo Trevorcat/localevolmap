@@ -185,7 +185,7 @@ npx ts-node examples/hub-server.ts
 ```
 🚀 Capsule Hub Server running
    Port: 3000
-   API Key: test-api-key
+   API Key: YOUR_API_KEY
 
 📋 Available endpoints:
    GET  /health
@@ -252,7 +252,7 @@ curl "http://localhost:3000/api/v1/capsules/search?signals=error&limit=10"
 curl http://localhost:3000/api/v1/capsules/capsule_type_error_fix
 
 # 下载胶囊（需要 API 密钥）
-curl -H "Authorization: Bearer test-api-key" \
+curl -H "Authorization: Bearer YOUR_API_KEY" \
      http://localhost:3000/api/v1/capsules/capsule_type_error_fix/download
 ```
 
@@ -353,7 +353,7 @@ console.log('External sources:', config.externalSources);
 
 // 手动测试下载
 fetch('http://localhost:3000/api/v1/capsules/capsule_123/download', {
-  headers: { 'Authorization': 'Bearer test-api-key' }
+  headers: { 'Authorization': 'Bearer YOUR_API_KEY' }
 })
   .then(r => r.json())
   .then(console.log);

@@ -5,13 +5,13 @@ set -euo pipefail
 # Supports: Claude Code, OpenCode, OpenAI Codex
 #
 # Usage:
-#   curl -sL http://10.104.11.12:3000/install.sh | bash
-#   curl -sL http://10.104.11.12:3000/install.sh | bash -s -- --client claude
-#   curl -sL http://10.104.11.12:3000/install.sh | bash -s -- --client opencode
-#   curl -sL http://10.104.11.12:3000/install.sh | bash -s -- --client codex
-#   curl -sL http://10.104.11.12:3000/install.sh | bash -s -- --project   # install to current project only
+#   curl -sL http://your-server.example.com:3000/install.sh | bash
+#   curl -sL http://your-server.example.com:3000/install.sh | bash -s -- --client claude
+#   curl -sL http://your-server.example.com:3000/install.sh | bash -s -- --client opencode
+#   curl -sL http://your-server.example.com:3000/install.sh | bash -s -- --client codex
+#   curl -sL http://your-server.example.com:3000/install.sh | bash -s -- --project   # install to current project only
 
-SERVER="http://10.104.11.12:3000"
+SERVER="http://your-server.example.com:3000"
 CLIENT=""
 PROJECT_ONLY=false
 

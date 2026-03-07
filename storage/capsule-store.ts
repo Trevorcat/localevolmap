@@ -7,6 +7,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import type { Capsule, Signal } from '../types/gene-capsule-schema';
+import { matchPatternToSignals } from '../core/gene-selector';
 
 export class CapsuleStore {
   constructor(private basePath: string) {}
@@ -79,6 +80,7 @@ export class CapsuleStore {
    * 更新胶囊
    */
   async update(capsule: Capsule): Promise<void> {
+    await fs.mkdir(this.basePath, { recursive: true });
     const filePath = path.join(this.basePath, `${this.sanitizeId(capsule.id)}.json`);
     const content = JSON.stringify(capsule, null, 2);
     await fs.writeFile(filePath, content, 'utf-8');
@@ -107,7 +109,7 @@ export class CapsuleStore {
     
     for (const capsule of capsules) {
       const matchCount = capsule.trigger.filter(t => 
-        signals.some(s => s.toLowerCase().includes(t.toLowerCase().split('|')[0].trim()))
+        matchPatternToSignals(t, signals)
       ).length;
       
       if (matchCount > 0) {

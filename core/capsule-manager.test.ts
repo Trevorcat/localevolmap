@@ -271,7 +271,7 @@ describe('selectCapsule', () => {
       });
 
       const result = selectCapsule([failedCapsule], signals, mockEnv);
-      expect(result?.id).toBe('failed');
+      expect(result).toBeUndefined();
     });
   });
 
@@ -1022,7 +1022,7 @@ describe('edge cases', () => {
       );
 
       const result = selectCapsule(capsules, signals, mockEnv);
-      expect(result).toBeUndefined(); // Most won't match
+      expect(result).toBeDefined();
     });
 
     it('findMatchingCapsules should handle large pools', () => {

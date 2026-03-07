@@ -437,7 +437,7 @@
         </div>
         <div class="api-key-section">
             <label style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">API Token</label>
-            <input type="password" id="api-key" value="test-api-key" placeholder="Bearer Token">
+            <input type="password" id="api-key" value="" placeholder="Set API token">
         </div>
     </nav>
 
@@ -477,7 +477,7 @@
             <div class="glass-card">
                 <div class="table-header">
                     <div class="search-bar">
-                        <input type="text" id="gene-search" placeholder="Search ID or signal..." onchange="loadGenes()">
+                        <input type="text" id="gene-search" placeholder="Search ID or signal..." oninput="state.genePage=1; loadGenes()">
                     </div>
                 </div>
                 <div style="overflow-x: auto;">
@@ -511,7 +511,7 @@
             <div class="glass-card">
                 <div class="table-header">
                     <div class="search-bar">
-                        <input type="text" id="capsule-search" placeholder="Search signals or gene..." onchange="loadCapsules()">
+                        <input type="text" id="capsule-search" placeholder="Search signals or gene..." oninput="state.capsulePage=1; loadCapsules()">
                     </div>
                 </div>
                 <div style="overflow-x: auto;">
@@ -541,6 +541,11 @@
         <div id="page-events" class="page">
             <div class="title">Evolution Logs</div>
             <div class="glass-card">
+                <div class="table-header" style="margin-bottom: 1rem;">
+                    <div class="search-bar">
+                        <input type="text" id="event-search" placeholder="Search gene, status, signal..." oninput="state.eventPage=1; loadEvents()">
+                    </div>
+                </div>
                 <div class="timeline" id="events-timeline">
                 </div>
                 <div class="pagination">
@@ -841,6 +846,20 @@
     <div id="toast-container"></div>
 
     <script>
+        // --- Toggle JSON Details ---
+        function toggleJson(id) {
+            const el = document.getElementById(id);
+            const arrow = document.getElementById(id + '-arrow');
+            if (!el) return;
+            if (el.style.display === 'none') {
+                el.style.display = 'block';
+                if (arrow) arrow.textContent = '▼ hide';
+            } else {
+                el.style.display = 'none';
+                if (arrow) arrow.textContent = '▶ details';
+            }
+        }
+
         // --- State ---
         const API_BASE = '/api/v1';
         let state = {
@@ -964,7 +983,7 @@
                         tl.innerHTML += `
                             <div class="timeline-item">
                                 <span class="timeline-time">${new Date(ev.timestamp).toLocaleString()}</span>
-                                <div class="timeline-content">${ev.type}: ${ev.id || 'N/A'}</div>
+                                <div class="timeline-content">${ev.selected_gene || 'evolution'} — ${ev.outcome?.status || 'N/A'}</div>
                             </div>
                         `;
                     });
@@ -1047,19 +1066,29 @@
 
         // --- Events ---
         async function loadEvents() {
+            const q = document.getElementById('event-search')?.value || '';
             const offset = (state.eventPage - 1) * state.limit;
             try {
-                const res = await api(`/events?limit=${state.limit}&offset=${offset}`);
+                const res = await api(`/events?q=${encodeURIComponent(q)}&limit=${state.limit}&offset=${offset}`);
                 const tl = document.getElementById('events-timeline');
                 tl.innerHTML = '';
                 if(res.events && res.events.length > 0) {
                     res.events.forEach((ev) => {
+                        const evId = ev.id || 'N/A';
+                        const geneName = ev.selected_gene || evId;
+                        const status = ev.outcome?.status || 'unknown';
+                        const score = ev.outcome?.score != null ? (ev.outcome.score * 100).toFixed(0) + '%' : '-';
+                        const jsonStr = JSON.stringify(ev, null, 2);
+                        const toggleId = 'evt-' + evId.replace(/[^a-zA-Z0-9]/g, '_');
                         tl.innerHTML += `
                             <div class="timeline-item">
                                 <span class="timeline-time">${new Date(ev.timestamp).toLocaleString()}</span>
                                 <div class="timeline-content">
-                                    <strong>${ev.type}</strong> [${ev.id || 'N/A'}]<br>
-                                    <pre style="font-size:0.75rem; margin-top:0.5rem; color:var(--text-muted); white-space: pre-wrap; font-family: inherit;">${JSON.stringify(ev.details || ev, null, 2)}</pre>
+                                    <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="toggleJson('${toggleId}')">
+                                        <span><strong>${geneName}</strong> — <span class="badge">${status}</span> (score: ${score})</span>
+                                        <span style="font-size:0.75rem; color:var(--text-muted);" id="${toggleId}-arrow">▶ details</span>
+                                    </div>
+                                    <pre id="${toggleId}" style="display:none; font-size:0.75rem; margin-top:0.5rem; color:var(--text-muted); white-space: pre-wrap; font-family: inherit;">${jsonStr}</pre>
                                 </div>
                             </div>
                         `;

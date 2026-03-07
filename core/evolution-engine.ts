@@ -1,48 +1,58 @@
 /**
  * Evolution Engine - 进化引擎
- * 
- * 核心进化循环控制器
- * 编排信号提取、基因选择、胶囊匹配、验证和事件记录
  */
 
-import type { 
-  EvolutionConfig, 
-  Signal, 
-  EvolutionEvent, 
-  Gene, 
+import { execSync } from 'child_process';
+import * as path from 'path';
+import type {
+  EnvFingerprint,
+  EvolutionConfig,
+  EvolutionEvent,
+  Gene,
   Capsule,
-  EnvFingerprint 
+  OutcomeStatus,
+  Signal
 } from '../types/gene-capsule-schema';
-import { extractSignals, prioritizeSignals } from './signal-extractor';
-import { selectGene } from './gene-selector';
-import { selectCapsule, shouldReuseCapsule } from './capsule-manager';
-import { isValidationCommandAllowed, estimateBlastRadius, requiresApproval, executeValidation } from './validation-gate';
+import { extractSignals } from './signal-extractor';
+import { selectGene, banGenesFromFailedCapsules, NoMatchingGeneError, AllGenesBannedError } from './gene-selector';
+import { selectCapsule, shouldReuseCapsule, updateCapsuleFeedback } from './capsule-manager';
+import {
+  estimateBlastRadius,
+  requiresApproval,
+  executeValidation,
+  checkPathSafety,
+  isValidationCommandAllowed,
+  type BlastRadiusEstimate
+} from './validation-gate';
 import { LLMProvider } from './llm-provider';
+import { buildAutoGene } from './auto-gene-builder';
+import { applyEpigeneticMarks } from './epigenetic';
+import { shouldDistill, prepareDistillation, completeDistillation, type DistillationState } from './skill-distiller';
 import type { CapsuleStore } from '../storage/capsule-store';
-
-// ============================================================================
-// 进化引擎配置
-// ============================================================================
+import type { GeneStore } from '../storage/gene-store';
 
 export interface EvolutionEngineConfig extends EvolutionConfig {
-  // LLM 相关配置（实际实现需要）
   llmProvider?: 'openai' | 'anthropic' | 'local';
   llmModel?: string;
   llmApiKey?: string;
-  llmBaseURL?: string;  // 本地模型端点（Ollama/LM Studio）
-  
-  // 回滚策略
-  rollbackEnabled: boolean;
-  rollbackStrategy: 'full' | 'partial' | 'none';
-  
-  // 缓存策略
-  cacheEnabled: boolean;
-  cacheTtlMs: number;
-}
+  llmBaseURL?: string;
 
-// ============================================================================
-// 进化状态
-// ============================================================================
+  /**
+   * @planned — 回滚能力，预留接口，当前版本未实现。
+   * 计划在 v2.0 中支持进化失败后自动 git revert 或文件级还原。
+   */
+  rollbackEnabled?: boolean;
+  /** @planned — 回滚策略，依赖 rollbackEnabled，当前未实现 */
+  rollbackStrategy?: 'full' | 'partial' | 'none';
+
+  /**
+   * @planned — 基因/胶囊选择结果缓存，当前版本未实现。
+   * 计划在高频调用场景下缓存 selectGene / selectCapsule 结果以提升性能。
+   */
+  cacheEnabled?: boolean;
+  /** @planned — 缓存 TTL（毫秒），依赖 cacheEnabled，当前未实现 */
+  cacheTtlMs?: number;
+}
 
 export interface EvolutionChange {
   file: string;
@@ -67,6 +77,21 @@ export interface EvolutionResult {
   event: EvolutionEvent;
   changes: EvolutionChange[];
   capsule_created: string | null;
+  auto_gene_created?: boolean;
+  distillation_triggered?: boolean;
+  distilled_gene_id?: string | null;
+}
+
+interface EvolutionExecution {
+  changes: EvolutionChange[];
+  confidence: number;
+}
+
+interface ValidationCheckResult {
+  passed: boolean;
+  errors: string[];
+  warnings: string[];
+  commandsRun: number;
 }
 
 export class LLMProviderError extends Error {
@@ -76,20 +101,29 @@ export class LLMProviderError extends Error {
   }
 }
 
-// ============================================================================
-// 进化引擎
-// ============================================================================
+export class ApprovalRequiredError extends Error {
+  constructor(
+    public readonly blastRadius: BlastRadiusEstimate,
+    public readonly pendingChanges: EvolutionChange[]
+  ) {
+    super(`Approval required: ${blastRadius.riskLevel} risk level`);
+    this.name = 'ApprovalRequiredError';
+  }
+}
 
 export class EvolutionEngine {
   private state: EvolutionState;
   private genePool: Gene[] = [];
   private capsulePool: Capsule[] = [];
   private llmProvider?: LLMProvider;
-  
+  private failedCapsules: Array<{ gene: string; trigger: Signal[] }> = [];
+  private distillationState: DistillationState = { lastDistillationTime: 0 };
+
   constructor(
     private config: EvolutionEngineConfig,
     private eventLogger: EventLogger,
-    private capsuleStore?: CapsuleStore  // 可选：用于持久化胶囊
+    private capsuleStore?: CapsuleStore,
+    private geneStore?: GeneStore
   ) {
     this.state = {
       sessionId: config.session_scope || `session_${Date.now()}`,
@@ -101,147 +135,168 @@ export class EvolutionEngine {
       validationPassed: false,
       startTime: Date.now()
     };
-    
-    // 初始化 LLM Provider（如果配置了）
+
     if (config.llmProvider && config.llmModel) {
+      const apiKey = process.env.LLM_API_KEY || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY || config.llmApiKey;
       this.llmProvider = new LLMProvider({
         provider: config.llmProvider,
         model: config.llmModel,
-        apiKey: config.llmApiKey,
+        apiKey,
         baseURL: config.llmBaseURL
       });
+      delete this.config.llmApiKey;
     }
   }
-  
-  /**
-   * 设置基因池
-   */
+
   setGenePool(genes: Gene[]): void {
     this.genePool = genes;
   }
-  
-  /**
-   * 设置胶囊池
-   */
+
   setCapsulePool(capsules: Capsule[]): void {
     this.capsulePool = capsules;
   }
-  
-  /**
-   * 执行一次进化循环
-   */
+
   async evolve(
     logs: any[],
     overrides?: { dryRun?: boolean; strategy?: string }
   ): Promise<EvolutionResult> {
-    // 保存原始配置，在 finally 中恢复
     const savedDryRun = this.config.dryRun;
     const savedStrategy = this.config.strategy;
     if (overrides?.dryRun !== undefined) this.config.dryRun = overrides.dryRun;
-    if (overrides?.strategy !== undefined) {
-      this.config.strategy = overrides.strategy as EvolutionConfig['strategy'];
-    }
-    
-    this.state.iteration++;
+    if (overrides?.strategy !== undefined) this.config.strategy = overrides.strategy as EvolutionConfig['strategy'];
+
+    this.state.iteration += 1;
     this.state.startTime = Date.now();
-    
+
     try {
-      // 1. 信号提取
-      const { prioritySignals } = extractSignals({ logs });
+      const { prioritySignals } = extractSignals({ logs: logs as any });
       this.state.signals = prioritySignals;
-      
-      // 2. 基因选择
-      const { selected: gene, alternatives } = this.selectGene();
+
+      const { selected: gene, alternatives, autoGenerated } = this.selectGeneWithFallback();
       this.state.selectedGene = gene;
-      
-      // 3. 胶囊匹配
+
       const capsule = this.selectCapsule();
       this.state.selectedCapsule = capsule;
-      
-      // 4. 胶囊复用决策
-      const shouldReuse = capsule ? shouldReuseCapsule(capsule, this.state.signals) : null;
-      
-      // 5. 构建进化提示
-      const prompt = this.buildEvolutionPrompt({
+
+      const envFingerprint = this.getEnvFingerprint();
+      const reuseDecision = capsule ? shouldReuseCapsule(capsule, this.state.signals, envFingerprint) : null;
+      const basePrompt = this.buildEvolutionPrompt({
         signals: this.state.signals,
         gene,
         capsule,
-        shouldReuse,
+        shouldReuse: reuseDecision,
         alternatives
       });
-      
-      // 6. 执行进化（调用 LLM）
-      const changes = await this.executeEvolution(prompt);
-      this.state.changes = changes;
-      
-      // 7. 影响范围估算
-      const blastRadius = this.estimateBlastRadius(changes);
-      
-      // 8. 审批检查
-      const needsApproval = requiresApproval(blastRadius, {
-        reviewMode: this.config.review_mode,
-        maxBlastRadius: this.config.max_blast_radius,
-        autoApproveLowRisk: false
-      });
-      
-      if (needsApproval) {
-        throw new Error(`Approval required: ${blastRadius.riskLevel} risk level`);
+
+      let execution = await this.executeEvolution(basePrompt);
+      let blastRadius = this.estimateBlastRadius(execution.changes);
+      this.ensureApproval(blastRadius, execution.changes);
+
+      let validation = await this.validateChanges(gene, execution.changes);
+      if (!validation.passed && this.llmProvider && execution.changes.length > 0) {
+        const retryPrompt = this.buildRetryPrompt(basePrompt, validation.errors);
+        execution = await this.executeEvolution(retryPrompt);
+        blastRadius = this.estimateBlastRadius(execution.changes);
+        this.ensureApproval(blastRadius, execution.changes);
+        validation = await this.validateChanges(gene, execution.changes);
       }
-      
-      // 9. 验证
-      const validationPassed = await this.validateChanges(gene, changes);
-      this.state.validationPassed = validationPassed;
-      
-      // 10. 构建事件
+
+      this.state.changes = execution.changes;
+      this.state.validationPassed = validation.passed;
+
+      const outcomeStatus: OutcomeStatus = validation.passed ? 'success' : 'failed';
+      const outcomeScore = this.computeOutcomeScore({
+        validationPassed: validation.passed,
+        llmConfidence: execution.confidence,
+        blastRadius,
+        capsuleReused: Boolean(capsule && reuseDecision?.shouldReuse)
+      });
+
       const event = this.buildEvolutionEvent({
         gene,
         capsule,
-        changes,
+        changes: execution.changes,
         blastRadius,
-        validationPassed
+        validation,
+        outcomeScore
       });
-      
-      // 11. 记录事件
       await this.eventLogger.append(event);
-      
-      // 12. 如果成功，创建新胶囊
-      const capsule_created = (validationPassed && !capsule)
-        ? await this.createCapsuleFromSuccess(gene, changes, this.state.signals)
+
+      const capsuleCreated = validation.passed
+        ? await this.persistSuccessfulCapsule(gene, execution.changes, this.state.signals, outcomeScore, capsule)
         : null;
-      
+
+      applyEpigeneticMarks(gene, envFingerprint, outcomeStatus);
+
+      if (capsule && this.capsuleStore) {
+        const updatedCapsule = updateCapsuleFeedback(capsule, outcomeStatus, outcomeScore);
+        await this.capsuleStore.update(updatedCapsule);
+        this.capsulePool = this.capsulePool.map(candidate => candidate.id === updatedCapsule.id ? updatedCapsule : candidate);
+      }
+
+      if (this.geneStore) {
+        await this.geneStore.upsert(gene);
+        if (autoGenerated && !this.genePool.some(candidate => candidate.id === gene.id)) {
+          this.genePool.push(gene);
+        }
+      }
+
+      const distillResult = validation.passed
+        ? await this.tryDistillation()
+        : { triggered: false, geneId: null };
+
       this.state.endTime = Date.now();
-      return { event, changes: this.state.changes, capsule_created };
-      
+      return {
+        event,
+        changes: execution.changes,
+        capsule_created: capsuleCreated,
+        auto_gene_created: autoGenerated,
+        distillation_triggered: distillResult.triggered,
+        distilled_gene_id: distillResult.geneId
+      };
     } catch (error) {
-      // 失败事件
-      const errorEvent = this.buildErrorEvent(error as Error);
-      await this.eventLogger.append(errorEvent);
+      if (!(error instanceof ApprovalRequiredError) && this.state.selectedGene) {
+        this.failedCapsules.push({
+          gene: this.state.selectedGene.id,
+          trigger: this.state.signals
+        });
+      }
+
+      if (!(error instanceof ApprovalRequiredError)) {
+        const errorEvent = this.buildErrorEvent(error as Error);
+        await this.eventLogger.append(errorEvent);
+      }
       throw error;
     } finally {
-      // 恢复原始配置
       this.config.dryRun = savedDryRun;
       this.config.strategy = savedStrategy;
     }
   }
-  
-  /**
-   * 选择基因
-   */
-  private selectGene() {
-    return selectGene(this.genePool, this.state.signals, this.config.selection);
+
+  private selectGeneWithFallback(): { selected: Gene; alternatives: Gene[]; autoGenerated: boolean } {
+    const bannedGeneIds = banGenesFromFailedCapsules(this.failedCapsules, this.genePool);
+    const selectionOptions = {
+      ...this.config.selection,
+      bannedGeneIds,
+      envFingerprint: this.getEnvFingerprint()
+    };
+
+    try {
+      const result = selectGene(this.genePool, this.state.signals, selectionOptions);
+      return { ...result, autoGenerated: false };
+    } catch (error) {
+      if (error instanceof NoMatchingGeneError || error instanceof AllGenesBannedError) {
+        const autoGene = buildAutoGene({ signals: this.state.signals });
+        return { selected: autoGene, alternatives: [], autoGenerated: true };
+      }
+      throw error;
+    }
   }
-  
-  /**
-   * 选择胶囊
-   */
+
   private selectCapsule(): Capsule | null {
-    const env = this.getEnvFingerprint();
-    return selectCapsule(this.capsulePool, this.state.signals, env) || null;
+    return selectCapsule(this.capsulePool, this.state.signals, this.getEnvFingerprint()) || null;
   }
-  
-  /**
-   * 构建进化提示
-   */
+
   private buildEvolutionPrompt(opts: {
     signals: Signal[];
     gene: Gene;
@@ -250,167 +305,155 @@ export class EvolutionEngine {
     alternatives: Gene[];
   }): string {
     const { signals, gene, capsule, shouldReuse, alternatives } = opts;
-    
-    let prompt = `# Evolution Task\n\n`;
-    
-    // 信号
+    let prompt = '# Evolution Task\n\n';
     prompt += `## Detected Signals\n${signals.slice(0, 10).join(', ')}\n\n`;
-    
-    // 选择的基因
     prompt += `## Selected Gene: ${gene.id}\n`;
     prompt += `Category: ${gene.category}\n`;
-    prompt += `Strategy:\n${gene.strategy.map(s => `- ${s}`).join('\n')}\n\n`;
-    
-    // 约束
-    prompt += `## Constraints\n`;
+    prompt += `Strategy:\n${gene.strategy.map(step => `- ${step}`).join('\n')}\n\n`;
+    prompt += '## Constraints\n';
     prompt += `Max files: ${gene.constraints.max_files || 'unlimited'}\n`;
     prompt += `Max lines: ${gene.constraints.max_lines || 'unlimited'}\n`;
-    if (gene.constraints.forbidden_paths) {
-      prompt += `Forbidden: ${gene.constraints.forbidden_paths.join(', ')}\n`;
-    }
-    prompt += `\n`;
-    
-    // 相似胶囊
+    if (gene.constraints.forbidden_paths) prompt += `Forbidden: ${gene.constraints.forbidden_paths.join(', ')}\n`;
+    prompt += '\n';
+
     if (capsule) {
-      prompt += `## Similar Capsule Available\n`;
+      prompt += '## Similar Capsule Available\n';
       prompt += `ID: ${capsule.id}\n`;
       prompt += `Summary: ${capsule.summary}\n`;
       prompt += `Confidence: ${capsule.confidence}\n`;
       prompt += `Outcome: ${capsule.outcome.status} (score: ${capsule.outcome.score})\n`;
-      
       if (shouldReuse?.shouldReuse) {
-        prompt += `\n**RECOMMENDATION: Reuse this capsule**\n`;
-        prompt += `Reason: ${shouldReuse.reason}\n`;
+        prompt += `\n**RECOMMENDATION: Reuse this capsule**\nReason: ${shouldReuse.reason}\n`;
       }
-      prompt += `\n`;
+      prompt += '\n';
     }
-    
-    // 替代基因
+
     if (alternatives.length > 0) {
-      prompt += `## Alternative Genes\n`;
-      alternatives.forEach((alt, i) => {
-        prompt += `${i + 1}. ${alt.id} (${alt.category})\n`;
+      prompt += '## Alternative Genes\n';
+      alternatives.forEach((alternative, index) => {
+        prompt += `${index + 1}. ${alternative.id} (${alternative.category})\n`;
       });
-      prompt += `\n`;
+      prompt += '\n';
     }
-    
-    // 任务
-    prompt += `## Task\n`;
-    prompt += `Based on the signals and selected gene strategy, generate the necessary code changes.\n`;
-    prompt += `Follow the constraints strictly.\n`;
-    prompt += `If a similar capsule exists and is recommended for reuse, prefer reusing it.\n`;
-    
+
+    prompt += '## Task\n';
+    prompt += 'Based on the signals and selected gene strategy, generate the necessary code changes.\n';
+    prompt += 'Follow the constraints strictly.\n';
+    prompt += 'If a similar capsule exists and is recommended for reuse, prefer reusing it.\n';
     return prompt.trim();
   }
-  
-  /**
-   * 执行进化（调用 LLM）
-   * 
-   * 实现：
-   * 1. 调用 LLM Provider
-   * 2. 解析结构化输出
-   * 3. 路径安全验证
-   * 4. dry-run 支持
-   */
-  private async executeEvolution(prompt: string): Promise<EvolutionChange[]> {
-    // 如果没有配置 LLM，返回空变更（dry-run 模式）
+
+  private buildRetryPrompt(prompt: string, validationErrors: string[]): string {
+    return `${prompt}\n\n## Validation Feedback\n${validationErrors.map(error => `- ${error}`).join('\n')}\n\nRegenerate a smaller, safer patch that satisfies validation.`;
+  }
+
+  private async executeEvolution(prompt: string): Promise<EvolutionExecution> {
     if (!this.llmProvider) {
-      console.warn('[EvolutionEngine] No LLM provider configured, returning empty changes');
-      return [];
+      return { changes: [], confidence: 0.8 };
     }
 
     try {
-      // 调用 LLM 生成进化方案
       const output = await this.llmProvider.generateEvolution(prompt);
-      
-      console.log(`[EvolutionEngine] LLM generated ${output.changes.length} changes, confidence: ${output.confidence}`);
-      
-      // 路径安全验证：过滤掉 forbidden_paths
-      const safeChanges = output.changes.filter(change => {
-        const isSafe = !this.config.forbidden_paths.some(fp => 
-          change.file.includes(fp)
-        );
-        if (!isSafe) {
-          console.warn(`[Security] Blocked forbidden path: ${change.file}`);
-        }
-        return isSafe;
-      });
-      
-      // dry-run 模式：只记录，不写磁盘
       if (this.config.dryRun) {
-        console.log('[DryRun] Would apply changes:', safeChanges.map(c => `${c.operation} ${c.file}`));
+        console.log('[DryRun] Would apply changes:', output.changes.map(change => `${change.operation} ${change.file}`));
       }
-      
-      return safeChanges;
+      return {
+        changes: output.changes,
+        confidence: output.confidence ?? 0.75
+      };
     } catch (error) {
-      console.error('[EvolutionEngine] LLM generation failed:', error);
-      throw new LLMProviderError(
-        `LLM generation failed: ${(error as Error).message || 'Unknown error'}`,
-        error
-      );
+      throw new LLMProviderError(`LLM generation failed: ${(error as Error).message || 'Unknown error'}`, error);
     }
   }
-  
-  /**
-   * 估算影响范围
-   */
-  private estimateBlastRadius(changes: EvolutionChange[]) {
+
+  private estimateBlastRadius(changes: EvolutionChange[]): BlastRadiusEstimate {
     const linesPerFile = new Map<string, number>();
-    changes.forEach(c => {
-      linesPerFile.set(c.file, c.content.split('\n').length);
-    });
-    
-    return estimateBlastRadius(
-      changes.map(c => c.file),
-      linesPerFile,
-      this.config.forbidden_paths
-    );
+    changes.forEach(change => linesPerFile.set(change.file, change.content.split('\n').length));
+    return estimateBlastRadius(changes.map(change => change.file), linesPerFile, this.config.forbidden_paths);
   }
-  
-  /**
-   * 验证更改
-   */
-  private async validateChanges(gene: Gene, changes: EvolutionChange[]): Promise<boolean> {
-    // 1. 命令白名单检查
-    if (gene.validation) {
-      const allAllowed = gene.validation.every(cmd => 
-        isValidationCommandAllowed(cmd)
-      );
-      if (!allAllowed) return false;
+
+  private ensureApproval(blastRadius: BlastRadiusEstimate, changes: EvolutionChange[]): void {
+    const needsApproval = requiresApproval(blastRadius, {
+      reviewMode: this.config.review_mode,
+      maxBlastRadius: this.config.max_blast_radius,
+      autoApproveLowRisk: this.config.autoApproveLowRisk ?? false
+    });
+
+    if (needsApproval) {
+      throw new ApprovalRequiredError(blastRadius, changes);
     }
-    
-    // 2. 路径安全检查
-    const allPathsSafe = changes.every(c => 
-      !this.config.forbidden_paths.some(fp => c.file.includes(fp))
-    );
-    if (!allPathsSafe) return false;
-    
-    // 3. 执行验证命令
+  }
+
+  private async validateChanges(gene: Gene, changes: EvolutionChange[]): Promise<ValidationCheckResult> {
+    const errors: string[] = [];
+    const warnings: string[] = [];
+
+    if (gene.validation?.some(command => !isValidationCommandAllowed(command))) {
+      errors.push('Validation command rejected by security policy');
+      return { passed: false, errors, warnings, commandsRun: gene.validation?.length || 0 };
+    }
+
+    const pathCheck = checkPathSafety(changes.map(change => change.file), process.cwd(), this.config.forbidden_paths);
+    errors.push(...pathCheck.violations);
+    warnings.push(...pathCheck.warnings);
+    if (!pathCheck.safe) {
+      return { passed: false, errors, warnings, commandsRun: gene.validation?.length || 0 };
+    }
+
     if (gene.validation && gene.validation.length > 0) {
-      const result = await executeValidation(gene.validation, {
+      const validation = await executeValidation(gene.validation, {
         timeoutMs: 30000,
+        maxConcurrent: 3,
         failFast: false
       });
-      return result.passed;
+
+      validation.failures.forEach(failure => errors.push(failure.error));
+      return {
+        passed: validation.passed,
+        errors,
+        warnings,
+        commandsRun: validation.commandsRun
+      };
     }
-    
-    return true;
+
+    return { passed: true, errors, warnings, commandsRun: 0 };
   }
-  
-  /**
-   * 构建进化事件
-   */
+
+  private computeOutcomeScore(opts: {
+    validationPassed: boolean;
+    llmConfidence: number;
+    blastRadius: BlastRadiusEstimate;
+    capsuleReused: boolean;
+  }): number {
+    if (!opts.validationPassed) {
+      return 0;
+    }
+
+    const baseConfidence = Math.max(0, Math.min(1, opts.llmConfidence || 0.75));
+    const validationScore = 1;
+    const blastPenalty = opts.blastRadius.riskLevel === 'critical'
+      ? 0.3
+      : opts.blastRadius.riskLevel === 'high'
+        ? 0.15
+        : opts.blastRadius.riskLevel === 'medium'
+          ? 0.05
+          : 0;
+    const reuseBonus = opts.capsuleReused ? 0.03 : 0;
+
+    const score = (baseConfidence * 0.6) + (validationScore * 0.4) - blastPenalty + reuseBonus;
+    return Number(Math.max(0, Math.min(0.95, score)).toFixed(4));
+  }
+
   private buildEvolutionEvent(opts: {
     gene: Gene;
     capsule: Capsule | null;
     changes: EvolutionChange[];
-    blastRadius: ReturnType<typeof estimateBlastRadius>;
-    validationPassed: boolean;
+    blastRadius: BlastRadiusEstimate;
+    validation: ValidationCheckResult;
+    outcomeScore: number;
   }): EvolutionEvent {
-    const { gene, capsule, changes, blastRadius, validationPassed } = opts;
-    
-    const totalLinesAdded = changes.reduce((sum, c) => sum + c.content.split('\n').length, 0);
-    
+    const { gene, capsule, changes, blastRadius, validation, outcomeScore } = opts;
+    const totalLinesAdded = changes.reduce((sum, change) => sum + change.content.split('\n').length, 0);
     return {
       id: `event_${Date.now()}_${this.state.iteration}`,
       timestamp: new Date().toISOString(),
@@ -418,17 +461,18 @@ export class EvolutionEngine {
       selected_gene: gene.id,
       used_capsule: capsule?.id,
       outcome: {
-        status: validationPassed ? 'success' : 'failed',
-        score: validationPassed ? 0.9 : 0.0,
+        status: validation.passed ? 'success' : 'failed',
+        score: outcomeScore,
         changes: {
           files_modified: changes.length,
           lines_added: totalLinesAdded,
-          lines_removed: changes.filter(c => c.operation === 'delete').reduce((sum, c) => sum + c.content.split('\n').length, 0)
+          lines_removed: changes.filter(change => change.operation === 'delete').reduce((sum, change) => sum + change.content.split('\n').length, 0)
         }
       },
       validation: {
-        passed: validationPassed,
-        commands_run: gene.validation?.length || 0
+        passed: validation.passed,
+        commands_run: validation.commandsRun,
+        errors: validation.errors.length > 0 ? validation.errors : undefined
       },
       metadata: {
         session_id: this.state.sessionId,
@@ -437,14 +481,12 @@ export class EvolutionEngine {
           files: blastRadius.files,
           lines: blastRadius.lines,
           risk_level: blastRadius.riskLevel
-        }
+        },
+        warnings: validation.warnings
       }
     };
   }
-  
-  /**
-   * 构建错误事件
-   */
+
   private buildErrorEvent(error: Error): EvolutionEvent {
     return {
       id: `event_error_${Date.now()}`,
@@ -453,7 +495,7 @@ export class EvolutionEngine {
       selected_gene: this.state.selectedGene?.id || 'unknown',
       outcome: {
         status: 'failed',
-        score: 0.0,
+        score: 0,
         changes: { files_modified: 0, lines_added: 0, lines_removed: 0 }
       },
       validation: {
@@ -468,77 +510,117 @@ export class EvolutionEngine {
       }
     };
   }
-  
-  /**
-   * 从成功进化创建胶囊
-   */
-  private async createCapsuleFromSuccess(
+
+  private async tryDistillation(): Promise<{ triggered: boolean; geneId: string | null }> {
+    if (!this.geneStore || !this.capsuleStore || !this.llmProvider) {
+      return { triggered: false, geneId: null };
+    }
+
+    if (!shouldDistill(this.capsulePool, this.distillationState)) {
+      return { triggered: false, geneId: null };
+    }
+
+    try {
+      const outputDir = path.join(process.cwd(), '.evomap', 'distillation');
+      const request = await prepareDistillation(
+        this.capsulePool,
+        this.genePool,
+        outputDir,
+        { state: this.distillationState }
+      );
+      if (!request) {
+        return { triggered: false, geneId: null };
+      }
+
+      const { readFile } = await import('fs/promises');
+      const prompt = await readFile(request.promptFilePath, 'utf-8');
+      const llmResponse = await this.llmProvider.generateText(prompt);
+
+      const sourceCapsuleIds = this.capsulePool
+        .filter(c => c.outcome.status === 'success' && !c._deleted)
+        .slice(-20)
+        .map(c => c.id);
+
+      const result = completeDistillation(llmResponse.text, this.genePool, sourceCapsuleIds);
+      if (result.success && result.gene) {
+        await this.geneStore.upsert(result.gene);
+        this.genePool.push(result.gene);
+        return { triggered: true, geneId: result.gene.id };
+      }
+
+      return { triggered: true, geneId: null };
+    } catch (error) {
+      console.warn('[EvolutionEngine] Distillation failed (non-fatal):', (error as Error).message);
+      return { triggered: true, geneId: null };
+    }
+  }
+
+  private async persistSuccessfulCapsule(
     gene: Gene,
     changes: EvolutionChange[],
-    signals: Signal[]
+    signals: Signal[],
+    outcomeScore: number,
+    reusedCapsule: Capsule | null
   ): Promise<string | null> {
+    if (reusedCapsule) {
+      return reusedCapsule.id;
+    }
+
     const capsule: Capsule = {
       type: 'Capsule',
       schema_version: '1.5.0',
       id: `capsule_${Date.now()}`,
-      trigger: signals.slice(0, 5),
+      trigger: [...signals],
       gene: gene.id,
-      summary: `Auto-generated from successful evolution`,
-      confidence: 0.7,
+      summary: 'Auto-generated from successful evolution',
+      confidence: Math.max(0.7, outcomeScore),
       blast_radius: {
         files: changes.length,
-        lines: changes.reduce((sum, c) => sum + c.content.split('\n').length, 0)
+        lines: changes.reduce((sum, change) => sum + change.content.split('\n').length, 0)
       },
       outcome: {
         status: 'success',
-        score: 0.9
+        score: outcomeScore
       },
       env_fingerprint: this.getEnvFingerprint(),
       metadata: {
         created_at: new Date().toISOString(),
-        source: 'local'
+        source: 'local',
+        validated: true
       }
     };
-    
-    // 实际持久化到胶囊存储
-    if (this.capsuleStore) {
-      try {
-        await this.capsuleStore.add(capsule);
-        console.log(`[EvolutionEngine] Capsule persisted: ${capsule.id}`);
-        return capsule.id;
-      } catch (error) {
-        console.error(`[EvolutionEngine] Failed to persist capsule:`, error);
-        return null;
-      }
-    } else {
-      console.warn(`[EvolutionEngine] No capsule store configured, capsule not persisted: ${capsule.id}`);
+
+    if (!this.capsuleStore) {
       return null;
     }
+
+    await this.capsuleStore.add(capsule);
+    this.capsulePool.push(capsule);
+    return capsule.id;
   }
-  
-  /**
-   * 获取环境指纹
-   */
+
   private getEnvFingerprint(): EnvFingerprint {
     return {
       node_version: process.version,
       platform: process.platform as EnvFingerprint['platform'],
       arch: process.arch as EnvFingerprint['arch'],
-      working_dir: process.cwd()
+      working_dir: process.cwd(),
+      git_branch: this.getGitBranch()
     };
   }
-  
-  /**
-   * 获取当前状态
-   */
+
+  private getGitBranch(): string | undefined {
+    try {
+      return execSync('git rev-parse --abbrev-ref HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+    } catch {
+      return undefined;
+    }
+  }
+
   getState(): EvolutionState {
     return { ...this.state };
   }
 }
-
-// ============================================================================
-// 事件日志器接口
-// ============================================================================
 
 export interface EventLogger {
   append(event: EvolutionEvent): Promise<void>;

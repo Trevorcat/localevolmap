@@ -17,10 +17,16 @@ import { GeneStore } from './storage/gene-store';
 import { CapsuleStore } from './storage/capsule-store';
 import { EventLogger } from './storage/event-logger';
 import { EvolutionEngine, type EvolutionEngineConfig, type EventLogger as EventLoggerInterface, type EvolutionResult } from './core/evolution-engine';
-import { extractSignals, prioritizeSignals, analyzeSignals } from './core/signal-extractor';
+import { extractSignals, prioritizeSignals, analyzeSignals, type LogEntry } from './core/signal-extractor';
 import { selectGene, computeDriftIntensity, analyzeGenePool } from './core/gene-selector';
 import { selectCapsule, shouldReuseCapsule, analyzeCapsules } from './core/capsule-manager';
 import { isValidationCommandAllowed, estimateBlastRadius, requiresApproval } from './core/validation-gate';
+import { prepareDistillation, completeDistillation, shouldDistill, type DistillationState } from './core/skill-distiller';
+import { applyEpigeneticMarks, getEpigeneticBoost, pruneExpiredMarks } from './core/epigenetic';
+import { buildAutoGene, isAutoGene } from './core/auto-gene-builder';
+import { banGenesFromFailedCapsules, computeSignalOverlap, DISTILLED_PREFIX, DISTILLED_SCORE_FACTOR } from './core/gene-selector';
+import type { DistillationRequest, DistillationResult } from './types/gene-capsule-schema';
+import * as path from 'path';
 
 // ============================================================================
 // 默认配置
@@ -70,6 +76,7 @@ export class LocalEvomap {
   private eventLogger: EventLogger;
   private engine: EvolutionEngine | null = null;
   private hubRegistry: HubRegistry | null = null;
+  private distillationState: DistillationState = { lastDistillationTime: 0 };
   
   private initialized = false;
   
@@ -105,7 +112,7 @@ export class LocalEvomap {
     }
     
     // 创建进化引擎
-    this.engine = new EvolutionEngine(this.config, this.eventLogger, this.capsuleStore);
+    this.engine = new EvolutionEngine(this.config, this.eventLogger, this.capsuleStore, this.geneStore);
     
     // 加载基因和胶囊
     const genes = await this.geneStore.getAll();
@@ -143,7 +150,16 @@ export class LocalEvomap {
       throw new Error('Evolution engine not initialized');
     }
     
-    return this.engine.evolve(logs, overrides);
+    const result = await this.engine.evolve(logs, overrides);
+
+    if (result.event.outcome.status === 'success') {
+      const capsules = await this.capsuleStore.getAll();
+      const genes = await this.geneStore.getAll();
+      const outputDir = path.join(path.dirname(this.config.genes_path), 'distiller');
+      await prepareDistillation(capsules, genes, outputDir, { state: this.distillationState });
+    }
+
+    return result;
   }
   
   /**
@@ -188,7 +204,7 @@ export class LocalEvomap {
    * 提取信号（简版，返回优先信号列表）
    */
   extractSignals(logs: any[]): Signal[] {
-    const { prioritySignals } = extractSignals({ logs });
+    const { prioritySignals } = extractSignals({ logs: logs as LogEntry[] });
     return prioritySignals;
   }
   
@@ -206,7 +222,7 @@ export class LocalEvomap {
       userRequestCount: number;
     };
   } {
-    const { signals, prioritySignals } = extractSignals({ logs });
+    const { signals, prioritySignals } = extractSignals({ logs: logs as LogEntry[] });
     const raw = analyzeSignals(signals);
     return {
       signals,
@@ -234,7 +250,7 @@ export class LocalEvomap {
     }
     
     const genes = await this.geneStore.getAll();
-    return selectGene(genes, signals, this.config.selection);
+    return selectGene(genes, signals, { ...this.config.selection, envFingerprint: this.getRuntimeEnvFingerprint() });
   }
   
   /**
@@ -246,14 +262,7 @@ export class LocalEvomap {
     }
     
     const capsules = await this.capsuleStore.getAll();
-    const env = {
-      node_version: process.version,
-      platform: process.platform as 'linux' | 'darwin' | 'win32',
-      arch: process.arch as 'x64' | 'arm64' | 'ia32',
-      working_dir: process.cwd()
-    };
-    
-    return selectCapsule(capsules, signals, env);
+    return selectCapsule(capsules, signals, this.getRuntimeEnvFingerprint());
   }
   
   /**
@@ -383,6 +392,65 @@ export class LocalEvomap {
     
     return totalCached;
   }
+
+  /**
+   * 准备蒸馏 (阶段1)
+   * 收集数据、分析模式、生成 LLM 提示文件
+   */
+  async prepareDistillation(): Promise<DistillationRequest | null> {
+    if (!this.initialized) {
+      await this.init();
+    }
+    
+    const capsules = await this.capsuleStore.getAll();
+    const genes = await this.geneStore.getAll();
+    const outputDir = path.join(path.dirname(this.config.genes_path), 'distiller');
+    
+    return prepareDistillation(capsules, genes, outputDir, { state: this.distillationState });
+  }
+  
+  /**
+   * 完成蒸馏 (阶段2)
+   * 验证 LLM 响应并保存新基因
+   */
+  async completeDistillation(
+    responseText: string,
+    sourceCapsuleIds?: string[]
+  ): Promise<DistillationResult> {
+    if (!this.initialized) {
+      await this.init();
+    }
+    
+    const genes = await this.geneStore.getAll();
+    const result = completeDistillation(responseText, genes, sourceCapsuleIds);
+    
+    // 如果成功，保存新基因
+    if (result.success && result.gene) {
+      await this.geneStore.add(result.gene);
+      
+      // 更新引擎基因池
+      if (this.engine) {
+        const updatedGenes = await this.geneStore.getAll();
+        this.engine.setGenePool(updatedGenes);
+      }
+      
+      console.log(`[Distiller] New gene created: ${result.gene.id}`);
+    }
+    
+    return result;
+  }
+  
+  /**
+   * 检查是否应该执行蒸馏
+   */
+  async shouldDistill(): Promise<boolean> {
+    if (!this.initialized) {
+      await this.init();
+    }
+    
+    const capsules = await this.capsuleStore.getAll();
+    return shouldDistill(capsules, this.distillationState);
+  }
   
   /**
    * 获取基因池统计
@@ -497,7 +565,7 @@ export class LocalEvomap {
     return requiresApproval(blastRadius, {
       reviewMode: this.config.review_mode,
       maxBlastRadius: this.config.max_blast_radius,
-      autoApproveLowRisk: false
+      autoApproveLowRisk: this.config.autoApproveLowRisk ?? false
     });
   }
   
@@ -505,7 +573,8 @@ export class LocalEvomap {
    * 获取配置
    */
   getConfig(): EvolutionConfig {
-    return { ...this.config };
+    const { llmApiKey, ...safeConfig } = this.config;
+    return { ...safeConfig };
   }
   
   /**
@@ -571,6 +640,14 @@ export class LocalEvomap {
     
     console.log(`Imported ${data.genes?.length || 0} genes, ${data.capsules?.length || 0} capsules`);
   }
+  private getRuntimeEnvFingerprint() {
+    return {
+      node_version: process.version,
+      platform: process.platform as 'linux' | 'darwin' | 'win32',
+      arch: process.arch as 'x64' | 'arm64' | 'ia32',
+      working_dir: process.cwd()
+    };
+  }
 }
 
 // ============================================================================
@@ -591,6 +668,26 @@ export {
   selectCapsule,
   shouldReuseCapsule,
   analyzeCapsules,
+
+  // 蒸馏器
+  prepareDistillation,
+  completeDistillation,
+  shouldDistill,
+  
+  // 表观遗传
+  applyEpigeneticMarks,
+  getEpigeneticBoost,
+  pruneExpiredMarks,
+  
+  // 自动基因
+  buildAutoGene,
+  isAutoGene,
+  
+  // 基因选择 (新增)
+  banGenesFromFailedCapsules,
+  computeSignalOverlap,
+  DISTILLED_PREFIX,
+  DISTILLED_SCORE_FACTOR,
   
   // 验证
   isValidationCommandAllowed,
@@ -608,6 +705,11 @@ export type {
   Gene,
   Capsule,
   Signal
+} from './types/gene-capsule-schema';
+
+export type {
+  DistillationRequest,
+  DistillationResult
 } from './types/gene-capsule-schema';
 
 export type {

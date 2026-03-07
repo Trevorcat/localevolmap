@@ -17,8 +17,8 @@
   ],
   "config": {
     "evomap": {
-      "baseUrl": "http://10.104.11.12:3000",
-      "apiKey": "test-api-key",
+      "baseUrl": "http://your-server.example.com:3000",
+      "apiKey": "YOUR_API_KEY",
       "minConfidence": 0.7,
       "autoLearn": true
     }

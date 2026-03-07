@@ -1,164 +1,63 @@
 # LocalEvomap 快速部署指南
 
-## 🚀 一键部署（推荐）
+## 当前环境
 
-### 前提条件
-- ✅ SSH 免密登录已配置（10.104.11.15）
-- ✅ 服务器有 root 或 sudo 权限
-- ✅ 服务器已安装 Node.js 20+ 和 npm
+- **服务器**: `deploy@your-server.example.com`（SSH 免密登录）
+- **正式服**: `http://your-server.example.com:3000`，目录 `/home/itops/localevolmap`
+- **测试服**: `http://your-server.example.com:3001`，目录 `/home/itops/localevolmap-test`
+- **Node.js**: v20.20.0（nvm 管理）
+- **进程管理**: nohup + PID 文件（无 PM2）
 
-### 部署步骤
+## 日常开发流程
 
-**只需一条命令：**
+```
+修改代码 → npm run build → 部署测试服 → 验证 → 推进正式服
+```
+
+### Step 1: 修改代码 & 构建
 
 ```bash
 cd E:\projects\test_model\capability
-./ONE_CLICK_DEPLOY.sh
+# 修改 server.ts / public/index.html / core/*.ts 等
+npm run build    # 必须零错误
 ```
 
-脚本会自动完成：
-1. 克隆最新代码到服务器
-2. 安装依赖并构建
-3. 安装 PM2 进程管理器
-4. 创建配置文件
-5. 启动服务
-6. 配置开机自启
-
-### 验证部署
+### Step 2: 部署到测试服
 
 ```bash
-# 方式 1: 访问 Web UI
-# 浏览器打开：http://10.104.11.15:3000
-
-# 方式 2: 测试 API
-curl http://10.104.11.15:3000/api/stats
-
-# 方式 3: 查看服务状态
-ssh root@10.104.11.15 'pm2 status'
+./scripts/deploy-test.sh
 ```
 
-## 📋 常用命令
+### Step 3: 验证测试服
 
-### 查看服务状态
 ```bash
-ssh root@10.104.11.15 'pm2 status'
+# 浏览器打开 http://your-server.example.com:3001
+# 或 API 测试
+ssh deploy@your-server.example.com "curl -s http://localhost:3001/api/v1/genes?limit=1"
 ```
 
-### 查看实时日志
+### Step 4: 推进到正式服
+
 ```bash
-ssh root@10.104.11.15 'pm2 logs local-evomap'
+./scripts/promote.sh
 ```
 
-### 重启服务
+### Step 5: 验证正式服
+
 ```bash
-ssh root@10.104.11.15 'pm2 restart local-evomap'
+ssh deploy@your-server.example.com "curl -s http://localhost:3000/api/v1/genes?limit=1"
 ```
 
-### 停止服务
+## 进程管理
+
 ```bash
-ssh root@10.104.11.15 'pm2 stop local-evomap'
+# 在服务器上（ssh deploy@your-server.example.com 后执行）
+bash /home/itops/localevolmap/manage.sh status prod       # 查看正式服
+bash /home/itops/localevolmap/manage.sh restart prod      # 重启正式服
+bash /home/itops/localevolmap-test/manage.sh status test  # 查看测试服
+bash /home/itops/localevolmap-test/manage.sh restart test # 重启测试服
 ```
 
-### 更新代码
-```bash
-ssh root@10.104.11.15 'cd /opt/local-evomap && git pull && pm2 restart local-evomap'
-```
+## 完整文档
 
-### 运行 E2E 测试
-```bash
-ssh root@10.104.11.15 'cd /opt/local-evomap && npx playwright test e2e/browser.spec.ts'
-```
-
-## 🔧 修改配置
-
-### 修改端口
-编辑服务器上的配置文件：
-```bash
-ssh root@10.104.11.15 'nano /opt/local-evomap/.env.production'
-# 修改 PORT=3000 为你想要的端口
-# 然后重启服务
-pm2 restart local-evomap
-```
-
-### 修改 CORS 设置
-```bash
-ssh root@10.104.11.15 'nano /opt/local-evomap/.env.production'
-# 修改 CORS_ORIGINS 为允许的域名列表
-# 例如：CORS_ORIGINS="http://your-frontend.com,http://localhost:5173"
-```
-
-## 🐛 故障排查
-
-### 问题 1: 无法访问服务
-```bash
-# 检查服务是否运行
-ssh root@10.104.11.15 'pm2 status'
-
-# 检查端口是否监听
-ssh root@10.104.11.15 'netstat -tlnp | grep 3000'
-
-# 检查防火墙
-ssh root@10.104.11.15 'ufw status'
-# 如果防火墙开启，放行端口：
-# sudo ufw allow 3000/tcp
-```
-
-### 问题 2: 服务崩溃
-```bash
-# 查看日志
-ssh root@10.104.11.15 'pm2 logs local-evomap --lines 100'
-
-# 重启服务
-ssh root@10.104.11.15 'pm2 restart local-evomap'
-```
-
-### 问题 3: 代码更新失败
-```bash
-# 手动更新
-ssh root@10.104.11.15 'cd /opt/local-evomap && git pull origin master && npm run build && pm2 restart local-evomap'
-```
-
-## 📊 监控
-
-### 使用 PM2 监控
-```bash
-# 安装 PM2 监控
-ssh root@10.104.11.15 'pm2 install pm2-logrotate'
-
-# 查看监控面板
-ssh root@10.104.11.15 'pm2 monit'
-```
-
-### 定期检查
-```bash
-# 添加定时任务检查服务
-ssh root@10.104.11.15 'crontab -e'
-
-# 添加以下内容（每小时检查一次）
-0 * * * * cd /opt/local-evomap && /opt/local-evomap/deployment/health-check.sh >> /var/log/local-evomap-health.log 2>&1
-```
-
-## 🔒 安全建议
-
-1. **修改默认端口**（如果可能）
-2. **配置防火墙**只允许必要的 IP 访问
-3. **禁用 root SSH 登录**，使用普通用户
-4. **定期更新**系统包和依赖
-5. **备份数据**目录（data/）
-
-## 📖 完整文档
-
-- [完整部署手册](docs/DEPLOYMENT_OPENCODE.md)
-- [API 文档](docs/HTTP_API.md)
-- [SSH 配置](docs/SSH_OPENCODE.md)
-- [浏览器自动化](docs/PLAYWRIGHT_REMOTE.md)
-
-## 🎯 下一步
-
-1. **访问 Web UI**: http://10.104.11.15:3000
-2. **测试 API**: `curl http://10.104.11.15:3000/api/stats`
-3. **运行 E2E 测试**: `ssh root@10.104.11.15 'cd /opt/local-evomap && npx playwright test e2e/browser.spec.ts'`
-
----
-
-**部署完成！享受 LocalEvomap！** 🎉
+详见 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — 包含环境变量说明、数据管理、故障排查等。

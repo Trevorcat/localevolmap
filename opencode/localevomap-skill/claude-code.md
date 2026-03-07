@@ -4,9 +4,9 @@ This project integrates with a LocalEvomap server for automatic solution search 
 
 ## Server Configuration
 
-- **API Base URL**: http://10.104.11.12:3000/api/v1
-- **API Key**: `test-api-key` (set via env `EVOMAP_API_KEY`)
-- **Dashboard**: http://10.104.11.12:3000
+- **API Base URL**: http://your-server.example.com:3000/api/v1
+- **API Key**: `YOUR_API_KEY` (set via env `EVOMAP_API_KEY`)
+- **Dashboard**: http://your-server.example.com:3000
 
 ## When to Use
 
@@ -30,8 +30,8 @@ This project integrates with a LocalEvomap server for automatic solution search 
 ### 1. Search for Existing Solutions (Capsules)
 
 ```bash
-curl -s "http://10.104.11.12:3000/api/v1/capsules/search?signals=TypeError,undefined&minConfidence=0.5" \
-  -H "Authorization: Bearer test-api-key"
+curl -s "http://your-server.example.com:3000/api/v1/capsules/search?signals=TypeError,undefined&minConfidence=0.5" \
+  -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
 If `total > 0`, use the highest-confidence capsule's `summary` as the fix strategy.
@@ -39,8 +39,8 @@ If `total > 0`, use the highest-confidence capsule's `summary` as the fix strate
 ### 2. Get Evolution Strategy (Genes)
 
 ```bash
-curl -s "http://10.104.11.12:3000/api/v1/genes?category=repair" \
-  -H "Authorization: Bearer test-api-key"
+curl -s "http://your-server.example.com:3000/api/v1/genes?category=repair" \
+  -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
 Use the gene's `strategy` array as step-by-step guidance.
@@ -50,8 +50,8 @@ Use the gene's `strategy` array as step-by-step guidance.
 After fixing an issue, **always** record it. The server accepts flexible formats and fills defaults:
 
 ```bash
-curl -X POST "http://10.104.11.12:3000/api/v1/capsules" \
-  -H "Authorization: Bearer test-api-key" \
+curl -X POST "http://your-server.example.com:3000/api/v1/capsules" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d "{\"trigger\":[\"TypeError\",\"undefined\"],\"gene\":\"gene_repair\",\"summary\":\"Fixed by adding null check\",\"confidence\":0.85}"
 ```
@@ -63,8 +63,8 @@ Only `summary` and `trigger` are truly needed. The server auto-generates `id`, `
 Record a reusable strategy pattern:
 
 ```bash
-curl -X POST "http://10.104.11.12:3000/api/v1/genes" \
-  -H "Authorization: Bearer test-api-key" \
+curl -X POST "http://your-server.example.com:3000/api/v1/genes" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d "{\"category\":\"repair\",\"signals_match\":[\"TypeError\",\"undefined\"],\"strategy\":[\"Check for null/undefined values\",\"Add optional chaining\",\"Run tests\"]}"
 ```
@@ -122,7 +122,7 @@ Note: `outcome` accepts both `{"status":"success","score":0.9}` and `{"success":
 
 All write operations require Bearer token:
 ```
-Authorization: Bearer test-api-key
+Authorization: Bearer YOUR_API_KEY
 ```
 
 ## Core Concepts

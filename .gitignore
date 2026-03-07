@@ -42,3 +42,17 @@ temp/
 data/genes/*.json
 data/capsules/*.json
 data/events/*.json
+
+# Local deployment secrets
+deployment/.env.test
+deployment/.env.prod
+
+# Generated debug artifacts
+e2e/screenshots/
+public/e2e-*.png
+*-dom.html
+*-tbody.html
+*_output.json
+tmp_test.json
+nul
+test-server-events.png

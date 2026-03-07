@@ -2,10 +2,10 @@
 # Supports: Claude Code, OpenCode, OpenAI Codex
 #
 # Usage:
-#   irm http://10.104.11.12:3000/install.ps1 | iex
-#   irm http://10.104.11.12:3000/install.ps1 | iex -Client claude
+#   irm http://your-server.example.com:3000/install.ps1 | iex
+#   irm http://your-server.example.com:3000/install.ps1 | iex -Client claude
 #   Or save and run:
-#   Invoke-WebRequest http://10.104.11.12:3000/install.ps1 -OutFile install.ps1; .\install.ps1 -Client codex
+#   Invoke-WebRequest http://your-server.example.com:3000/install.ps1 -OutFile install.ps1; .\install.ps1 -Client codex
 
 param(
     [ValidateSet("claude", "opencode", "codex", "all", "")]
@@ -13,7 +13,7 @@ param(
     [switch]$Project
 )
 
-$Server = "http://10.104.11.12:3000"
+$Server = "http://your-server.example.com:3000"
 
 function Write-Header {
     Write-Host ""

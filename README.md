@@ -1,6 +1,6 @@
 # LocalEvomap - 本地能力进化系统
 
-基于 **EvoMap/evolver** 核心思想的本地进化知识系统。让 AI 编码助手在工作过程中自动搜索、复用已验证的解决方案，并将新方案录入共享知识库。
+基于 [EvoMap/evolver](https://github.com/EvoMap/evolver/tree/main) 核心思想的本地进化知识系统。让 AI 编码助手在工作过程中自动搜索、复用已验证的解决方案，并将新方案录入共享知识库。
 
 ## 核心概念
 
@@ -21,27 +21,56 @@ node dist/server.js
 初始化知识库：
 
 ```bash
-curl -X POST http://localhost:3000/api/v1/seed -H "Authorization: Bearer test-api-key"
+curl -X POST http://localhost:3000/api/v1/seed -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
 ## 项目结构
 
 ```
 ├── core/                    # 核心算法（基因选择、胶囊匹配、信号提取、进化引擎）
-├── storage/                 # 持久化存储（基因、胶囊、事件日志）
+│   └── llm-provider.ts      # LLM 调用（Codex 5.3 SSE 流式 + JSON 提取）
+├── storage/                 # 持久化存储（基因、胶囊、事件日志 JSONL）
 ├── types/                   # TypeScript 类型定义
-├── public/                  # Dashboard 单页面应用
+├── public/                  # Dashboard 单页面应用（单 HTML 文件，无构建步骤）
 ├── opencode/localevomap-skill/  # AI Skill 分发文件
-├── data/                    # 数据存储目录
+├── data/                    # 正式数据存储目录
+├── deployment/              # 部署配置
+│   ├── .env.test            # 测试服环境变量（端口 3001）
+│   └── .env.prod            # 正式服环境变量（端口 3000）
+├── scripts/                 # 部署 & 管理脚本
+│   ├── manage.sh            # 进程管理（start/stop/restart/status test/prod）
+│   ├── deploy-test.sh       # 一键部署到测试服
+│   ├── deploy-prod.sh       # 一键部署到正式服
+│   └── promote.sh           # 测试服代码推进到正式服
 ├── server.ts                # HTTP API 服务器
 └── index.ts                 # LocalEvomap 主入口
 ```
+
+## 部署
+
+支持测试/正式双环境部署，示例主机使用 `your-server.example.com`：
+
+| 环境 | 端口 | 目录 | 数据 |
+|------|------|------|------|
+| 正式服 | 3000 | `/home/itops/localevolmap` | `./data/` |
+| 测试服 | 3001 | `/home/itops/localevolmap-test` | `./data-test/` |
+
+```bash
+# 日常开发流程
+npm run build              # 本地构建
+./scripts/deploy-test.sh   # 部署到测试服
+# 验证通过后...
+./scripts/promote.sh       # 推进到正式服
+```
+
+详见 [部署指南](./docs/DEPLOYMENT.md)。
 
 ## 文档
 
 | 文档 | 说明 |
 |------|------|
-| [部署指南](./docs/DEPLOYMENT.md) | 服务器部署流程（给 AI 读，让 AI 帮你部署） |
+| [部署指南](./docs/DEPLOYMENT.md) | 测试服/正式服双服部署流程、环境变量、数据管理、故障排查 |
+| [快速部署](./DEPLOY_INSTRUCTIONS.md) | 5 步快速部署 cheatsheet |
 | [AI Skill 安装](./docs/SKILL_INSTALL.md) | 为 Claude Code / OpenCode / Codex 安装 Skill（给 AI 读） |
 | [API Reference](./docs/API_REFERENCE.md) | 完整的 HTTP API 文档和 Schema 说明 |
 | [架构设计](./ARCHITECTURE.md) | 系统架构和设计决策 |
@@ -82,9 +111,12 @@ irm http://YOUR_SERVER/install.ps1 | iex
 | `POST` | `/api/v1/signals/extract` | 从日志提取信号 |
 | `POST` | `/api/v1/genes/select` | 根据信号选择基因 |
 | `POST` | `/api/v1/capsules/select` | 根据信号选择胶囊 |
+| `GET` | `/api/v1/distill/status` | 检查蒸馏条件是否满足 |
+| `POST` | `/api/v1/distill/prepare` | 准备蒸馏（阶段 1，需认证） |
+| `POST` | `/api/v1/distill/complete` | 完成蒸馏（阶段 2，需认证） |
 | `GET` | `/api/v1/export` | 导出所有数据（需认证） |
 | `POST` | `/api/v1/import` | 导入数据（需认证） |
-| `GET` | `/api/v1/events` | 列出进化事件 |
+| `GET` | `/api/v1/events` | 列出进化事件（支持 `?q=` 搜索，最新在前） |
 | `POST` | `/api/v1/seed` | 预加载基础 Gene 策略（需认证） |
 
 详见 [API Reference](./docs/API_REFERENCE.md)。

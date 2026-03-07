@@ -116,6 +116,72 @@ export class LLMProvider {
   }
 
   /**
+   * 通用文本生成（用于蒸馏等非结构化输出场景）
+   *
+   * 与 generateEvolution 不同，此方法不强制结构化 schema，
+   * 直接返回 LLM 的原始文本响应，由调用方自行解析。
+   */
+  async generateText(prompt: string): Promise<{ text: string }> {
+    const sanitizedPrompt = this.sanitizePrompt(prompt);
+
+    if (this.config.provider === 'local') {
+      return this.generateTextLocal(sanitizedPrompt);
+    }
+
+    return this.generateTextSDK(sanitizedPrompt);
+  }
+
+  private async generateTextSDK(prompt: string): Promise<{ text: string }> {
+    const { generateText: aiGenerateText } = await import('ai');
+    try {
+      const result = await aiGenerateText({
+        model: this.model,
+        prompt,
+        maxOutputTokens: this.config.maxTokens ?? 4096,
+        temperature: this.config.temperature ?? 0.3,
+      });
+      return { text: result.text };
+    } catch (error) {
+      throw new Error(`LLM text generation failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  private async generateTextLocal(prompt: string): Promise<{ text: string }> {
+    const baseURL = this.config.baseURL || 'http://localhost:11434/v1';
+    const apiKey = this.config.apiKey || process.env.LLM_API_KEY || 'local';
+    const url = `${baseURL}/chat/completions`;
+
+    const body = {
+      model: this.config.model,
+      messages: [
+        { role: 'system', content: 'You are a gene synthesis engine. Return ONLY a valid JSON object, no markdown wrapping.' },
+        { role: 'user', content: prompt }
+      ],
+      max_tokens: this.config.maxTokens ?? 4096,
+      temperature: this.config.temperature ?? 0.3,
+      stream: true,
+      chat_template_kwargs: { enable_thinking: false },
+    };
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`HTTP ${response.status}: ${errorText.slice(0, 500)}`);
+    }
+
+    const rawContent = await this.collectStreamResponse(response);
+    if (!rawContent) {
+      throw new Error('LLM returned empty content');
+    }
+    return { text: rawContent };
+  }
+
+  /**
    * AI SDK 路径（openai/anthropic）
    * 使用 generateObject 的默认 tool calling mode
    */
@@ -180,9 +246,10 @@ Do NOT wrap in markdown code blocks. Return raw JSON only.`;
       max_tokens: this.config.maxTokens ?? 4096,
       temperature: this.config.temperature ?? 0.2,
       response_format: { type: 'json_object' },
+      // 某些 API（如 Codex）要求 stream=true；
+      // 对于不要求的（SGLang/vLLM），stream 也是兼容的
+      stream: true,
       // SGLang + Qwen3.5: 关闭 thinking mode
-      // Qwen3.5 默认开启 thinking，会把响应放在 reasoning_content 而非 content，
-      // 导致 content:null。通过 chat_template_kwargs 显式关闭。
       chat_template_kwargs: { enable_thinking: false },
     };
 
@@ -201,25 +268,16 @@ Do NOT wrap in markdown code blocks. Return raw JSON only.`;
         throw new Error(`HTTP ${response.status}: ${errorText.slice(0, 500)}`);
       }
       
-      const data = await response.json() as any;
-      const message = data?.choices?.[0]?.message;
-      
-      if (!message) {
-        throw new Error('No message in LLM response');
-      }
-      
-      // 优先取 content，fallback 到 reasoning_content（以防 thinking 未被关闭）
-      const rawContent = message.content || message.reasoning_content;
+      // 收集流式 SSE 响应，拼接完整 content
+      const rawContent = await this.collectStreamResponse(response);
       
       if (!rawContent) {
         throw new Error('LLM returned null content (thinking mode may still be active)');
       }
       
-      // 清理可能的 markdown 包裹
-      const jsonStr = rawContent
-        .replace(/^```(?:json)?\s*/i, '')
-        .replace(/\s*```\s*$/i, '')
-        .trim();
+      // 从 LLM 输出中提取 JSON
+      // 某些模型（如 Codex 5.3）即使要求 json_object 也会在前后加 markdown 文本
+      const jsonStr = this.extractJson(rawContent);
       
       let parsed: unknown;
       try {
@@ -239,6 +297,123 @@ Do NOT wrap in markdown code blocks. Return raw JSON only.`;
       console.error('[LLMProvider] Local generation failed:', error);
       throw new Error(`LLM generation failed: ${error instanceof Error ? error.message : String(error)}`);
     }
+  }
+
+  /**
+   * 收集流式 SSE 响应，拼接完整 content
+   * 
+   * 兼容两种流式格式：
+   * 1. 标准 SSE（data: {JSON}\n\n）
+   * 2. 非流式 JSON 响应（某些 API 即使设了 stream=true 也可能返回非流式）
+   */
+  private async collectStreamResponse(response: Response): Promise<string> {
+    const contentType = response.headers.get('content-type') || '';
+    
+    // 如果返回的是普通 JSON（非流式），直接解析
+    if (contentType.includes('application/json')) {
+      const data = await response.json() as any;
+      const message = data?.choices?.[0]?.message;
+      if (!message) throw new Error('No message in LLM response');
+      return message.content || message.reasoning_content || '';
+    }
+    
+    // 流式 SSE 解析
+    const reader = response.body?.getReader();
+    if (!reader) throw new Error('No readable stream in response');
+    
+    const decoder = new TextDecoder();
+    let contentParts: string[] = [];
+    let buffer = '';
+    
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      
+      buffer += decoder.decode(value, { stream: true });
+      
+      // 按行解析 SSE
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || ''; // 保留不完整的最后一行
+      
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed === 'data: [DONE]') continue;
+        if (!trimmed.startsWith('data: ')) continue;
+        
+        try {
+          const chunk = JSON.parse(trimmed.slice(6));
+          const delta = chunk?.choices?.[0]?.delta;
+          if (delta?.content) {
+            contentParts.push(delta.content);
+          }
+          // fallback: 某些模型把内容放在 reasoning_content
+          if (delta?.reasoning_content) {
+            contentParts.push(delta.reasoning_content);
+          }
+        } catch {
+          // 跳过无法解析的行
+        }
+      }
+    }
+    
+    const fullContent = contentParts.join('');
+    if (!fullContent) {
+      throw new Error('LLM stream returned empty content');
+    }
+    
+    return fullContent;
+  }
+
+  /**
+   * 从 LLM 输出中提取 JSON 对象
+   * 
+   * 处理常见情况：
+   * 1. 纯 JSON 输出
+   * 2. markdown 代码块包裹的 JSON
+   * 3. 前后有文本描述的 JSON（如 Codex 5.3 的行为）
+   */
+  private extractJson(raw: string): string {
+    const trimmed = raw.trim();
+    
+    // Case 1: 已经是合法 JSON
+    if (trimmed.startsWith('{')) {
+      // 找到最后一个匹配的 }
+      let depth = 0;
+      let endIdx = -1;
+      for (let i = 0; i < trimmed.length; i++) {
+        if (trimmed[i] === '{') depth++;
+        else if (trimmed[i] === '}') {
+          depth--;
+          if (depth === 0) { endIdx = i; break; }
+        }
+      }
+      if (endIdx > 0) return trimmed.slice(0, endIdx + 1);
+      return trimmed;
+    }
+    
+    // Case 2: markdown 代码块
+    const codeBlockMatch = trimmed.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
+    if (codeBlockMatch) return codeBlockMatch[1].trim();
+    
+    // Case 3: 前面有文本描述，找第一个 { 开始的 JSON 对象
+    const firstBrace = trimmed.indexOf('{');
+    if (firstBrace >= 0) {
+      const fromBrace = trimmed.slice(firstBrace);
+      let depth = 0;
+      let endIdx = -1;
+      for (let i = 0; i < fromBrace.length; i++) {
+        if (fromBrace[i] === '{') depth++;
+        else if (fromBrace[i] === '}') {
+          depth--;
+          if (depth === 0) { endIdx = i; break; }
+        }
+      }
+      if (endIdx > 0) return fromBrace.slice(0, endIdx + 1);
+      return fromBrace;
+    }
+    
+    // 无法提取，返回原始内容让调用者报错
+    return trimmed;
   }
 
   /**

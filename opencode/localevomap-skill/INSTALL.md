@@ -9,9 +9,9 @@ A skill/instruction set that teaches your AI assistant to:
 2. **Reuse** verified capsules (proven solutions) when encountering known error patterns
 3. **Record** new solutions after fixing issues, building a shared knowledge base
 
-**Server**: `http://10.104.11.12:3000`
-**Dashboard**: `http://10.104.11.12:3000` (web UI)
-**API**: `http://10.104.11.12:3000/api/v1`
+**Server**: `http://your-server.example.com:3000`
+**Dashboard**: `http://your-server.example.com:3000` (web UI)
+**API**: `http://your-server.example.com:3000/api/v1`
 
 ---
 
@@ -20,36 +20,36 @@ A skill/instruction set that teaches your AI assistant to:
 ### macOS / Linux
 
 ```bash
-curl -sL http://10.104.11.12:3000/install.sh | bash
+curl -sL http://your-server.example.com:3000/install.sh | bash
 ```
 
 ### Windows (PowerShell)
 
 ```powershell
-irm http://10.104.11.12:3000/install.ps1 | iex
+irm http://your-server.example.com:3000/install.ps1 | iex
 ```
 
 ### Specify client
 
 ```bash
 # Linux/macOS
-curl -sL http://10.104.11.12:3000/install.sh | bash -s -- --client claude
-curl -sL http://10.104.11.12:3000/install.sh | bash -s -- --client opencode
-curl -sL http://10.104.11.12:3000/install.sh | bash -s -- --client codex
+curl -sL http://your-server.example.com:3000/install.sh | bash -s -- --client claude
+curl -sL http://your-server.example.com:3000/install.sh | bash -s -- --client opencode
+curl -sL http://your-server.example.com:3000/install.sh | bash -s -- --client codex
 
 # Windows PowerShell
-powershell -Command "Invoke-WebRequest http://10.104.11.12:3000/install.ps1 -OutFile install.ps1; .\install.ps1 -Client claude"
-powershell -Command "Invoke-WebRequest http://10.104.11.12:3000/install.ps1 -OutFile install.ps1; .\install.ps1 -Client codex"
+powershell -Command "Invoke-WebRequest http://your-server.example.com:3000/install.ps1 -OutFile install.ps1; .\install.ps1 -Client claude"
+powershell -Command "Invoke-WebRequest http://your-server.example.com:3000/install.ps1 -OutFile install.ps1; .\install.ps1 -Client codex"
 ```
 
 ### Install to current project only (not global)
 
 ```bash
 # Linux/macOS
-curl -sL http://10.104.11.12:3000/install.sh | bash -s -- --project
+curl -sL http://your-server.example.com:3000/install.sh | bash -s -- --project
 
 # Windows
-powershell -Command "Invoke-WebRequest http://10.104.11.12:3000/install.ps1 -OutFile install.ps1; .\install.ps1 -Project"
+powershell -Command "Invoke-WebRequest http://your-server.example.com:3000/install.ps1 -OutFile install.ps1; .\install.ps1 -Project"
 ```
 
 ---
@@ -65,25 +65,25 @@ Download the skill file and place it in the Claude commands directory.
 **Linux/macOS (global):**
 ```bash
 mkdir -p ~/.claude/commands
-curl -sL http://10.104.11.12:3000/skill/claude -o ~/.claude/commands/evomap.md
+curl -sL http://your-server.example.com:3000/skill/claude -o ~/.claude/commands/evomap.md
 ```
 
 **Linux/macOS (project-local):**
 ```bash
 mkdir -p .claude/commands
-curl -sL http://10.104.11.12:3000/skill/claude -o .claude/commands/evomap.md
+curl -sL http://your-server.example.com:3000/skill/claude -o .claude/commands/evomap.md
 ```
 
 **Windows (global):**
 ```powershell
 New-Item -ItemType Directory -Path "$env:USERPROFILE\.claude\commands" -Force | Out-Null
-Invoke-WebRequest -Uri "http://10.104.11.12:3000/skill/claude" -OutFile "$env:USERPROFILE\.claude\commands\evomap.md" -UseBasicParsing
+Invoke-WebRequest -Uri "http://your-server.example.com:3000/skill/claude" -OutFile "$env:USERPROFILE\.claude\commands\evomap.md" -UseBasicParsing
 ```
 
 **Windows (project-local):**
 ```powershell
 New-Item -ItemType Directory -Path ".claude\commands" -Force | Out-Null
-Invoke-WebRequest -Uri "http://10.104.11.12:3000/skill/claude" -OutFile ".claude\commands\evomap.md" -UseBasicParsing
+Invoke-WebRequest -Uri "http://your-server.example.com:3000/skill/claude" -OutFile ".claude\commands\evomap.md" -UseBasicParsing
 ```
 
 After install, use `/evomap` command in Claude Code.
@@ -97,25 +97,25 @@ Download the skill file and place it in the OpenCode commands directory.
 **Linux/macOS (global):**
 ```bash
 mkdir -p ~/.config/opencode/commands
-curl -sL http://10.104.11.12:3000/skill/opencode -o ~/.config/opencode/commands/evomap.md
+curl -sL http://your-server.example.com:3000/skill/opencode -o ~/.config/opencode/commands/evomap.md
 ```
 
 **Linux/macOS (project-local):**
 ```bash
 mkdir -p .opencode/commands
-curl -sL http://10.104.11.12:3000/skill/opencode -o .opencode/commands/evomap.md
+curl -sL http://your-server.example.com:3000/skill/opencode -o .opencode/commands/evomap.md
 ```
 
 **Windows (global):**
 ```powershell
 New-Item -ItemType Directory -Path "$env:USERPROFILE\.config\opencode\commands" -Force | Out-Null
-Invoke-WebRequest -Uri "http://10.104.11.12:3000/skill/opencode" -OutFile "$env:USERPROFILE\.config\opencode\commands\evomap.md" -UseBasicParsing
+Invoke-WebRequest -Uri "http://your-server.example.com:3000/skill/opencode" -OutFile "$env:USERPROFILE\.config\opencode\commands\evomap.md" -UseBasicParsing
 ```
 
 **Windows (project-local):**
 ```powershell
 New-Item -ItemType Directory -Path ".opencode\commands" -Force | Out-Null
-Invoke-WebRequest -Uri "http://10.104.11.12:3000/skill/opencode" -OutFile ".opencode\commands\evomap.md" -UseBasicParsing
+Invoke-WebRequest -Uri "http://your-server.example.com:3000/skill/opencode" -OutFile ".opencode\commands\evomap.md" -UseBasicParsing
 ```
 
 After install, use `/evomap` command in OpenCode.
@@ -129,23 +129,23 @@ Download the AGENTS.md file.
 **Linux/macOS (global):**
 ```bash
 mkdir -p ~/.codex
-curl -sL http://10.104.11.12:3000/skill/codex -o ~/.codex/AGENTS.md
+curl -sL http://your-server.example.com:3000/skill/codex -o ~/.codex/AGENTS.md
 ```
 
 **Linux/macOS (project-local):**
 ```bash
-curl -sL http://10.104.11.12:3000/skill/codex -o AGENTS.md
+curl -sL http://your-server.example.com:3000/skill/codex -o AGENTS.md
 ```
 
 **Windows (global):**
 ```powershell
 New-Item -ItemType Directory -Path "$env:USERPROFILE\.codex" -Force | Out-Null
-Invoke-WebRequest -Uri "http://10.104.11.12:3000/skill/codex" -OutFile "$env:USERPROFILE\.codex\AGENTS.md" -UseBasicParsing
+Invoke-WebRequest -Uri "http://your-server.example.com:3000/skill/codex" -OutFile "$env:USERPROFILE\.codex\AGENTS.md" -UseBasicParsing
 ```
 
 **Windows (project-local):**
 ```powershell
-Invoke-WebRequest -Uri "http://10.104.11.12:3000/skill/codex" -OutFile "AGENTS.md" -UseBasicParsing
+Invoke-WebRequest -Uri "http://your-server.example.com:3000/skill/codex" -OutFile "AGENTS.md" -UseBasicParsing
 ```
 
 Codex will auto-load AGENTS.md on next session.
@@ -159,12 +159,12 @@ These tools typically read `AGENTS.md` or `.cursorrules` from the project root.
 **Any platform:**
 ```bash
 # Download as AGENTS.md (works for most AI tools)
-curl -sL http://10.104.11.12:3000/skill/codex -o AGENTS.md
+curl -sL http://your-server.example.com:3000/skill/codex -o AGENTS.md
 ```
 
 ```powershell
 # Windows
-Invoke-WebRequest -Uri "http://10.104.11.12:3000/skill/codex" -OutFile "AGENTS.md" -UseBasicParsing
+Invoke-WebRequest -Uri "http://your-server.example.com:3000/skill/codex" -OutFile "AGENTS.md" -UseBasicParsing
 ```
 
 ---
@@ -174,12 +174,12 @@ Invoke-WebRequest -Uri "http://10.104.11.12:3000/skill/codex" -OutFile "AGENTS.m
 After installing, run this to confirm the server is reachable:
 
 ```bash
-curl -s http://10.104.11.12:3000/api/v1/genes | head -c 200
+curl -s http://your-server.example.com:3000/api/v1/genes | head -c 200
 ```
 
 ```powershell
 # Windows
-(Invoke-WebRequest -Uri "http://10.104.11.12:3000/api/v1/genes" -UseBasicParsing).Content.Substring(0,200)
+(Invoke-WebRequest -Uri "http://your-server.example.com:3000/api/v1/genes" -UseBasicParsing).Content.Substring(0,200)
 ```
 
 Expected: JSON response with `total` and `genes` fields.
@@ -196,16 +196,16 @@ The server auto-fills defaults for all optional fields. You only need to provide
 
 ```bash
 # Linux/macOS
-curl -X POST "http://10.104.11.12:3000/api/v1/genes" \
-  -H "Authorization: Bearer test-api-key" \
+curl -X POST "http://your-server.example.com:3000/api/v1/genes" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"category":"repair","signals_match":["TypeError","null"],"strategy":["Add null check","Test"]}'
 ```
 
 ```powershell
 # Windows
-Invoke-WebRequest -Uri "http://10.104.11.12:3000/api/v1/genes" -Method POST `
-  -Headers @{"Authorization"="Bearer test-api-key";"Content-Type"="application/json"} `
+Invoke-WebRequest -Uri "http://your-server.example.com:3000/api/v1/genes" -Method POST `
+  -Headers @{"Authorization"="Bearer YOUR_API_KEY";"Content-Type"="application/json"} `
   -Body '{"category":"repair","signals_match":["TypeError","null"],"strategy":["Add null check","Test"]}'
 ```
 
@@ -227,16 +227,16 @@ Auto-filled: `id`, `type`, `preconditions`, `constraints`
 
 ```bash
 # Linux/macOS
-curl -X POST "http://10.104.11.12:3000/api/v1/capsules" \
-  -H "Authorization: Bearer test-api-key" \
+curl -X POST "http://your-server.example.com:3000/api/v1/capsules" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"trigger":["TypeError","null"],"summary":"Fixed by adding optional chaining"}'
 ```
 
 ```powershell
 # Windows
-Invoke-WebRequest -Uri "http://10.104.11.12:3000/api/v1/capsules" -Method POST `
-  -Headers @{"Authorization"="Bearer test-api-key";"Content-Type"="application/json"} `
+Invoke-WebRequest -Uri "http://your-server.example.com:3000/api/v1/capsules" -Method POST `
+  -Headers @{"Authorization"="Bearer YOUR_API_KEY";"Content-Type"="application/json"} `
   -Body '{"trigger":["TypeError","null"],"summary":"Fixed by adding optional chaining"}'
 ```
 
@@ -257,11 +257,11 @@ Auto-filled: `id`, `type`, `schema_version`, `outcome`, `env_fingerprint`, `blas
 Pre-load base genes (repair, refactor, performance, feature, security, test):
 
 ```bash
-curl -X POST "http://10.104.11.12:3000/api/v1/seed" -H "Authorization: Bearer test-api-key"
+curl -X POST "http://your-server.example.com:3000/api/v1/seed" -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
 ```powershell
-Invoke-WebRequest -Uri "http://10.104.11.12:3000/api/v1/seed" -Method POST -Headers @{"Authorization"="Bearer test-api-key"}
+Invoke-WebRequest -Uri "http://your-server.example.com:3000/api/v1/seed" -Method POST -Headers @{"Authorization"="Bearer YOUR_API_KEY"}
 ```
 
 Skips genes that already exist (safe to run multiple times).
@@ -272,14 +272,14 @@ Skips genes that already exist (safe to run multiple times).
 
 | URL | Content-Type | Description |
 |-----|-------------|-------------|
-| `http://10.104.11.12:3000/install.sh` | shell script | One-liner installer (Linux/macOS) |
-| `http://10.104.11.12:3000/install.ps1` | PowerShell | One-liner installer (Windows) |
-| `http://10.104.11.12:3000/INSTALL.md` | markdown | This file |
-| `http://10.104.11.12:3000/skill` | JSON | Skill manifest |
-| `http://10.104.11.12:3000/skill/claude` | markdown | Claude Code skill file |
-| `http://10.104.11.12:3000/skill/opencode` | markdown | OpenCode skill file |
-| `http://10.104.11.12:3000/skill/codex` | markdown | Codex/AGENTS.md file |
-| `POST http://10.104.11.12:3000/api/v1/seed` | JSON | Pre-load base genes (auth required) |
+| `http://your-server.example.com:3000/install.sh` | shell script | One-liner installer (Linux/macOS) |
+| `http://your-server.example.com:3000/install.ps1` | PowerShell | One-liner installer (Windows) |
+| `http://your-server.example.com:3000/INSTALL.md` | markdown | This file |
+| `http://your-server.example.com:3000/skill` | JSON | Skill manifest |
+| `http://your-server.example.com:3000/skill/claude` | markdown | Claude Code skill file |
+| `http://your-server.example.com:3000/skill/opencode` | markdown | OpenCode skill file |
+| `http://your-server.example.com:3000/skill/codex` | markdown | Codex/AGENTS.md file |
+| `POST http://your-server.example.com:3000/api/v1/seed` | JSON | Pre-load base genes (auth required) |
 
 ---
 

@@ -4,8 +4,11 @@ import * as path from 'path';
 import { LocalEvomap, DEFAULT_CONFIG } from './index';
 import type { Gene, Capsule, EvolutionEvent } from './types/gene-capsule-schema';
 import type { EvolutionResult } from './core/evolution-engine';
-import { LLMProviderError } from './core/evolution-engine';
+import { LLMProviderError, ApprovalRequiredError } from './core/evolution-engine';
 import { shouldReuseCapsule } from './core/capsule-manager';
+import { InvalidSignalContextError } from './core/signal-extractor';
+import { matchPatternToSignals, NoMatchingGeneError, AllGenesBannedError } from './core/gene-selector';
+import { normalizeSignals } from './types/signal-registry';
 
 // 加载 .env 文件（无依赖实现，避免引入 dotenv）
 function loadEnvFile(envPath: string): void {
@@ -95,8 +98,26 @@ async function getEvomap(): Promise<LocalEvomap> {
         const llmApiKey = process.env.LLM_API_KEY || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY;
         const llmBaseURL = process.env.LOCAL_LLM_BASE_URL;
         
+        // 数据路径：从环境变量读取，否则使用默认配置
+        const genesPath = process.env.GENES_PATH || DEFAULT_CONFIG.genes_path;
+        const capsulesPath = process.env.CAPSULES_PATH || DEFAULT_CONFIG.capsules_path;
+        const eventsPath = process.env.EVENTS_PATH || DEFAULT_CONFIG.events_path;
+        
+        // 从环境变量读取审批配置
+        const reviewMode = process.env.EVOMAP_REVIEW_MODE !== undefined
+            ? process.env.EVOMAP_REVIEW_MODE === 'true'
+            : DEFAULT_CONFIG.review_mode;
+        const autoApproveLowRisk = process.env.AUTO_APPROVE_LOW_RISK === 'true';
+        const dryRun = process.env.EVOMAP_DRY_RUN === 'true';
+        
         const config = {
             ...DEFAULT_CONFIG,
+            genes_path: genesPath,
+            capsules_path: capsulesPath,
+            events_path: eventsPath,
+            review_mode: reviewMode,
+            autoApproveLowRisk,
+            dryRun,
             ...(llmProvider && { llmProvider }),
             ...(llmModel && { llmModel }),
             ...(llmApiKey && { llmApiKey }),
@@ -446,6 +467,22 @@ async function handleHubApi(
             await handleImport(req, res, evomap);
             return;
         }
+
+        // Distiller endpoints
+        if (req.method === 'POST' && pathname === '/api/v1/distill/prepare') {
+            await handleDistillPrepare(req, res, evomap);
+            return;
+        }
+        
+        if (req.method === 'POST' && pathname === '/api/v1/distill/complete') {
+            await handleDistillComplete(req, res, evomap);
+            return;
+        }
+        
+        if (req.method === 'GET' && pathname === '/api/v1/distill/status') {
+            await handleDistillStatus(req, res, evomap);
+            return;
+        }
         
         res.writeHead(404);
         res.end(JSON.stringify({ error: 'Hub endpoint not found' }));
@@ -466,7 +503,8 @@ async function handleCapsuleSearch(
     evomap: LocalEvomap,
     params: URLSearchParams
 ): Promise<void> {
-    const signals = params.get('signals')?.split(',').filter(s => s.trim()) || [];
+    const rawSignalTerms = params.get('signals')?.split(',').map(s => s.trim()).filter(Boolean) || [];
+    const signals = normalizeSignals(rawSignalTerms);
     const gene = params.get('gene');
     const minConfidence = params.get('minConfidence') ? parseFloat(params.get('minConfidence')!) : 0;
     const limit = params.get('limit') ? parseInt(params.get('limit')!) : 100;
@@ -478,7 +516,18 @@ async function handleCapsuleSearch(
     // Filter by signals if provided
     let filtered = allCapsules.filter(c => {
         if (c._deleted) return false;
-        if (signals.length > 0 && !c.trigger.some(t => signals.some(s => t.includes(s)))) return false;
+        if (signals.length > 0) {
+            const matchesSignal = c.trigger.some(t => matchPatternToSignals(t, signals));
+            const matchesText = rawSignalTerms.some(term => {
+                const candidate = term.toLowerCase();
+                return c.id?.toLowerCase().includes(candidate)
+                    || c.gene?.toLowerCase().includes(candidate)
+                    || c.summary?.toLowerCase().includes(candidate)
+                    || c.trigger.some(trigger => trigger.toLowerCase().includes(candidate));
+            });
+
+            if (!matchesSignal && !matchesText) return false;
+        }
         if (gene && c.gene !== gene) return false;
         if (c.confidence < minConfidence) return false;
         return true;
@@ -569,6 +618,7 @@ async function handleGenesList(
     const search = params.get('q') || '';
     const category = params.get('category');
     const signal = params.get('signal');
+    const signalTerms = signal ? signal.split(',').map(item => item.trim()).filter(Boolean) : [];
     const limit = params.get('limit') ? parseInt(params.get('limit')!) : 100;
     const offset = params.get('offset') ? parseInt(params.get('offset')!) : 0;
     
@@ -590,9 +640,9 @@ async function handleGenesList(
         filteredGenes = filteredGenes.filter((g: Gene) => g.category === category);
     }
     
-    if (signal) {
+    if (signalTerms.length > 0) {
         filteredGenes = filteredGenes.filter((g: Gene) => 
-            g.signals_match?.some((s: string) => s.toLowerCase().includes(signal.toLowerCase()))
+            g.signals_match?.some((candidate: string) => signalTerms.some(term => matchPatternToSignals(candidate, [term])))
         );
     }
     
@@ -929,13 +979,26 @@ async function handleEventsList(
 ): Promise<void> {
     const limit = params.get('limit') ? parseInt(params.get('limit')!) : 50;
     const offset = params.get('offset') ? parseInt(params.get('offset')!) : 0;
+    const search = params.get('q') || '';
     
-    const stats = await evomap.getEventStats();
-    
-    // Get events from store
+    // Get events from store (newest first)
     const allEvents = await evomap['eventLogger'].getAll();
-    const total = allEvents.length;
-    const paginatedEvents = allEvents.slice(offset, offset + limit);
+    let events = [...allEvents].reverse();
+    
+    // Apply search filter
+    if (search) {
+        const q = search.toLowerCase();
+        events = events.filter((ev: EvolutionEvent) => {
+            const gene = (ev.selected_gene || '').toLowerCase();
+            const id = (ev.id || '').toLowerCase();
+            const status = (ev.outcome?.status || '').toLowerCase();
+            const signals = (ev.signals || []).join(' ').toLowerCase();
+            return gene.includes(q) || id.includes(q) || status.includes(q) || signals.includes(q);
+        });
+    }
+    
+    const total = events.length;
+    const paginatedEvents = events.slice(offset, offset + limit);
     
     res.writeHead(200);
     res.end(JSON.stringify({
@@ -1086,13 +1149,16 @@ async function handleEvolve(
         console.error('[Hub API] Evolve error:', error);
         const msg = (error as Error).message;
         
-        if (error instanceof LLMProviderError) {
+        if (error instanceof InvalidSignalContextError) {
+            res.writeHead(400);
+            res.end(JSON.stringify({ error: 'invalid_input', message: msg }));
+        } else if (error instanceof LLMProviderError) {
             res.writeHead(502);
             res.end(JSON.stringify({ error: 'llm_failed', message: msg }));
-        } else if (msg.includes('Approval required')) {
+        } else if (error instanceof ApprovalRequiredError) {
             res.writeHead(403);
-            res.end(JSON.stringify({ error: 'approval_required', message: msg }));
-        } else if (msg.includes('No matching genes')) {
+            res.end(JSON.stringify({ error: 'approval_required', message: msg, blastRadius: error.blastRadius, changes: error.pendingChanges }));
+        } else if (error instanceof NoMatchingGeneError || error instanceof AllGenesBannedError) {
             res.writeHead(422);
             res.end(JSON.stringify({ error: 'no_matching_gene', message: msg }));
         } else {
@@ -1137,8 +1203,13 @@ async function handleExtractSignals(
         }));
     } catch (error) {
         console.error('[Hub API] ExtractSignals error:', error);
-        res.writeHead(500);
-        res.end(JSON.stringify({ error: 'Signal extraction failed', detail: (error as Error).message }));
+        if (error instanceof InvalidSignalContextError) {
+            res.writeHead(400);
+            res.end(JSON.stringify({ error: 'invalid_input', detail: (error as Error).message }));
+        } else {
+            res.writeHead(500);
+            res.end(JSON.stringify({ error: 'Signal extraction failed', detail: (error as Error).message }));
+        }
     }
 }
 
@@ -1160,12 +1231,12 @@ async function handleSelectGene(
         return;
     }
     
-    const signals = parsed.signals;
-    if (!Array.isArray(signals)) {
+    if (!Array.isArray(parsed.signals)) {
         res.writeHead(400);
         res.end(JSON.stringify({ error: 'Missing or invalid "signals" array' }));
         return;
     }
+    const signals = normalizeSignals(parsed.signals);
     
     try {
         const result = await evomap.selectGene(signals);
@@ -1207,12 +1278,12 @@ async function handleSelectCapsule(
         return;
     }
     
-    const signals = parsed.signals;
-    if (!Array.isArray(signals)) {
+    if (!Array.isArray(parsed.signals)) {
         res.writeHead(400);
         res.end(JSON.stringify({ error: 'Missing or invalid "signals" array' }));
         return;
     }
+    const signals = normalizeSignals(parsed.signals);
     
     try {
         const capsule = await evomap.selectCapsule(signals);
@@ -1299,6 +1370,105 @@ async function handleImport(
         console.error('[Hub API] Import error:', error);
         res.writeHead(500);
         res.end(JSON.stringify({ error: 'Import failed', detail: (error as Error).message }));
+    }
+}
+
+/**
+ * Prepare distillation (phase 1)
+ */
+async function handleDistillPrepare(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    evomap: LocalEvomap
+): Promise<void> {
+    if (!checkApiKey(req)) {
+        res.writeHead(401);
+        res.end(JSON.stringify({ error: 'Authentication required' }));
+        return;
+    }
+    
+    try {
+        const result = await evomap.prepareDistillation();
+        if (!result) {
+            res.writeHead(200);
+            res.end(JSON.stringify({ 
+                distillation: null, 
+                message: 'Distillation conditions not met (min capsules, interval, or success rate)' 
+            }));
+            return;
+        }
+        
+        res.writeHead(200);
+        res.end(JSON.stringify({ distillation: result }));
+    } catch (error) {
+        console.error('[Hub API] Distill prepare error:', error);
+        res.writeHead(500);
+        res.end(JSON.stringify({ error: 'Distillation preparation failed', detail: (error as Error).message }));
+    }
+}
+
+/**
+ * Complete distillation (phase 2)
+ */
+async function handleDistillComplete(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    evomap: LocalEvomap
+): Promise<void> {
+    if (!checkApiKey(req)) {
+        res.writeHead(401);
+        res.end(JSON.stringify({ error: 'Authentication required' }));
+        return;
+    }
+    
+    const body = await readRequestBody(req);
+    let parsed: any;
+    try {
+        parsed = JSON.parse(body);
+    } catch (e) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: 'Invalid JSON', detail: (e as Error).message }));
+        return;
+    }
+    
+    if (!parsed.responseText || typeof parsed.responseText !== 'string') {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: 'Missing "responseText" field (LLM response)' }));
+        return;
+    }
+    
+    try {
+        const result = await evomap.completeDistillation(
+            parsed.responseText,
+            parsed.sourceCapsuleIds
+        );
+        
+        const statusCode = result.success ? 201 : 422;
+        res.writeHead(statusCode);
+        res.end(JSON.stringify(result));
+    } catch (error) {
+        console.error('[Hub API] Distill complete error:', error);
+        res.writeHead(500);
+        res.end(JSON.stringify({ error: 'Distillation completion failed', detail: (error as Error).message }));
+    }
+}
+
+/**
+ * Check distillation readiness
+ */
+async function handleDistillStatus(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    evomap: LocalEvomap
+): Promise<void> {
+    try {
+        const ready = await evomap.shouldDistill();
+        res.writeHead(200);
+        res.end(JSON.stringify({ ready }));
+    } catch (error) {
+        console.error('[Hub API] Distill status error:', error);
+        res.writeHead(500);
+        res.end(JSON.stringify({ error: 'Status check failed', detail: (error as Error).message }));
     }
 }
 

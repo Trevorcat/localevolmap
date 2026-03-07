@@ -1,10 +1,13 @@
 import { test, expect, request as playwrightRequest } from '@playwright/test';
 
+const TEST_BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
+const RUN_ID = `${Date.now()}`;
+
 test.describe('Detail View and Edit Functionality', () => {
     test.beforeAll(async () => {
         const apiContext = await playwrightRequest.newContext({
-            baseURL: 'http://localhost:3000',
-            extraHTTPHeaders: { 'Authorization': 'test-api-key' }
+            baseURL: TEST_BASE_URL,
+            extraHTTPHeaders: { 'Authorization': 'Bearer test-api-key' }
         });
 
         // Seed 8 capsules
@@ -13,9 +16,9 @@ test.describe('Detail View and Edit Functionality', () => {
                 data: {
                     type: "Capsule",
                     schema_version: "1.0",
-                    id: `cap-${i}`,
-                    trigger: [`test-${i}`],
-                    gene: `gene-${i}`,
+                    id: `cap-${RUN_ID}-${i}`,
+                    trigger: [`test-${RUN_ID}-${i}`],
+                    gene: `gene-${RUN_ID}-${i}`,
                     summary: `Test capsule ${i}`,
                     confidence: 0.9,
                     changes: { files: [], post_commands: [] }
@@ -28,9 +31,9 @@ test.describe('Detail View and Edit Functionality', () => {
             await apiContext.post('/api/v1/genes', {
                 data: {
                     type: "Gene",
-                    id: `gene-${i}`,
+                    id: `gene-${RUN_ID}-${i}`,
                     category: "feature",
-                    signals_match: [`signal-${i}`],
+                    signals_match: [`signal-${RUN_ID}-${i}`],
                     preconditions: [],
                     strategy: ["Initial strategy"],
                     constraints: {}
@@ -40,7 +43,7 @@ test.describe('Detail View and Edit Functionality', () => {
     });
 
     test.beforeEach(async ({ page }) => {
-        await page.goto('http://localhost:3000');
+        await page.goto('/');
         await page.waitForTimeout(500);
     });
 
@@ -52,7 +55,7 @@ test.describe('Detail View and Edit Functionality', () => {
         // verify there's a view button
         const viewButtons = page.locator('#capsules-tbody button:has-text("View")');
         await expect(viewButtons.first()).toBeVisible();
-        await page.screenshot({ path: 'public/e2e-test-capsules-page.png' });
+        await page.screenshot({ path: 'e2e/screenshots/detail-capsules-page.png' });
     });
 
     test('Step 2 & 3: Gene detail view and edit', async ({ page }) => {
@@ -69,7 +72,7 @@ test.describe('Detail View and Edit Functionality', () => {
         await page.waitForTimeout(500);
         
         // Step 2: Screenshot detail view
-        await page.screenshot({ path: 'public/e2e-test-gene-detail.png' });
+        await page.screenshot({ path: 'e2e/screenshots/detail-gene-view.png' });
         
         // Switch to Edit tab
         const editTab = page.locator('#modal-gene-detail .modal-tab:has-text("编辑")');
@@ -95,7 +98,7 @@ test.describe('Detail View and Edit Functionality', () => {
         }
         
         // Screenshot after edit
-        await page.screenshot({ path: 'public/e2e-test-gene-edit.png' });
+        await page.screenshot({ path: 'e2e/screenshots/detail-gene-edit.png' });
     });
 
     test('Step 4: Capsule detail view and edit', async ({ page }) => {
@@ -109,7 +112,7 @@ test.describe('Detail View and Edit Functionality', () => {
         const modal = page.locator('#modal-capsule-detail');
         await expect(modal).toBeVisible();
         await page.waitForTimeout(500);
-        await page.screenshot({ path: 'public/e2e-test-capsule-detail.png' });
+        await page.screenshot({ path: 'e2e/screenshots/detail-capsule-view.png' });
         
         // Edit Capsule
         const editTab = page.locator('#modal-capsule-detail .modal-tab:has-text("编辑")');
@@ -120,6 +123,6 @@ test.describe('Detail View and Edit Functionality', () => {
             if (await editTab2.isVisible()) await editTab2.click();
         }
         await page.waitForTimeout(500);
-        await page.screenshot({ path: 'public/e2e-test-capsule-edit.png' });
+        await page.screenshot({ path: 'e2e/screenshots/detail-capsule-edit.png' });
     });
 });

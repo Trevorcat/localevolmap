@@ -1,21 +1,20 @@
 import { chromium } from 'playwright';
 import fs from 'fs';
 
+const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
+
 async function run() {
   const browser = await chromium.launch();
   const page = await browser.newPage();
-  
-  // Ensure public directory exists for the screenshot
+
   if (!fs.existsSync('public')) {
     fs.mkdirSync('public');
   }
 
-  await page.goto('http://10.104.11.12:3000');
-  await page.waitForTimeout(2000); // wait for render
-  
-  // take screenshot
+  await page.goto(BASE_URL);
+  await page.waitForTimeout(2000);
   await page.screenshot({ path: 'public/e2e-dashboard-actual-render.png' });
-  
+
   const data = await page.evaluate(() => {
     function getStyles(selector) {
       const el = document.querySelector(selector);
@@ -38,7 +37,6 @@ async function run() {
         boundingHeight: el.getBoundingClientRect().height
       };
     }
-    
     return {
       statsGrid: getStyles('.stats-grid'),
       statCard: getStyles('.stat-card'),
@@ -46,19 +44,17 @@ async function run() {
       statValue: getStyles('.stat-value')
     };
   });
+
   console.log('--- DASHBOARD_DATA ---');
   console.log(JSON.stringify(data, null, 2));
 
-  await page.goto('http://10.104.11.12:3000/genes');
+  await page.goto(`${BASE_URL}/genes`);
   await page.waitForTimeout(2000);
   const genesData = await page.evaluate(() => {
     const el = document.querySelector('.glass-card');
     if (!el) return null;
     const styles = window.getComputedStyle(el);
-    return {
-      height: styles.height,
-      boundingHeight: el.getBoundingClientRect().height
-    };
+    return { height: styles.height, boundingHeight: el.getBoundingClientRect().height };
   });
   console.log('--- GENES_DATA ---');
   console.log(JSON.stringify(genesData, null, 2));

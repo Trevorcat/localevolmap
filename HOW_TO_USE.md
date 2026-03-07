@@ -14,13 +14,13 @@
 
 ### 服务器信息
 
-- **地址**: `http://10.104.11.12:3000`
-- **Dashboard**: `http://10.104.11.12:3000`
-- **API Base**: `http://10.104.11.12:3000/api/v1`
+- **地址**: `http://your-server.example.com:3000`
+- **Dashboard**: `http://your-server.example.com:3000`
+- **API Base**: `http://your-server.example.com:3000/api/v1`
 
 ### 访问 Dashboard
 
-直接在浏览器打开：`http://10.104.11.12:3000`
+直接在浏览器打开：`http://your-server.example.com:3000`
 
 你会看到 4 个页面：
 - **Dashboard** - 概览统计
@@ -34,7 +34,7 @@
 
 ### 1. 配置 API Key
 
-在左侧导航栏底部，输入 API Key（默认：`test-api-key`），按 Enter 保存。
+在左侧导航栏底部，输入 API Key（默认：`YOUR_API_KEY`），按 Enter 保存。
 
 ### 2. 管理基因 (Genes)
 
@@ -95,25 +95,25 @@
 
 写操作需要 Bearer Token：
 ```bash
-Authorization: Bearer test-api-key
+Authorization: Bearer YOUR_API_KEY
 ```
 
 ### 基因 API
 
 **列出基因**:
 ```bash
-curl http://10.104.11.12:3000/api/v1/genes?q=error&category=repair&limit=10
+curl http://your-server.example.com:3000/api/v1/genes?q=error&category=repair&limit=10
 ```
 
 **获取单个基因**:
 ```bash
-curl http://10.104.11.12:3000/api/v1/genes/gene_repair_type_error
+curl http://your-server.example.com:3000/api/v1/genes/gene_repair_type_error
 ```
 
 **创建基因**:
 ```bash
-curl -X POST http://10.104.11.12:3000/api/v1/genes \
-  -H "Authorization: Bearer test-api-key" \
+curl -X POST http://your-server.example.com:3000/api/v1/genes \
+  -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "type": "Gene",
@@ -128,26 +128,26 @@ curl -X POST http://10.104.11.12:3000/api/v1/genes \
 
 **软删除基因**:
 ```bash
-curl -X DELETE http://10.104.11.12:3000/api/v1/genes/gene_my_gene \
-  -H "Authorization: Bearer test-api-key"
+curl -X DELETE http://your-server.example.com:3000/api/v1/genes/gene_my_gene \
+  -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
 ### 胶囊 API
 
 **搜索胶囊**:
 ```bash
-curl "http://10.104.11.12:3000/api/v1/capsules/search?signals=error&minConfidence=0.8&limit=10"
+curl "http://your-server.example.com:3000/api/v1/capsules/search?signals=error&minConfidence=0.8&limit=10"
 ```
 
 **获取单个胶囊**:
 ```bash
-curl http://10.104.11.12:3000/api/v1/capsules/capsule_my_capsule
+curl http://your-server.example.com:3000/api/v1/capsules/capsule_my_capsule
 ```
 
 **创建胶囊**:
 ```bash
-curl -X POST http://10.104.11.12:3000/api/v1/capsules \
-  -H "Authorization: Bearer test-api-key" \
+curl -X POST http://your-server.example.com:3000/api/v1/capsules \
+  -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "type": "Capsule",
@@ -165,20 +165,20 @@ curl -X POST http://10.104.11.12:3000/api/v1/capsules \
 
 **软删除胶囊**:
 ```bash
-curl -X DELETE http://10.104.11.12:3000/api/v1/capsules/capsule_my_capsule \
-  -H "Authorization: Bearer test-api-key"
+curl -X DELETE http://your-server.example.com:3000/api/v1/capsules/capsule_my_capsule \
+  -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
 ### 事件 API
 
 **列出事件**:
 ```bash
-curl "http://10.104.11.12:3000/api/v1/events?limit=20&offset=0"
+curl "http://your-server.example.com:3000/api/v1/events?limit=20&offset=0"
 ```
 
 **获取单个事件**:
 ```bash
-curl http://10.104.11.12:3000/api/v1/events/event_123
+curl http://your-server.example.com:3000/api/v1/events/event_123
 ```
 
 ---
@@ -193,15 +193,15 @@ curl http://10.104.11.12:3000/api/v1/events/event_123
 ```json
 {
   "server": {
-    "baseUrl": "http://10.104.11.12:3000"
+    "baseUrl": "http://your-server.example.com:3000"
   },
   "ssh": {
     "user": "itops",
-    "host": "10.104.11.12",
+    "host": "your-server.example.com",
     "appDir": "/home/itops/localevolmap"
   },
   "api": {
-    "apiKey": "test-api-key"
+    "apiKey": "YOUR_API_KEY"
   }
 }
 ```
@@ -213,7 +213,7 @@ curl http://10.104.11.12:3000/api/v1/events/event_123
 在 OpenCode 中，使用配置的 `baseUrl` 发送 HTTP 请求：
 
 ```typescript
-const baseUrl = 'http://10.104.11.12:3000';
+const baseUrl = 'http://your-server.example.com:3000';
 
 // 获取基因列表
 const genes = await fetch(`${baseUrl}/api/v1/genes`).then(r => r.json());
@@ -222,7 +222,7 @@ const genes = await fetch(`${baseUrl}/api/v1/genes`).then(r => r.json());
 await fetch(`${baseUrl}/api/v1/genes`, {
   method: 'POST',
   headers: {
-    'Authorization': 'Bearer test-api-key',
+    'Authorization': 'Bearer YOUR_API_KEY',
     'Content-Type': 'application/json'
   },
   body: JSON.stringify(geneData)
@@ -234,7 +234,7 @@ await fetch(`${baseUrl}/api/v1/genes`, {
 通过 SSH 在远程服务器执行命令：
 
 ```bash
-ssh itops@10.104.11.12 "cd localevolmap && pm2 status"
+ssh itops@your-server.example.com "cd localevolmap && pm2 status"
 ```
 
 #### 3. 浏览器自动化
@@ -242,7 +242,7 @@ ssh itops@10.104.11.12 "cd localevolmap && pm2 status"
 使用 Playwright 测试远程 UI：
 
 ```bash
-BASE_URL="http://10.104.11.12:3000" npx playwright test
+BASE_URL="http://your-server.example.com:3000" npx playwright test
 ```
 
 ---
@@ -252,14 +252,14 @@ BASE_URL="http://10.104.11.12:3000" npx playwright test
 ### 场景 1: 添加新的错误修复基因
 
 **通过 Dashboard**:
-1. 打开 `http://10.104.11.12:3000/#genes`
+1. 打开 `http://your-server.example.com:3000/#genes`
 2. 点击 "Create Gene"
 3. 填写表单并提交
 
 **通过 API**:
 ```bash
-curl -X POST http://10.104.11.12:3000/api/v1/genes \
-  -H "Authorization: Bearer test-api-key" \
+curl -X POST http://your-server.example.com:3000/api/v1/genes \
+  -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "type": "Gene",
@@ -275,38 +275,38 @@ curl -X POST http://10.104.11.12:3000/api/v1/genes \
 ### 场景 2: 搜索可用的胶囊
 
 **通过 Dashboard**:
-1. 打开 `http://10.104.11.12:3000/#capsules`
+1. 打开 `http://your-server.example.com:3000/#capsules`
 2. 在搜索框输入信号（如 `error`）
 3. 设置最小置信度
 
 **通过 API**:
 ```bash
-curl "http://10.104.11.12:3000/api/v1/capsules/search?signals=TypeError&minConfidence=0.8"
+curl "http://your-server.example.com:3000/api/v1/capsules/search?signals=TypeError&minConfidence=0.8"
 ```
 
 ### 场景 3: 查看最近的进化事件
 
 **通过 Dashboard**:
-- 打开 `http://10.104.11.12:3000/#events`
+- 打开 `http://your-server.example.com:3000/#events`
 - 时间线显示所有事件
 
 **通过 API**:
 ```bash
-curl "http://10.104.11.12:3000/api/v1/events?limit=10"
+curl "http://your-server.example.com:3000/api/v1/events?limit=10"
 ```
 
 ### 场景 4: 清理不需要的基因
 
 **通过 Dashboard**:
-1. 打开 `http://10.104.11.12:3000/#genes`
+1. 打开 `http://your-server.example.com:3000/#genes`
 2. 找到要删除的基因
 3. 点击删除按钮
 4. 确认软删除
 
 **通过 API**:
 ```bash
-curl -X DELETE http://10.104.11.12:3000/api/v1/genes/gene_old_gene \
-  -H "Authorization: Bearer test-api-key"
+curl -X DELETE http://your-server.example.com:3000/api/v1/genes/gene_old_gene \
+  -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
 ---
@@ -316,19 +316,19 @@ curl -X DELETE http://10.104.11.12:3000/api/v1/genes/gene_old_gene \
 ### 查看日志
 
 ```bash
-ssh itops@10.104.11.12 "cd localevolmap && tail -f server.log"
+ssh itops@your-server.example.com "cd localevolmap && tail -f server.log"
 ```
 
 ### 重启服务器
 
 ```bash
-ssh itops@10.104.11.12 "cd localevolmap && pkill -f 'node.*dist/server.js' && . ~/.nvm/nvm.sh && node dist/server.js > server.log 2>&1 &"
+ssh itops@your-server.example.com "cd localevolmap && pkill -f 'node.*dist/server.js' && . ~/.nvm/nvm.sh && node dist/server.js > server.log 2>&1 &"
 ```
 
 ### 查看进程
 
 ```bash
-ssh itops@10.104.11.12 "ps aux | grep 'node.*dist/server' | grep -v grep"
+ssh itops@your-server.example.com "ps aux | grep 'node.*dist/server' | grep -v grep"
 ```
 
 ---
@@ -339,24 +339,24 @@ ssh itops@10.104.11.12 "ps aux | grep 'node.*dist/server' | grep -v grep"
 
 1. 检查服务器是否运行：
    ```bash
-   ssh itops@10.104.11.12 "curl -s http://localhost:3000/api/stats"
+   ssh itops@your-server.example.com "curl -s http://localhost:3000/api/stats"
    ```
 
 2. 检查防火墙：
    ```bash
-   ssh itops@10.104.11.12 "sudo ufw status | grep 3000"
+   ssh itops@your-server.example.com "sudo ufw status | grep 3000"
    ```
 
 ### API 返回 401
 
-- 检查 API Key 是否正确（默认 `test-api-key`）
+- 检查 API Key 是否正确（默认 `YOUR_API_KEY`）
 - 确保 `Authorization` header 格式为 `Bearer <key>`
 
 ### 创建失败
 
 - 检查 JSON 格式是否正确
 - 检查必填字段是否齐全
-- 查看服务器日志：`ssh itops@10.104.11.12 "tail -20 localevolmap/server.log"`
+- 查看服务器日志：`ssh itops@your-server.example.com "tail -20 localevolmap/server.log"`
 
 ---
 

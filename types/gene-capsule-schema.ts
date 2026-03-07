@@ -9,7 +9,85 @@
 // 基础类型
 // ============================================================================
 
-export type Signal = string;
+export type KnownSignal =
+  | 'log_error'
+  | 'system_error'
+  | 'perf_critical'
+  | 'perf_bottleneck'
+  | 'user_feature_request'
+  | 'user_bug_report'
+  | 'security_concern'
+  | 'performance_concern'
+  | 'refactor_request'
+  | 'testing_concern'
+  | 'system_timeout'
+  | 'memory_pressure'
+  | 'cpu_pressure'
+  | 'disk_pressure'
+  | 'network_issue'
+  | 'recurring_failures'
+  | 'low_success_rate'
+  | 'high_success_rate'
+  | 'error_undefined'
+  | 'error_null'
+  | 'error_timeout'
+  | 'error_permission'
+  | 'error_not_found'
+  | 'error_syntax'
+  | 'error_type'
+  | 'error_connection'
+  | 'error_memory'
+  | 'error_stack'
+  | 'error_circular'
+  | 'error_duplicate'
+  | 'error_validation'
+  | 'error_auth'
+  | 'error_authz';
+
+export type DynamicSignal =
+  | `errsig:${string}`
+  | `error_code:${string}`
+  | `error_msg:${string}`
+  | `frequent_gene:${string}`;
+
+type LooseString = string & {};
+
+export type Signal = KnownSignal | DynamicSignal | LooseString;
+
+export type SignalAlias =
+  | 'error'
+  | 'exception'
+  | 'failed'
+  | 'crash'
+  | 'bug'
+  | 'broken'
+  | 'TypeError'
+  | 'ReferenceError'
+  | 'SyntaxError'
+  | 'undefined'
+  | 'null'
+  | 'timeout'
+  | 'permission'
+  | 'not found'
+  | 'performance'
+  | 'warning'
+  | 'security'
+  | 'refactor'
+  | 'test'
+  | 'testing'
+  | 'feature'
+  | 'build'
+  | 'compile'
+  | 'tsc'
+  | 'webpack'
+  | 'vite'
+  | 'esbuild'
+  | 'build failed'
+  | 'compilation error'
+  | 'module'
+  | 'import';
+
+export type SignalPattern = Signal | SignalAlias | `${string}|${string}`;
 
 export type Category = 
   | 'repair'
@@ -53,7 +131,7 @@ export interface Gene {
   category: Category;
   
   /** 信号匹配模式 - 支持多语言别名 "error|错误 | エラー" */
-  signals_match: Signal[];
+  signals_match: SignalPattern[];
   
   /** 前置条件 */
   preconditions: string[];
@@ -82,10 +160,31 @@ export interface Gene {
     description?: string;
     tags?: string[];
   };
+
+  /** 表观遗传标记 - 环境感知的适应度追踪 */
+  epigenetic_marks?: EpigeneticMark[];
+
+  /** 蒸馏元数据 (仅蒸馏基因有) */
+  _distilled_meta?: {
+    source_capsule_ids: string[];
+    distilled_at: string;
+    pattern_summary: string;
+  };
   
   /** 软删除标记 (internal use) */
   _deleted?: boolean;
   _deleted_at?: string;
+}
+
+export interface EpigeneticMark {
+  /** 环境指纹哈希 */
+  env_hash: string;
+  /** 结果状态 */
+  outcome: OutcomeStatus;
+  /** 增减幅度: success +0.05, failure -0.1 */
+  boost: number;
+  /** 记录时间 */
+  timestamp: string;
 }
 
 // ============================================================================
@@ -213,12 +312,24 @@ export interface SelectionOptions {
   
   /** 随机种子 (用于可重复性) */
   randomSeed?: number;
+
+  /** 当前环境指纹（用于表观遗传加成） */
+  envFingerprint?: EnvFingerprint;
+
+  /** 蒸馏基因初始折扣 */
+  distilledScoreFactor?: number;
   
   /** 最小置信度阈值 */
   minConfidence?: number;
   
   /** 返回的替代选项数量 */
   alternativesCount?: number;
+
+  /** 被禁止的基因 ID 列表 */
+  bannedGeneIds?: string[];
+
+  /** 偏好的基因 ID (来自记忆图谱) */
+  preferredGeneId?: string;
 }
 
 // ============================================================================
@@ -236,6 +347,40 @@ export interface SelectionResult<T> {
   scoring: {
     selected_score: number;
     all_scores: Map<string, number>;
+  };
+}
+
+// ============================================================================
+// Distiller (蒸馏器) - 胶囊到基因的合成
+// ============================================================================
+
+export interface DistillationRequest {
+  /** 蒸馏提示文件路径 */
+  promptFilePath: string;
+  /** 收集的数据摘要 */
+  dataSummary: {
+    totalCapsules: number;
+    successRate: number;
+    topGenes: Array<{ geneId: string; count: number; avgScore: number }>;
+    coverageGaps: string[];
+    strategyDrifts: Array<{ geneId: string; jaccardSimilarity: number }>;
+  };
+}
+
+export interface DistillationResult {
+  /** 是否成功 */
+  success: boolean;
+  /** 新合成的基因 (成功时) */
+  gene?: Gene;
+  /** 失败原因 */
+  error?: string;
+  /** 验证详情 */
+  validation?: {
+    idValid: boolean;
+    maxFilesValid: boolean;
+    forbiddenPathsValid: boolean;
+    signalOverlapCheck: boolean;
+    structureValid?: boolean;
   };
 }
 
@@ -279,15 +424,18 @@ export interface EvolutionConfig {
   }>;
   
   /** 回滚策略配置 */
-  rollbackEnabled: boolean;
-  rollbackStrategy: 'full' | 'partial' | 'none';
+  rollbackEnabled?: boolean;
+  rollbackStrategy?: 'full' | 'partial' | 'none';
   
   /** 缓存策略配置 */
-  cacheEnabled: boolean;
-  cacheTtlMs: number;
+  cacheEnabled?: boolean;
+  cacheTtlMs?: number;
   
   /** Dry-run 模式：只记录 changes 但不写磁盘 */
   dryRun?: boolean;
+  
+  /** 低风险变更自动审批（跳过 approval gate） */
+  autoApproveLowRisk?: boolean;
 }
 
 // ============================================================================

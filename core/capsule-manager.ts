@@ -1,15 +1,9 @@
 /**
  * Capsule Manager - 胶囊管理器
- * 
- * 负责胶囊的存储、检索、匹配和复用决策
  */
 
-import type { Capsule, Signal, EnvFingerprint } from '../types/gene-capsule-schema';
+import type { Capsule, EnvFingerprint, Signal } from '../types/gene-capsule-schema';
 import { matchPatternToSignals } from './gene-selector';
-
-// ============================================================================
-// 存储接口
-// ============================================================================
 
 export interface CapsuleStore {
   get(id: string): Promise<Capsule | undefined>;
@@ -22,10 +16,6 @@ export interface CapsuleStore {
   searchByCategory(category: string): Promise<Capsule[]>;
 }
 
-// ============================================================================
-// 胶囊匹配
-// ============================================================================
-
 export interface ScoredCapsule {
   capsule: Capsule;
   score: number;
@@ -34,82 +24,70 @@ export interface ScoredCapsule {
   successWeight: number;
 }
 
-/**
- * 根据信号和环境匹配最佳胶囊
- * 
- * 评分算法：
- * 1. 信号匹配得分：每个匹配的触发信号 +1 分
- * 2. 环境匹配度：平台 +2, 架构 +1, Node 版本 +1
- * 3. 成功率加权：成功 1.5x, 失败 0.5x
- * 4. 综合得分 = (信号分 + 环境分) × 置信度 × 成功权重
- */
+function isCapsuleSelectable(capsule: Capsule, currentEnv: EnvFingerprint): boolean {
+  if (capsule._deleted || capsule.outcome.status === 'failed') {
+    return false;
+  }
+
+  return checkEnvironmentCompatibility(capsule, currentEnv).compatible;
+}
+
 export function selectCapsule(
   capsules: Capsule[],
-  signals: Signal[],
+  signals: readonly string[],
   currentEnv: EnvFingerprint
 ): Capsule | undefined {
   if (capsules.length === 0) return undefined;
-  
-  const scored: ScoredCapsule[] = capsules.map(c => {
-    // 1. 信号匹配得分
+
+  const activeCapsules = capsules.filter(capsule => isCapsuleSelectable(capsule, currentEnv));
+  if (activeCapsules.length === 0) return undefined;
+
+  const scored: ScoredCapsule[] = activeCapsules.map(capsule => {
     let signalScore = 0;
-    c.trigger.forEach(trigger => {
+    capsule.trigger.forEach(trigger => {
       if (matchPatternToSignals(trigger, signals)) {
         signalScore++;
       }
     });
-    
-    // 2. 环境匹配度
+
     let envScore = 0;
-    if (c.env_fingerprint) {
-      if (c.env_fingerprint.platform === currentEnv.platform) envScore += 2;
-      if (c.env_fingerprint.arch === currentEnv.arch) envScore += 1;
-      if (c.env_fingerprint.node_version === currentEnv.node_version) envScore += 1;
-    }
-    
-    // 3. 成功率加权
-    const successWeight = c.outcome.status === 'success' ? 1.5 : 
-                         c.outcome.status === 'partial' ? 1.0 : 0.5;
-    
-    // 4. 综合得分
-    const totalScore = (signalScore + envScore) * c.confidence * successWeight;
-    
+    if (capsule.env_fingerprint.platform === currentEnv.platform) envScore += 2;
+    if (capsule.env_fingerprint.arch === currentEnv.arch) envScore += 1;
+    if (capsule.env_fingerprint.node_version === currentEnv.node_version) envScore += 1;
+
+    const successWeight = capsule.outcome.status === 'success'
+      ? 1.5
+      : capsule.outcome.status === 'partial'
+        ? 1.0
+        : 0.5;
+
     return {
-      capsule: c,
-      score: totalScore,
+      capsule,
+      score: (signalScore + envScore) * capsule.confidence * successWeight,
       signalScore,
       envScore,
       successWeight
     };
   });
-  
-  // 过滤掉无信号匹配的，按得分排序
-  const valid = scored
-    .filter(x => x.signalScore > 0)
-    .sort((a, b) => b.score - a.score);
-  
+
+  const valid = scored.filter(item => item.signalScore > 0).sort((left, right) => right.score - left.score);
   return valid.length > 0 ? valid[0].capsule : undefined;
 }
 
-/**
- * 查找所有匹配的胶囊（不选最佳）
- */
 export function findMatchingCapsules(
   capsules: Capsule[],
-  signals: Signal[],
+  signals: readonly string[],
   minSignalMatch: number = 1
 ): Capsule[] {
-  return capsules.filter(c => {
-    const matchCount = c.trigger.filter(t => 
-      matchPatternToSignals(t, signals)
-    ).length;
+  return capsules.filter(capsule => {
+    if (capsule._deleted || capsule.outcome.status === 'failed') {
+      return false;
+    }
+
+    const matchCount = capsule.trigger.filter(trigger => matchPatternToSignals(trigger, signals)).length;
     return matchCount >= minSignalMatch;
   });
 }
-
-// ============================================================================
-// 胶囊复用决策
-// ============================================================================
 
 export interface ReuseDecision {
   shouldReuse: boolean;
@@ -117,22 +95,12 @@ export interface ReuseDecision {
   confidence: number;
 }
 
-/**
- * 决定是否复用胶囊
- * 
- * 复用条件：
- * 1. 置信度 >= 阈值（默认 0.6）
- * 2. 历史状态不是失败
- * 3. 至少 2 个信号匹配
- * 4. 环境兼容性可接受
- */
 export function shouldReuseCapsule(
   capsule: Capsule,
-  signals: Signal[],
+  signals: readonly string[],
   currentEnv?: EnvFingerprint,
   minConfidence: number = 0.6
 ): ReuseDecision {
-  // 1. 置信度检查
   if (capsule.confidence < minConfidence) {
     return {
       shouldReuse: false,
@@ -140,21 +108,16 @@ export function shouldReuseCapsule(
       confidence: capsule.confidence
     };
   }
-  
-  // 2. 历史成功率检查
-  if (capsule.outcome.status === 'failed') {
+
+  if (capsule.outcome.status === 'failed' || capsule._deleted) {
     return {
       shouldReuse: false,
-      reason: 'Capsule has failed outcome history',
+      reason: 'Capsule is inactive or has failed outcome history',
       confidence: 0
     };
   }
-  
-  // 3. 信号匹配检查
-  const matchCount = capsule.trigger.filter(t => 
-    matchPatternToSignals(t, signals)
-  ).length;
-  
+
+  const matchCount = capsule.trigger.filter(trigger => matchPatternToSignals(trigger, signals)).length;
   if (matchCount < 2) {
     return {
       shouldReuse: false,
@@ -162,8 +125,7 @@ export function shouldReuseCapsule(
       confidence: capsule.confidence * (matchCount / 2)
     };
   }
-  
-  // 4. 环境兼容性检查（如果提供）
+
   if (currentEnv) {
     const envCompat = checkEnvironmentCompatibility(capsule, currentEnv);
     if (!envCompat.compatible) {
@@ -174,7 +136,7 @@ export function shouldReuseCapsule(
       };
     }
   }
-  
+
   return {
     shouldReuse: true,
     reason: 'All reuse criteria met',
@@ -182,23 +144,16 @@ export function shouldReuseCapsule(
   };
 }
 
-/**
- * 环境兼容性检查
- */
 export interface EnvironmentCompatibility {
   compatible: boolean;
   reason: string;
   compatibilityScore: number;
 }
 
-function checkEnvironmentCompatibility(
-  capsule: Capsule,
-  currentEnv: EnvFingerprint
-): EnvironmentCompatibility {
+function checkEnvironmentCompatibility(capsule: Capsule, currentEnv: EnvFingerprint): EnvironmentCompatibility {
   let score = 0;
   let maxScore = 0;
-  
-  // 平台检查（必需）
+
   maxScore += 3;
   if (capsule.env_fingerprint.platform === currentEnv.platform) {
     score += 3;
@@ -209,47 +164,63 @@ function checkEnvironmentCompatibility(
       compatibilityScore: 0
     };
   }
-  
-  // 架构检查（重要）
+
   maxScore += 2;
-  if (capsule.env_fingerprint.arch === currentEnv.arch) {
-    score += 2;
-  } else {
-    score += 1; // 部分兼容
-  }
-  
-  // Node 版本检查（次要）
+  score += capsule.env_fingerprint.arch === currentEnv.arch ? 2 : 1;
+
   maxScore += 1;
   if (capsule.env_fingerprint.node_version === currentEnv.node_version) {
     score += 1;
   } else if (majorVersionMatch(capsule.env_fingerprint.node_version, currentEnv.node_version)) {
     score += 0.5;
   }
-  
+
   const compatibilityScore = score / maxScore;
-  
   return {
     compatible: compatibilityScore >= 0.6,
-    reason: compatibilityScore >= 0.6 
+    reason: compatibilityScore >= 0.6
       ? `Environment compatible (${(compatibilityScore * 100).toFixed(0)}%)`
       : `Environment compatibility low (${(compatibilityScore * 100).toFixed(0)}%)`,
     compatibilityScore
   };
 }
 
-/**
- * 检查 Node 版本主版本是否匹配
- */
 function majorVersionMatch(v1?: string, v2?: string): boolean {
   if (!v1 || !v2) return false;
-  const major1 = v1.split('.')[0];
-  const major2 = v2.split('.')[0];
+  const major1 = v1.replace(/^v/i, '').split('.')[0];
+  const major2 = v2.replace(/^v/i, '').split('.')[0];
   return major1 === major2;
 }
 
-// ============================================================================
-// 胶囊统计与分析
-// ============================================================================
+export function updateCapsuleFeedback(
+  capsule: Capsule,
+  outcomeStatus: Capsule['outcome']['status'],
+  outcomeScore: number
+): Capsule {
+  const adjustedConfidence = outcomeStatus === 'success'
+    ? Math.min(0.99, capsule.confidence + 0.05)
+    : outcomeStatus === 'failed'
+      ? Math.max(0.05, capsule.confidence - 0.1)
+      : capsule.confidence;
+
+  const nextScore = capsule.outcome.score > 0
+    ? Number(((capsule.outcome.score * 0.6) + (outcomeScore * 0.4)).toFixed(4))
+    : outcomeScore;
+
+  return {
+    ...capsule,
+    confidence: Number(adjustedConfidence.toFixed(4)),
+    outcome: {
+      ...capsule.outcome,
+      status: outcomeStatus,
+      score: Number(nextScore.toFixed(4))
+    },
+    metadata: {
+      ...(capsule.metadata || { created_at: new Date().toISOString() }),
+      applied_at: new Date().toISOString()
+    }
+  };
+}
 
 export interface CapsuleStats {
   total: number;
@@ -260,29 +231,21 @@ export interface CapsuleStats {
   successRate: number;
 }
 
-/**
- * 分析胶囊统计信息
- */
 export function analyzeCapsules(capsules: Capsule[]): CapsuleStats {
   const byStatus = new Map<string, number>();
   const byGene = new Map<string, number>();
   let totalConfidence = 0;
   let totalScore = 0;
   let successCount = 0;
-  
-  capsules.forEach(c => {
-    // 按状态统计
-    byStatus.set(c.outcome.status, (byStatus.get(c.outcome.status) || 0) + 1);
-    
-    // 按基因统计
-    byGene.set(c.gene, (byGene.get(c.gene) || 0) + 1);
-    
-    // 累计
-    totalConfidence += c.confidence;
-    totalScore += c.outcome.score;
-    if (c.outcome.status === 'success') successCount++;
+
+  capsules.forEach(capsule => {
+    byStatus.set(capsule.outcome.status, (byStatus.get(capsule.outcome.status) || 0) + 1);
+    byGene.set(capsule.gene, (byGene.get(capsule.gene) || 0) + 1);
+    totalConfidence += capsule.confidence;
+    totalScore += capsule.outcome.score;
+    if (capsule.outcome.status === 'success') successCount++;
   });
-  
+
   return {
     total: capsules.length,
     byStatus,
@@ -293,29 +256,13 @@ export function analyzeCapsules(capsules: Capsule[]): CapsuleStats {
   };
 }
 
-/**
- * 胶囊健康度评分
- */
 export function calculateCapsuleHealth(capsule: Capsule): number {
-  let health = 1.0;
-  
-  // 失败惩罚
-  if (capsule.outcome.status === 'failed') {
-    health *= 0.3;
-  } else if (capsule.outcome.status === 'partial') {
-    health *= 0.7;
-  }
-  
-  // 置信度因子
+  let health = 1;
+  if (capsule.outcome.status === 'failed') health *= 0.3;
+  else if (capsule.outcome.status === 'partial') health *= 0.7;
+
   health *= capsule.confidence;
-  
-  // 影响范围惩罚（太大的影响范围可能有问题）
-  if (capsule.blast_radius.files > 20) {
-    health *= 0.8;
-  }
-  if (capsule.blast_radius.lines > 200) {
-    health *= 0.9;
-  }
-  
-  return Math.max(0, Math.min(1, health));
+  if (capsule.blast_radius.files > 20) health *= 0.8;
+  if (capsule.blast_radius.lines > 200) health *= 0.9;
+  return Number(Math.max(0, Math.min(1, health)).toFixed(4));
 }

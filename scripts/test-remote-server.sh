@@ -1,8 +1,8 @@
 #!/bin/bash
 # LocalEvomap 快速测试脚本
 
-BASE_URL="http://10.104.11.12:3000"
-API_KEY="test-api-key"
+BASE_URL="${BASE_URL:-http://localhost:3000}"
+API_KEY="${API_KEY:-YOUR_API_KEY}"
 
 echo "========================================="
 echo "LocalEvomap 远程服务测试"
@@ -79,5 +79,5 @@ echo "✅ 测试基因已软删除"
 echo -e "\n========================================="
 echo "所有测试完成！"
 echo "========================================="
-echo -e "\n访问 Dashboard: http://10.104.11.12:3000"
+echo -e "\n访问 Dashboard: http://your-server.example.com:3000"
 echo "查看使用文档：HOW_TO_USE.md"

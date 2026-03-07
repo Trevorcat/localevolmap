@@ -9,7 +9,7 @@ export default defineConfig({
   workers: 1,
   reporter: 'html',
   use: {
-    baseURL: process.env.BASE_URL || 'http://10.104.11.12:3000',
+    baseURL: process.env.BASE_URL || 'http://localhost:3000',
     headless: process.env.PLAYWRIGHT_HEADLESS !== 'false',
     trace: 'on-first-retry',
     screenshot: 'on',

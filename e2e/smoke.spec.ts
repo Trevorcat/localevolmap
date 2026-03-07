@@ -256,11 +256,10 @@ test.describe('信号提取', () => {
     expect(Array.isArray(signals)).toBe(true);
   });
 
-  test('空日志应返回空信号数组', async () => {
+  test('空日志应抛出上下文校验错误', async () => {
     ctx = await createTempEvomap();
 
-    const signals = ctx.evomap.extractSignals([]);
-    expect(Array.isArray(signals)).toBe(true);
+    expect(() => ctx.evomap.extractSignals([])).toThrow(/logs or history is required/i);
   });
 });
 

@@ -18,15 +18,15 @@
 ```json
 {
   "server": {
-    "baseUrl": "http://10.104.11.12:3000"
+    "baseUrl": "http://your-server.example.com:3000"
   },
   "ssh": {
     "user": "itops",
-    "host": "10.104.11.12",
+    "host": "your-server.example.com",
     "appDir": "/home/itops/localevolmap"
   },
   "api": {
-    "apiKey": "test-api-key"
+    "apiKey": "YOUR_API_KEY"
   }
 }
 ```
@@ -225,11 +225,11 @@ export async function evolutionAgent(logs: any[]) {
 
 ```bash
 # 测试 API 连接
-curl http://10.104.11.12:3000/api/stats
+curl http://your-server.example.com:3000/api/stats
 
 # 测试创建基因
-curl -X POST http://10.104.11.12:3000/api/v1/genes \
-  -H "Authorization: Bearer test-api-key" \
+curl -X POST http://your-server.example.com:3000/api/v1/genes \
+  -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"type":"Gene","id":"gene_test","category":"repair","signals_match":["error"],"preconditions":["test"],"strategy":["test"],"constraints":{}}'
 ```
@@ -288,11 +288,11 @@ console.log('Matching capsules:', capsules.total);
 
 ```typescript
 headers: {
-  'Authorization': 'Bearer test-api-key'
+  'Authorization': 'Bearer YOUR_API_KEY'
 }
 ```
 
-默认 API Key: `test-api-key`
+默认 API Key: `YOUR_API_KEY`
 可通过环境变量 `HUB_API_KEY` 修改。
 
 ## 📊 使用场景
@@ -371,7 +371,7 @@ await evomap.createCapsule({
 ```typescript
 // 确保认证头正确
 headers: {
-  'Authorization': 'Bearer test-api-key',  // 注意 Bearer 和空格
+  'Authorization': 'Bearer YOUR_API_KEY',  // 注意 Bearer 和空格
   'Content-Type': 'application/json'
 }
 ```
@@ -383,10 +383,10 @@ headers: {
 **解决**:
 ```bash
 # 检查服务器状态
-ssh itops@10.104.11.12 "curl -s http://localhost:3000/api/stats"
+ssh itops@your-server.example.com "curl -s http://localhost:3000/api/stats"
 
 # 查看服务器进程
-ssh itops@10.104.11.12 "ps aux | grep 'node.*dist/server'"
+ssh itops@your-server.example.com "ps aux | grep 'node.*dist/server'"
 ```
 
 ### 问题：创建失败

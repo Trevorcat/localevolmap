@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import fs from 'fs';
 
 test('Explore DOM', async ({ page }) => {
-    await page.goto('http://localhost:3000');
+    await page.goto('/');
     await page.waitForTimeout(2000);
     // Click Genes
     await page.click('.nav-link:has-text("Genes")');

@@ -18,10 +18,11 @@ import type {
   Capsule,
   Gene
 } from './types';
+import { normalizeSignal } from '../../types/signal-registry';
 
 const EVOMAP_CONFIG: EvomapConfig = {
-  baseUrl: process.env.EVOMAP_BASE_URL || 'http://10.104.11.12:3000',
-  apiKey: process.env.EVOMAP_API_KEY || 'test-api-key',
+  baseUrl: process.env.EVOMAP_BASE_URL || 'http://localhost:3000',
+  apiKey: process.env.EVOMAP_API_KEY || 'YOUR_API_KEY',
   minConfidence: 0.7
 };
 
@@ -35,16 +36,16 @@ function extractSignals(errorMessage: string, logs?: unknown[]): string[] {
   if (errorMessage) {
     const lowerMsg = errorMessage.toLowerCase();
     
-    if (lowerMsg.includes('typeerror')) signals.add('TypeError');
-    if (lowerMsg.includes('referenceerror')) signals.add('ReferenceError');
-    if (lowerMsg.includes('syntaxerror')) signals.add('SyntaxError');
-    if (lowerMsg.includes('undefined')) signals.add('undefined');
-    if (lowerMsg.includes('null')) signals.add('null');
-    if (lowerMsg.includes('timeout')) signals.add('timeout');
-    if (lowerMsg.includes('permission')) signals.add('permission');
-    if (lowerMsg.includes('not found')) signals.add('not found');
-    if (lowerMsg.includes('failed')) signals.add('failed');
-    if (lowerMsg.includes('slow') || lowerMsg.includes('performance')) signals.add('performance');
+    if (lowerMsg.includes('typeerror')) signals.add('error_type');
+    if (lowerMsg.includes('referenceerror')) signals.add('log_error');
+    if (lowerMsg.includes('syntaxerror')) signals.add('error_syntax');
+    if (lowerMsg.includes('undefined')) signals.add('error_undefined');
+    if (lowerMsg.includes('null')) signals.add('error_null');
+    if (lowerMsg.includes('timeout')) signals.add('error_timeout');
+    if (lowerMsg.includes('permission')) signals.add('error_permission');
+    if (lowerMsg.includes('not found')) signals.add('error_not_found');
+    if (lowerMsg.includes('failed')) signals.add('user_bug_report');
+    if (lowerMsg.includes('slow') || lowerMsg.includes('performance')) signals.add('performance_concern');
   }
   
   // 从日志提取
@@ -53,7 +54,7 @@ function extractSignals(errorMessage: string, logs?: unknown[]): string[] {
       if (log && typeof log === 'object') {
         const logObj = log as Record<string, unknown>;
         if (logObj.error) {
-          signals.add('error');
+          signals.add('log_error');
           if (typeof logObj.error === 'object' && logObj.error !== null) {
             const errorObj = logObj.error as Record<string, unknown>;
             if (typeof errorObj.message === 'string') {
@@ -64,13 +65,15 @@ function extractSignals(errorMessage: string, logs?: unknown[]): string[] {
             }
           }
         }
-        if (logObj.warning) signals.add('warning');
-        if (logObj.performance) signals.add('performance');
+        if (logObj.warning) signals.add('system_error');
+        if (logObj.performance) signals.add('performance_concern');
       }
     }
   }
   
-  return Array.from(signals);
+  return Array.from(signals)
+    .map(signal => normalizeSignal(signal) || signal)
+    .filter((signal, index, allSignals) => allSignals.indexOf(signal) === index);
 }
 
 /**
@@ -109,10 +112,30 @@ async function searchCapsules(
  * 获取相关基因
  */
 async function getGenes(category?: string, signals?: string[]): Promise<GenesListResult> {
+  if (signals && signals.length > 0) {
+    const response = await fetch(`${EVOMAP_CONFIG.baseUrl}/api/v1/genes/select`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${EVOMAP_CONFIG.apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ signals })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to select gene: ${response.statusText}`);
+    }
+
+    const selected = await response.json() as { selected: Gene; alternatives?: Gene[] };
+    return {
+      total: selected.selected ? 1 : 0,
+      genes: selected.selected ? [selected.selected, ...(selected.alternatives || [])] : []
+    } as GenesListResult;
+  }
+
   const params = new URLSearchParams();
   
   if (category) params.append('category', category);
-  if (signals && signals.length > 0) params.append('signal', signals.join(','));
   
   const url = params.toString() 
     ? `${EVOMAP_CONFIG.baseUrl}/api/v1/genes?${params}`

@@ -7,6 +7,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import type { Gene } from '../types/gene-capsule-schema';
+import { matchPatternToSignals } from '../core/gene-selector';
 
 export class GeneStore {
   constructor(private basePath: string) {}
@@ -76,6 +77,21 @@ export class GeneStore {
   }
   
   /**
+   * 更新或插入基因 (upsert)
+   * 如果基因已存在则更新，否则新增
+   */
+  async upsert(gene: Gene): Promise<void> {
+    const existing = await this.get(gene.id);
+    if (existing) {
+      // 保留软删除标记，合并更新
+      const merged = { ...existing, ...gene };
+      await this.add(merged);
+    } else {
+      await this.add(gene);
+    }
+  }
+  
+  /**
    * 删除基因
    */
   async remove(id: string): Promise<void> {
@@ -104,7 +120,7 @@ export class GeneStore {
     const genes = await this.getAll();
     return genes.filter(g => 
       g.signals_match.some(pattern => 
-        pattern.toLowerCase().includes(signal.toLowerCase())
+        matchPatternToSignals(pattern, [signal])
       )
     );
   }

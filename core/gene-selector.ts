@@ -1,175 +1,231 @@
 /**
  * Gene Selector - 基因选择算法
- * 
- * 基于群体遗传学原理，实现探索/利用平衡的选择机制
  */
 
-import type { Gene, SelectionOptions, SelectionResult, Signal } from '../types/gene-capsule-schema';
+import type {
+  EnvFingerprint,
+  Gene,
+  SelectionOptions,
+  SelectionResult,
+  Signal,
+  SignalPattern
+} from '../types/gene-capsule-schema';
+import { getEpigeneticBoost, pruneExpiredMarks } from './epigenetic';
+import { getSignalConfidence, matchSignalPattern } from '../types/signal-registry';
 
-/**
- * 计算漂移强度
- * 
- * 群体遗传学中的"遗传漂移"概念：
- * - 小群体：漂强度高 → 更多探索（避免局部最优）
- * - 大群体：漂移低 → 更多利用（收敛到最优解）
- * 
- * @param opts 选择配置
- * @returns 漂移强度 (0-1)
- */
+export const DISTILLED_PREFIX = 'gene_distilled_';
+export const DISTILLED_SCORE_FACTOR = 0.8;
+export const FAILED_CAPSULE_BAN_THRESHOLD = 2;
+export const FAILED_CAPSULE_OVERLAP_MIN = 0.6;
+
+export class NoMatchingGeneError extends Error {
+  constructor(signals: readonly string[]) {
+    super(`No matching genes found for signals: ${signals.join(', ')}`);
+    this.name = 'NoMatchingGeneError';
+  }
+}
+
+export class AllGenesBannedError extends Error {
+  constructor() {
+    super('All genes are banned');
+    this.name = 'AllGenesBannedError';
+  }
+}
+
 export function computeDriftIntensity(opts: SelectionOptions): number {
   const effectivePopulationSize = opts.effectivePopulationSize || opts.genePoolSize || 1;
-  
   if (opts.driftEnabled) {
-    // 显式启用漂移：中等到高强度
-    return effectivePopulationSize > 1 
-      ? Math.min(1, 1 / Math.sqrt(effectivePopulationSize) + 0.3) 
+    return effectivePopulationSize > 1
+      ? Math.min(1, 1 / Math.sqrt(effectivePopulationSize) + 0.3)
       : 0.7;
   }
-  
-  // 群体依赖漂移：
-  // Ne=1: intensity=1.0 (纯漂移，完全随机)
-  // Ne=4: intensity=0.5 (平衡)
-  // Ne=25: intensity=0.2 (低漂移，偏向最优)
   return Math.min(1, 1 / Math.sqrt(effectivePopulationSize));
 }
 
-/**
- * 多语言信号匹配
- * 
- * 支持格式："error|错误 | エラー"
- * 任意分支匹配即命中
- * 
- * @param pattern 匹配模式
- * @param signals 信号列表
- * @returns 是否匹配
- */
-export function matchPatternToSignals(pattern: string, signals: Signal[]): boolean {
-  const patternLower = pattern.toLowerCase();
-  
-  if (patternLower.includes('|')) {
-    // 多语言别名模式
-    const branches = patternLower.split('|').map(b => b.trim());
-    return branches.some(needle => 
-      signals.some(s => s.toLowerCase().includes(needle))
-    );
-  }
-  
-  // 简单包含匹配
-  return signals.some(s => s.toLowerCase().includes(patternLower));
+export function matchPatternToSignals(pattern: SignalPattern | string, signals: readonly string[]): boolean {
+  return matchSignalPattern(pattern, signals).matched;
 }
 
-/**
- * 信号匹配评分器
- */
+export function computeSignalOverlap(signals: readonly string[], patterns: readonly string[]): number {
+  if (signals.length === 0 && patterns.length === 0) return 0;
+  if (patterns.length === 0) return 0;
+
+  const matchedPatterns = patterns.filter(pattern => matchSignalPattern(pattern, signals).matched);
+  return matchedPatterns.length / patterns.length;
+}
+
 interface ScoredGene {
   gene: Gene;
   score: number;
-  matchedSignals: Signal[];
+  matchedSignals: string[];
 }
 
-/**
- * 为基因列表评分
- */
-function scoreGenes(genes: Gene[], signals: Signal[]): ScoredGene[] {
+function computeSpecificity(pattern: string, genes: Gene[]): number {
+  const normalizedPattern = pattern.toLowerCase();
+  const occurrences = genes.filter(gene =>
+    gene.signals_match.some(candidate => String(candidate).toLowerCase() === normalizedPattern)
+  ).length;
+  return 1 / (1 + occurrences);
+}
+
+function getDeterministicRandom(opts: SelectionOptions): () => number {
+  if (typeof opts.randomSeed !== 'number') {
+    return Math.random;
+  }
+
+  let state = opts.randomSeed >>> 0;
+  return () => {
+    state = (1664525 * state + 1013904223) >>> 0;
+    return state / 0x100000000;
+  };
+}
+
+function inferPreconditionPenalty(gene: Gene, signals: readonly string[]): number {
+  if (!gene.preconditions || gene.preconditions.length === 0) {
+    return 1;
+  }
+
+  const normalizedSignals = signals.map(signal => signal.toLowerCase());
+  const hasError = normalizedSignals.some(signal => signal.includes('error'));
+  const hasPerformance = normalizedSignals.some(signal => signal.includes('perf') || signal.includes('performance') || signal.includes('timeout'));
+  const hasSecurity = normalizedSignals.some(signal => signal.includes('security') || signal.includes('auth') || signal.includes('permission'));
+  const hasTesting = normalizedSignals.some(signal => signal.includes('test'));
+
+  let penalty = 1;
+
+  for (const precondition of gene.preconditions) {
+    const normalized = precondition.toLowerCase();
+    if (normalized.includes('error') && !hasError) penalty *= 0.6;
+    if (normalized.includes('performance') && !hasPerformance) penalty *= 0.6;
+    if (normalized.includes('security') && !hasSecurity) penalty *= 0.6;
+    if (normalized.includes('test') && !hasTesting) penalty *= 0.6;
+  }
+
+  return penalty;
+}
+
+function getDistilledFactor(gene: Gene, baseFactor: number): number {
+  if (!gene.id.startsWith(DISTILLED_PREFIX)) {
+    return 1;
+  }
+
+  const successCount = gene.epigenetic_marks?.filter(mark => mark.outcome === 'success').length || 0;
+  return Math.min(1, baseFactor + successCount * 0.04);
+}
+
+function scoreGenes(
+  genes: Gene[],
+  signals: readonly string[],
+  envFingerprint?: EnvFingerprint,
+  distilledScoreFactor: number = DISTILLED_SCORE_FACTOR
+): ScoredGene[] {
   return genes.map(gene => {
-    const matchedSignals: Signal[] = [];
-    
-    const score = gene.signals_match.reduce((acc, pattern) => {
-      if (matchPatternToSignals(pattern, signals)) {
-        const matchingSignals = signals.filter(s => 
-          pattern.split('|').some(p => s.toLowerCase().includes(p.trim().toLowerCase()))
-        );
-        matchedSignals.push(...matchingSignals);
-        return acc + 1;
+    pruneExpiredMarks(gene);
+
+    const matchedSignals = new Set<string>();
+    let baseScore = 0;
+
+    for (const pattern of gene.signals_match) {
+      const match = matchSignalPattern(pattern, signals);
+      if (!match.matched) {
+        continue;
       }
-      return acc;
-    }, 0);
-    
-    return { gene, score, matchedSignals: [...new Set(matchedSignals)] };
+
+      const specificity = computeSpecificity(String(pattern), genes);
+      const matchingSignals = signals.filter(signal => matchSignalPattern(pattern, [signal]).matched);
+      matchingSignals.forEach(signal => matchedSignals.add(signal));
+
+      const averageSignalConfidence = matchingSignals.length > 0
+        ? matchingSignals.reduce((sum, signal) => sum + getSignalConfidence(signal), 0) / matchingSignals.length
+        : getSignalConfidence(String(pattern));
+
+      baseScore += match.precision * (1 + specificity) * averageSignalConfidence;
+    }
+
+    const normalizedScore = gene.signals_match.length > 0
+      ? baseScore / gene.signals_match.length
+      : 0;
+
+    const preconditionPenalty = inferPreconditionPenalty(gene, signals);
+    const epigeneticBoost = envFingerprint ? getEpigeneticBoost(gene, envFingerprint) : 0;
+    const distilledFactor = getDistilledFactor(gene, distilledScoreFactor);
+    const finalScore = normalizedScore * preconditionPenalty * distilledFactor + epigeneticBoost;
+
+    return {
+      gene,
+      score: finalScore,
+      matchedSignals: Array.from(matchedSignals)
+    };
   });
 }
 
-/**
- * 根据信号选择最佳基因
- * 
- * 算法流程：
- * 1. 为所有基因评分（基于信号匹配数）
- * 2. 过滤掉无匹配的基因
- * 3. 按分数降序排序
- * 4. 根据漂移强度决定选择策略
- * 
- * @param genes 可用基因池
- * @param signals 当前信号
- * @param opts 选择配置
- * @returns 选择结果（选中基因 + 替代选项 + 评分详情）
- */
 export function selectGene(
   genes: Gene[],
-  signals: Signal[],
+  signals: readonly string[],
   opts: SelectionOptions = {}
 ): SelectionResult<Gene> {
   if (genes.length === 0) {
     throw new Error('Gene pool is empty');
   }
-  
+
   if (signals.length === 0) {
     throw new Error('No signals provided for gene selection');
   }
-  
-  // 1. 评分并过滤
-  const scored = scoreGenes(genes, signals)
-    .filter(x => x.score > 0)
-    .sort((a, b) => b.score - a.score);
-  
+
+  const bannedIds = new Set(opts.bannedGeneIds || []);
+  const activeGenes = bannedIds.size > 0 ? genes.filter(gene => !bannedIds.has(gene.id)) : genes;
+
+  if (activeGenes.length === 0) {
+    throw new AllGenesBannedError();
+  }
+
+  const scored = scoreGenes(activeGenes, signals, opts.envFingerprint, opts.distilledScoreFactor)
+    .filter(item => item.score > 0)
+    .sort((left, right) => right.score - left.score);
+
   if (scored.length === 0) {
-    throw new Error(`No matching genes found for signals: ${signals.join(', ')}`);
+    throw new NoMatchingGeneError(signals);
   }
-  
-  // 2. 计算漂移强度
+
   const driftIntensity = computeDriftIntensity(opts);
-  
-  // 3. 选择策略
-  let selectedIdx = 0;
-  
-  if (driftIntensity > 0 && scored.length > 1) {
-    // 有漂移且有多于一个选项
-    if (Math.random() < driftIntensity) {
-      // 在 top-N 中随机选择
-      const topN = Math.min(
-        scored.length, 
-        Math.ceil(scored.length * driftIntensity)
-      );
-      selectedIdx = Math.floor(Math.random() * topN);
-    }
-    // else: 选择最优 (idx=0)
+  const rng = getDeterministicRandom(opts);
+  let selectedIndex = 0;
+
+  if (driftIntensity > 0 && scored.length > 1 && rng() < driftIntensity) {
+    const topN = Math.min(scored.length, Math.max(2, Math.ceil(scored.length * driftIntensity)));
+    selectedIndex = Math.floor(rng() * topN);
   }
-  
-  // 4. 构建评分详情
+
+  if (opts.preferredGeneId) {
+    const preferredIndex = scored.findIndex(item => item.gene.id === opts.preferredGeneId);
+    if (preferredIndex >= 0) {
+      selectedIndex = preferredIndex;
+    }
+  }
+
+  const selectedEntry = scored[selectedIndex];
+  const alternatives = scored
+    .filter((_, index) => index !== selectedIndex)
+    .slice(0, opts.alternativesCount || 5)
+    .map(item => item.gene);
+
   const allScores = new Map<string, number>();
   scored.forEach(({ gene, score }) => allScores.set(gene.id, score));
-  
+
   return {
-    selected: scored[selectedIdx].gene,
-    alternatives: scored
-      .slice(1, (opts.alternativesCount || 5) + 1)
-      .map(s => s.gene),
+    selected: selectedEntry.gene,
+    alternatives,
     scoring: {
-      selected_score: scored[selectedIdx].score,
+      selected_score: selectedEntry.score,
       all_scores: allScores
     }
   };
 }
 
-/**
- * 按类别过滤基因
- */
 export function filterGenesByCategory(genes: Gene[], categories: string[]): Gene[] {
-  return genes.filter(g => categories.includes(g.category));
+  return genes.filter(gene => categories.includes(gene.category));
 }
 
-/**
- * 基因池统计信息
- */
 export interface GenePoolStats {
   total: number;
   byCategory: Map<string, number>;
@@ -177,39 +233,67 @@ export interface GenePoolStats {
   mostCommonSignals: Map<string, number>;
 }
 
-/**
- * 分析基因池统计信息
- */
 export function analyzeGenePool(genes: Gene[]): GenePoolStats {
   const byCategory = new Map<string, number>();
   const signalFrequency = new Map<string, number>();
   let totalSignals = 0;
-  
+
   genes.forEach(gene => {
-    // 按类别统计
     byCategory.set(gene.category, (byCategory.get(gene.category) || 0) + 1);
-    
-    // 信号频率统计
     gene.signals_match.forEach(pattern => {
-      pattern.split('|').forEach(branch => {
-        const sig = branch.trim().toLowerCase();
-        signalFrequency.set(sig, (signalFrequency.get(sig) || 0) + 1);
+      String(pattern).split('|').forEach(branch => {
+        const signal = branch.trim().toLowerCase();
+        signalFrequency.set(signal, (signalFrequency.get(signal) || 0) + 1);
       });
       totalSignals++;
     });
   });
-  
-  // 最常用的信号
+
   const mostCommonSignals = new Map(
     [...signalFrequency.entries()]
-      .sort((a, b) => b[1] - a[1])
+      .sort((left, right) => right[1] - left[1])
       .slice(0, 10)
   );
-  
+
   return {
     total: genes.length,
     byCategory,
     avgSignalsPerGene: genes.length > 0 ? totalSignals / genes.length : 0,
     mostCommonSignals
   };
+}
+
+export function banGenesFromFailedCapsules(
+  failedCapsules: Array<{ gene: string; trigger: Signal[] }>,
+  genes: Gene[]
+): string[] {
+  const failCountByGene = new Map<string, number>();
+  const failSignalsByGene = new Map<string, Signal[]>();
+
+  for (const capsule of failedCapsules) {
+    failCountByGene.set(capsule.gene, (failCountByGene.get(capsule.gene) || 0) + 1);
+    failSignalsByGene.set(capsule.gene, [...(failSignalsByGene.get(capsule.gene) || []), ...capsule.trigger]);
+  }
+
+  const bannedIds: string[] = [];
+
+  for (const [geneId, count] of failCountByGene) {
+    if (count < FAILED_CAPSULE_BAN_THRESHOLD) {
+      continue;
+    }
+
+    const gene = genes.find(candidate => candidate.id === geneId);
+    if (!gene) {
+      bannedIds.push(geneId);
+      continue;
+    }
+
+    const failSignals = failSignalsByGene.get(geneId) || [];
+    const overlap = computeSignalOverlap(failSignals, gene.signals_match.map(pattern => String(pattern)));
+    if (overlap >= FAILED_CAPSULE_OVERLAP_MIN) {
+      bannedIds.push(geneId);
+    }
+  }
+
+  return bannedIds;
 }

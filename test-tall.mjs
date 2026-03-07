@@ -1,10 +1,12 @@
 import { chromium } from 'playwright';
 
+const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
+
 async function run() {
   const browser = await chromium.launch();
   const page = await browser.newPage();
   
-  await page.goto('http://10.104.11.12:3000');
+  await page.goto(BASE_URL);
   await page.waitForTimeout(2000); // Wait for render
   
   const data = await page.evaluate(() => {
@@ -17,14 +19,17 @@ async function run() {
          const card = document.querySelector('.stat-card');
          const styles = window.getComputedStyle(card);
          resolve({
-           cardHeight: styles.height,
-           gridRowHeight: window.getComputedStyle(card.parentElement).gridTemplateRows,
-           valueHeight: window.getComputedStyle(el).height
+            cardHeight: styles.height,
+            cardScrollHeight: card.scrollHeight,
+            cardClientHeight: card.clientHeight,
+            bodyHeight: document.body.scrollHeight,
+            html: card.innerHTML,
+            statValue: card.querySelector('.stat-value')?.outerHTML,
+            statLabel: card.querySelector('.stat-label')?.outerHTML
          });
-       }, 500);
+       }, 100);
     });
   });
-  console.log('--- TEST TALL ---');
   console.log(JSON.stringify(data, null, 2));
 
   await browser.close();

@@ -1,16 +1,17 @@
 import { chromium } from 'playwright';
 
+const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
+
 async function run() {
   const browser = await chromium.launch();
   const page = await browser.newPage();
-  
-  await page.goto('http://10.104.11.12:3000');
-  await page.waitForTimeout(2000); // wait for render
-  
+
+  await page.goto(BASE_URL);
+  await page.waitForTimeout(2000);
+
   const data = await page.evaluate(() => {
     const card = document.querySelector('.stat-card');
     if (!card) return null;
-    
     return {
       card: {
         scrollHeight: card.scrollHeight,
@@ -30,9 +31,9 @@ async function run() {
       })
     };
   });
+
   console.log('--- CARD_DATA ---');
   console.log(JSON.stringify(data, null, 2));
-
   await browser.close();
 }
 

@@ -8,7 +8,7 @@
 Authorization: Bearer YOUR_API_KEY
 ```
 
-默认 API Key: `test-api-key`，可通过环境变量 `HUB_API_KEY` 修改。
+默认 API Key: `YOUR_API_KEY`，可通过环境变量 `HUB_API_KEY` 修改。
 
 ---
 
@@ -366,3 +366,81 @@ Authorization: Bearer YOUR_API_KEY
 | `/skill/claude` | text/markdown | Claude Code Skill 文件 |
 | `/skill/opencode` | text/markdown | OpenCode Skill 文件 |
 | `/skill/codex` | text/markdown | Codex AGENTS.md 文件 |
+
+---
+
+## 蒸馏器 API (Distiller)
+
+基因自动合成 — 从累积的成功胶囊中蒸馏出新的基因模式。
+
+### `GET /api/v1/distill/status`
+
+检查蒸馏条件是否满足。
+
+**Response:**
+```json
+{ "ready": true }
+```
+
+### `POST /api/v1/distill/prepare` 🔐
+
+阶段 1: 收集数据、分析模式、生成 LLM 提示文件。
+
+**Response (条件满足):**
+```json
+{
+  "distillation": {
+    "promptFilePath": "./data/distiller/distill-prompt-1234567890.md",
+    "dataSummary": {
+      "totalCapsules": 25,
+      "successRate": 0.8,
+      "topGenes": [{"geneId": "gene_repair", "count": 8, "avgScore": 0.85}],
+      "coverageGaps": ["memory_leak"],
+      "strategyDrifts": []
+    }
+  }
+}
+```
+
+**Response (条件不满足):**
+```json
+{
+  "distillation": null,
+  "message": "Distillation conditions not met..."
+}
+```
+
+### `POST /api/v1/distill/complete` 🔐
+
+阶段 2: 验证 LLM 返回的基因并保存。
+
+**Request:**
+```json
+{
+  "responseText": "{\"type\":\"Gene\",\"id\":\"gene_distilled_memory_fix\",...}",
+  "sourceCapsuleIds": ["capsule_1", "capsule_2"]
+}
+```
+
+**Response (成功, 201):**
+```json
+{
+  "success": true,
+  "gene": { ... },
+  "validation": {
+    "idValid": true,
+    "maxFilesValid": true,
+    "forbiddenPathsValid": true,
+    "signalOverlapCheck": true
+  }
+}
+```
+
+**Response (验证失败, 422):**
+```json
+{
+  "success": false,
+  "error": "ID must start with gene_distilled_; max_files must be <= 12",
+  "validation": { ... }
+}
+```

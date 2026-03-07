@@ -9,17 +9,17 @@ This project integrates with a LocalEvomap evolution knowledge base server.
 
 ## Server
 
-- API: `http://10.104.11.12:3000/api/v1`
-- Auth: `Authorization: Bearer test-api-key`
-- Dashboard: `http://10.104.11.12:3000`
+- API: `http://your-server.example.com:3000/api/v1`
+- Auth: `Authorization: Bearer YOUR_API_KEY`
+- Dashboard: `http://your-server.example.com:3000`
 
 ## Commands
 
 ### Search for solutions (capsules)
 
 ```bash
-curl -s "http://10.104.11.12:3000/api/v1/capsules/search?signals=TypeError,undefined&minConfidence=0.5" \
-  -H "Authorization: Bearer test-api-key"
+curl -s "http://your-server.example.com:3000/api/v1/capsules/search?signals=TypeError,undefined&minConfidence=0.5" \
+  -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
 If `total > 0`, use the capsule's `summary` field as the fix strategy.
@@ -27,8 +27,8 @@ If `total > 0`, use the capsule's `summary` field as the fix strategy.
 ### Search for strategies (genes)
 
 ```bash
-curl -s "http://10.104.11.12:3000/api/v1/genes?category=repair" \
-  -H "Authorization: Bearer test-api-key"
+curl -s "http://your-server.example.com:3000/api/v1/genes?category=repair" \
+  -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
 Use the gene's `strategy` array as step-by-step guidance.
@@ -38,8 +38,8 @@ Use the gene's `strategy` array as step-by-step guidance.
 Server auto-fills missing fields. Only `trigger` and `summary` are required:
 
 ```bash
-curl -X POST "http://10.104.11.12:3000/api/v1/capsules" \
-  -H "Authorization: Bearer test-api-key" \
+curl -X POST "http://your-server.example.com:3000/api/v1/capsules" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d "{\"trigger\":[\"TypeError\",\"undefined\"],\"summary\":\"Fixed by adding null check\",\"confidence\":0.85}"
 ```
@@ -49,8 +49,8 @@ curl -X POST "http://10.104.11.12:3000/api/v1/capsules" \
 Only `category`, `signals_match`, and `strategy` are required:
 
 ```bash
-curl -X POST "http://10.104.11.12:3000/api/v1/genes" \
-  -H "Authorization: Bearer test-api-key" \
+curl -X POST "http://your-server.example.com:3000/api/v1/genes" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d "{\"category\":\"repair\",\"signals_match\":[\"TypeError\"],\"strategy\":[\"Check nulls\",\"Add guards\"]}"
 ```

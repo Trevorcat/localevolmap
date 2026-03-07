@@ -32,7 +32,7 @@ LocalEvomap 是一个**本地进化系统**，帮助你在编码过程中：
 
 ```typescript
 // 在 OpenCode 的终端或代码块中运行
-const response = await fetch('http://10.104.11.12:3000/api/v1/capsules/search?signals=TypeError,undefined&minConfidence=0.7');
+const response = await fetch('http://your-server.example.com:3000/api/v1/capsules/search?signals=TypeError,undefined&minConfidence=0.7');
 const capsules = await response.json();
 console.log('Found capsules:', capsules.total);
 ```
@@ -191,14 +191,14 @@ await evomap.createCapsule({
 # .github/workflows/test.yml
 - name: Check for known issues
   run: |
-    curl -X GET "http://10.104.11.12:3000/api/v1/capsules/search?signals=$ERROR_TYPE" \
-      -H "Authorization: Bearer test-api-key" | jq .
+    curl -X GET "http://your-server.example.com:3000/api/v1/capsules/search?signals=$ERROR_TYPE" \
+      -H "Authorization: Bearer YOUR_API_KEY" | jq .
 
 - name: Record new fix
   if: success()
   run: |
-    curl -X POST "http://10.104.11.12:3000/api/v1/capsules" \
-      -H "Authorization: Bearer test-api-key" \
+    curl -X POST "http://your-server.example.com:3000/api/v1/capsules" \
+      -H "Authorization: Bearer YOUR_API_KEY" \
       -H "Content-Type: application/json" \
       -d '{"type":"Capsule","id":"capsule_'$(date +%s)'",...}'
 ```
@@ -261,7 +261,7 @@ for (const log of errorLogs) {
 // 修改配置
 const EVOMAP_CONFIG = {
   baseUrl: 'http://localhost:3000',  // 本地开发
-  apiKey: 'test-api-key',
+  apiKey: 'YOUR_API_KEY',
   minConfidence: 0.7
 };
 ```
@@ -271,7 +271,7 @@ const EVOMAP_CONFIG = {
 ```typescript
 // 使用远程服务器
 const EVOMAP_CONFIG = {
-  baseUrl: 'http://10.104.11.12:3000',  // 远程服务器
+  baseUrl: 'http://your-server.example.com:3000',  // 远程服务器
   apiKey: process.env.EVOMAP_API_KEY,
   minConfidence: 0.8  // 生产环境使用更高阈值
 };
@@ -304,11 +304,11 @@ const signals = ['error'];  // ❌ 太泛化
 
 ```bash
 # 查看事件历史
-curl http://10.104.11.12:3000/api/v1/events?limit=50
+curl http://your-server.example.com:3000/api/v1/events?limit=50
 
 # 清理低信心胶囊
-curl -X DELETE http://10.104.11.12:3000/api/v1/capsules/capsule_low_confidence_123 \
-  -H "Authorization: Bearer test-api-key"
+curl -X DELETE http://your-server.example.com:3000/api/v1/capsules/capsule_low_confidence_123 \
+  -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
 ## 🔍 故障排查
@@ -317,10 +317,10 @@ curl -X DELETE http://10.104.11.12:3000/api/v1/capsules/capsule_low_confidence_1
 
 ```bash
 # 测试连接
-curl http://10.104.11.12:3000/api/stats
+curl http://your-server.example.com:3000/api/stats
 
 # 检查服务器状态
-ssh itops@10.104.11.12 "ps aux | grep 'node.*dist/server'"
+ssh deploy@your-server.example.com "ps aux | grep 'node.*dist/server'"
 ```
 
 ### 问题 2: 认证失败
@@ -328,7 +328,7 @@ ssh itops@10.104.11.12 "ps aux | grep 'node.*dist/server'"
 ```typescript
 // 确保认证头正确
 headers: {
-  'Authorization': 'Bearer test-api-key',  // 注意 Bearer 和空格
+  'Authorization': 'Bearer YOUR_API_KEY',  // 注意 Bearer 和空格
   'Content-Type': 'application/json'
 }
 ```
@@ -360,7 +360,7 @@ const capsules = await evomap.searchCapsules({
 
 1. **测试连接**:
 ```bash
-curl http://10.104.11.12:3000/api/stats
+curl http://your-server.example.com:3000/api/stats
 ```
 
 2. **搜索胶囊**:
