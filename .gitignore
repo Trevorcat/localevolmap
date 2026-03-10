@@ -8,6 +8,7 @@ dist/
 logs/
 *.log
 npm-debug.log*
+server.log
 
 # Environment files
 .env
@@ -35,6 +36,23 @@ tmp/
 temp/
 *.tmp
 
+# Agent / MCP local state
+.kimi/
+.playwright-mcp/
+
+# Ad-hoc debug artifacts
+*-dom.html
+*-tbody.html
+*-page.png
+*-modal.png
+*-dashboard.png
+*-events.png
+*-check.png
+*_output.json
+*_result.json
+*_full_test.json
+tmp_*.json
+
 # PM2
 .pm2/
 
@@ -50,9 +68,5 @@ deployment/.env.prod
 # Generated debug artifacts
 e2e/screenshots/
 public/e2e-*.png
-*-dom.html
-*-tbody.html
-*_output.json
 tmp_test.json
 nul
-test-server-events.png

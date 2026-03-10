@@ -1,90 +1,35 @@
 # LocalEvomap - 本地能力进化系统
 
-基于 [EvoMap/evolver](https://github.com/EvoMap/evolver/tree/main) 核心思想的本地进化知识系统。让 AI 编码助手在工作过程中自动搜索、复用已验证的解决方案，并将新方案录入共享知识库。
+基于 EvoMap / evolver 思路构建的本地能力进化系统，用来让 AI Agent 在执行任务时：
+
+- 先搜索已有 `Gene` / `Capsule`
+- 在运行时通过 `MCP` 获取统一任务上下文
+- 在任务结束后自主判断是否完成，并提交 retrospective
+- 将验证过的经验沉淀回 LocalEvomap，影响后续 Agent
+
+## 当前标准架构
+
+LocalEvomap 当前采用 **MCP-first** 的标准接入方式：
+
+- **MCP Server**：面向 Agent Runtime 的标准入口，提供 `start_task`、`record_usage`、`finalize_task` 等工具，以及 workspace 资源
+- **Agent Skill**：负责任务完成判断、复盘组织、自主提交 retrospective
+- **HTTP API**：主要用于 Dashboard、管理、运维和数据导入导出，不再作为标准 Agent Runtime 接口
+
+这意味着：Agent 不再依赖旧式 helper / CLI skill 流程，而是通过 MCP 与 LocalEvomap 交互。
 
 ## 核心概念
 
-- **Genes (基因)** — 抽象的知识模式，编码"如何响应特定信号"的策略
-- **Capsules (胶囊)** — 具体、已验证的解决方案，可跨环境复用
-- **Signals (信号)** — 从运行时日志中提取的结构化事件，驱动基因匹配和进化决策
+- **Genes（基因）**：策略模式，回答“看到哪些信号时，优先尝试什么方法”
+- **Capsules（胶囊）**：已验证的解决方案，回答“这个问题上次是怎么修好的”
+- **Signals（信号）**：从任务、错误、日志、用户反馈中提取的结构化特征
+- **Task Session（任务会话）**：一次任务执行期间的上下文容器，用来记录选中的基因、使用过的胶囊和最终反馈
 
 ## 快速开始
 
 ```bash
 npm install
 npm run build
-node dist/server.js
 ```
-
-服务启动后访问 `http://localhost:3000` 查看 Dashboard。
-
-初始化知识库：
-
-```bash
-curl -X POST http://localhost:3000/api/v1/seed -H "Authorization: Bearer YOUR_API_KEY"
-```
-
-## 项目结构
-
-```
-├── core/                    # 核心算法（基因选择、胶囊匹配、信号提取、进化引擎）
-│   └── llm-provider.ts      # LLM 调用（Codex 5.3 SSE 流式 + JSON 提取）
-├── storage/                 # 持久化存储（基因、胶囊、事件日志 JSONL）
-├── types/                   # TypeScript 类型定义
-├── public/                  # Dashboard 单页面应用（单 HTML 文件，无构建步骤）
-├── mcp/                     # MCP 服务入口、Tools、Resources
-├── agent-skill/             # Agent 编排指令（MCP-first）
-├── data/                    # 正式数据存储目录
-├── deployment/              # 部署配置
-│   ├── .env.test            # 测试服环境变量（端口 3001）
-│   └── .env.prod            # 正式服环境变量（端口 3000）
-├── scripts/                 # 部署 & 管理脚本
-│   ├── manage.sh            # 进程管理（start/stop/restart/status test/prod）
-│   ├── deploy-test.sh       # 一键部署到测试服
-│   ├── deploy-prod.sh       # 一键部署到正式服
-│   └── promote.sh           # 测试服代码推进到正式服
-├── server.ts                # HTTP API 服务器
-└── index.ts                 # LocalEvomap 主入口
-```
-
-## 部署
-
-支持测试/正式双环境部署，示例主机使用 `your-server.example.com`：
-
-| 环境 | 端口 | 目录 | 数据 |
-|------|------|------|------|
-| 正式服 | 3000 | `/home/itops/localevolmap` | `./data/` |
-| 测试服 | 3001 | `/home/itops/localevolmap-test` | `./data-test/` |
-
-```bash
-# 日常开发流程
-npm run build              # 本地构建
-./scripts/deploy-test.sh   # 部署到测试服
-# 验证通过后...
-./scripts/promote.sh       # 推进到正式服
-```
-
-详见 [部署指南](./docs/DEPLOYMENT.md)。
-
-## 文档
-
-| 文档 | 说明 |
-|------|------|
-| [部署指南](./docs/DEPLOYMENT.md) | 测试服/正式服双服部署流程、环境变量、数据管理、故障排查 |
-| [快速部署](./DEPLOY_INSTRUCTIONS.md) | 5 步快速部署 cheatsheet |
-| [MCP / Skill 接入](./docs/SKILL_INSTALL.md) | 为 AI 客户端配置 MCP 服务和本地 agent skill |
-| [客户端 MCP 配置示例](./docs/MCP_CLIENT_CONFIG.md) | Cursor / Claude Code / Codex 的可复制配置示例 |
-| [API Reference](./docs/API_REFERENCE.md) | 完整的 HTTP API 文档和 Schema 说明 |
-| [架构设计](./ARCHITECTURE.md) | 系统架构和设计决策 |
-| [研究总结](./RESEARCH_SUMMARY.md) | EvoMap 原始论文研究笔记 |
-
-## 标准接入方式
-
-LocalEvomap 现在的标准 agent 接入方式是：
-
-- **MCP Server**：统一暴露 `start_task`、`record_usage`、`finalize_task`、workspace resources
-- **Agent Skill**：负责任务完成判断与 retrospective 组织
-- **HTTP API**：保留给 Dashboard、管理和运维，不再作为标准 agent runtime path
 
 启动 HTTP 管理面：
 
@@ -98,53 +43,77 @@ node dist/server.js
 npm run mcp:start
 ```
 
-## 支持的 AI 客户端
+Dashboard 默认可通过 `http://localhost:3000` 访问。
 
-| 客户端 | Skill 格式 | 触发方式 |
-|--------|-----------|----------|
-| Claude Code | Slash Command | `/evomap` |
-| OpenCode | Slash Command | `/evomap` |
-| OpenAI Codex | AGENTS.md | 自动加载 |
-| Cursor / Windsurf | AGENTS.md | 自动加载 |
+## 推荐接入流程
 
-历史上的 HTTP helper/CLI skill 已经退场；新的 client 接入应优先连接 MCP，并在本地加载 `agent-skill/SKILL.md` 风格的编排指令。
+1. 启动 `HTTP API` 与 `MCP Server`
+2. 在 Agent 客户端中接入 MCP 配置
+3. 本地加载 `agent-skill/SKILL.md` 风格的任务编排说明
+4. 任务开始时调用 `start_task`
+5. 任务过程中通过 `record_usage` 记录实际生效的基因 / 胶囊 / 经验
+6. Agent 自主判断任务是否完成；完成后调用 `finalize_task`
+7. `finalize_task` 写入 retrospective、效果反馈，并在满足条件时触发 distill
 
-接入说明见 [MCP / Skill 接入](./docs/SKILL_INSTALL.md)。
+## 项目结构
 
-## API 概览
+```text
+├── agent-skill/             # Agent 侧任务编排说明（MCP-first）
+├── core/                    # 核心逻辑：信号提取、选择、反馈、进化服务
+├── data/                    # 本地数据目录
+├── docs/                    # 设计、API、部署与接入文档
+├── examples/                # Cursor / Claude Code / Codex MCP 配置示例
+├── mcp/                     # MCP Server 实现与测试
+├── public/                  # Dashboard 前端资源
+├── storage/                 # Genes / Capsules / Events / Task Session 存储
+├── types/                   # TypeScript 类型定义
+├── server.ts                # HTTP API 入口
+└── index.ts                 # LocalEvomap 主入口
+```
+
+## 文档入口
+
+| 文档 | 说明 |
+|------|------|
+| `docs/SKILL_INSTALL.md` | MCP-first 接入说明与 agent-skill 使用方式 |
+| `docs/MCP_CLIENT_CONFIG.md` | Cursor / Claude Code / Codex 的可复制配置示例 |
+| `docs/API_REFERENCE.md` | HTTP API 与 MCP 相关能力说明 |
+| `docs/DEPLOYMENT.md` | 双环境部署流程 |
+| `agent-skill/SKILL.md` | Agent 如何判断完成、何时提交 retrospective |
+| `examples/.cursor/mcp.json` | Cursor MCP 示例 |
+| `examples/.mcp.json` | Claude Code MCP 示例 |
+| `examples/codex.config.toml` | Codex MCP 示例 |
+
+## 支持的客户端形态
+
+| 客户端 | 推荐方式 |
+|--------|----------|
+| Cursor | MCP + 本地 skill |
+| Claude Code | MCP + 本地 skill |
+| Codex | MCP + 本地 skill |
+| OpenCode | 可参考现有 skill 文档，但新接入应优先 MCP |
+
+## HTTP API 概览
 
 | 方法 | 端点 | 说明 |
 |------|------|------|
 | `GET` | `/api/v1/genes` | 列出基因 |
-| `POST` | `/api/v1/genes` | 创建基因（最小字段: `category`, `signals_match`, `strategy`） |
-| `GET` | `/api/v1/capsules` | 列出所有胶囊 |
+| `POST` | `/api/v1/genes` | 创建基因 |
 | `GET` | `/api/v1/capsules/search` | 搜索胶囊 |
-| `POST` | `/api/v1/capsules` | 创建胶囊（最小字段: `trigger`, `summary`） |
-| `GET` | `/api/v1/capsules/:id/download` | 下载胶囊（需认证） |
-| `POST` | `/api/v1/evolve` | 执行进化（需认证） |
-| `POST` | `/api/v1/feedback` | 提交任务完成后的 retrospective 反馈（需认证） |
-| `POST` | `/api/v1/signals/extract` | 从日志提取信号 |
-| `POST` | `/api/v1/genes/select` | 根据信号选择基因 |
-| `POST` | `/api/v1/capsules/select` | 根据信号选择胶囊 |
-| `GET` | `/api/v1/distill/status` | 检查蒸馏条件是否满足 |
-| `POST` | `/api/v1/distill/prepare` | 准备蒸馏（阶段 1，需认证） |
-| `POST` | `/api/v1/distill/complete` | 完成蒸馏（阶段 2，需认证） |
-| `GET` | `/api/v1/export` | 导出所有数据（需认证） |
-| `POST` | `/api/v1/import` | 导入数据（需认证） |
-| `GET` | `/api/v1/events` | 列出进化事件（支持 `?q=` 搜索，最新在前） |
-| `POST` | `/api/v1/seed` | 预加载基础 Gene 策略（需认证） |
+| `POST` | `/api/v1/capsules` | 创建胶囊 |
+| `POST` | `/api/v1/evolve` | 执行一次进化 |
+| `POST` | `/api/v1/feedback` | 提交 retrospective 反馈 |
+| `GET` | `/api/v1/events` | 查看事件流 |
+| `POST` | `/api/v1/distill/prepare` | 准备蒸馏 |
+| `POST` | `/api/v1/distill/complete` | 完成蒸馏 |
 
-任务结束时，agent 会通过 MCP 的 `finalize_task` 提交 retrospective；MCP 再调用 core 演化逻辑，把复用过的 `Gene` / `Capsule` 效果、自身失误和用户纠正统一回灌给 LocalEvomap。
+更完整的字段与示例请查看 `docs/API_REFERENCE.md`。
 
-详见 [API Reference](./docs/API_REFERENCE.md)。
+## 开发说明
 
-## 安全机制
-
-- **API 认证** — Bearer Token 保护所有写操作
-- **命令白名单** — 只允许安全命令前缀
-- **路径限制** — 禁止访问 `.git`、`node_modules` 等
-- **影响范围估算** — 限制修改文件数和行数
-- **审批流程** — 高风险操作需人工确认
+- 运行前请先配置 API Key / 环境变量
+- 本仓库会生成截图、临时 JSON、DOM 抓取文件等调试产物，这些文件应保留为本地调试用途，不应进入版本库
+- 对 Agent 行为的标准约束以 `agent-skill/SKILL.md` 和 `mcp/server.ts` 为准
 
 ## License
 
