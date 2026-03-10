@@ -28,7 +28,7 @@ export class GeneStore {
       const content = await fs.readFile(filePath, 'utf-8');
       return JSON.parse(content) as Gene;
     } catch (error) {
-      if (error instanceof Error && (error.message.includes('ENOENT'))) {
+      if ((error as NodeJS.ErrnoException)?.code === 'ENOENT' || (error instanceof Error && error.message.includes('ENOENT'))) {
         return undefined;
       }
       throw error;
@@ -64,6 +64,7 @@ export class GeneStore {
    * 添加基因
    */
   async add(gene: Gene): Promise<void> {
+    await fs.mkdir(this.basePath, { recursive: true });
     const filePath = path.join(this.basePath, `${this.sanitizeId(gene.id)}.json`);
     const content = JSON.stringify(gene, null, 2);
     await fs.writeFile(filePath, content, 'utf-8');

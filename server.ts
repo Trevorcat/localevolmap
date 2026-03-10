@@ -514,6 +514,11 @@ async function handleHubApi(
             return;
         }
 
+        if (req.method === 'POST' && pathname === '/api/v1/feedback') {
+            await handleFeedback(req, res, evomap);
+            return;
+        }
+
         // Distiller endpoints
         if (req.method === 'POST' && pathname === '/api/v1/distill/prepare') {
             await handleDistillPrepare(req, res, evomap);
@@ -1234,6 +1239,38 @@ async function handleEvolve(
             res.writeHead(500);
             res.end(JSON.stringify({ error: 'Evolution failed', detail: msg }));
         }
+    }
+}
+
+async function handleFeedback(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    evomap: LocalEvomap
+): Promise<void> {
+    if (!checkApiKey(req)) {
+        res.writeHead(401);
+        res.end(JSON.stringify({ error: 'Authentication required' }));
+        return;
+    }
+
+    const body = await readRequestBody(req);
+    let parsed: any;
+    try {
+        parsed = JSON.parse(body);
+    } catch (error) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: 'Invalid JSON', detail: (error as Error).message }));
+        return;
+    }
+
+    try {
+        const result = await evomap.submitFeedback(parsed);
+        res.writeHead(200);
+        res.end(JSON.stringify(result));
+    } catch (error) {
+        console.error('[Hub API] Feedback error:', error);
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: 'Feedback failed', detail: (error as Error).message }));
     }
 }
 

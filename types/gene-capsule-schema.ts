@@ -93,6 +93,7 @@ export type Category =
   | 'repair'
   | 'optimize'
   | 'feature'
+  | 'analysis'
   | 'security'
   | 'performance'
   | 'refactor'
@@ -294,6 +295,35 @@ export interface EvolutionEvent {
     error?: string;
     [key: string]: unknown;
   };
+}
+
+export interface FeedbackValidation {
+  passed?: boolean;
+  commands_run?: number;
+  errors?: string[];
+}
+
+export interface FeedbackSubmission {
+  signals: Signal[];
+  selected_gene?: string | null;
+  used_capsule?: string | null;
+  summary: string;
+  self_mistakes?: string[];
+  user_corrections?: string[];
+  outcome: {
+    status: OutcomeStatus;
+    score: number;
+  };
+  validation?: FeedbackValidation;
+  create_capsule?: boolean;
+}
+
+export interface FeedbackResult {
+  event_id: string;
+  capsule_id: string | null;
+  gene_updated: boolean;
+  capsule_updated: boolean;
+  distill_ready: boolean;
 }
 
 // ============================================================================

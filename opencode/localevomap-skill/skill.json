@@ -24,9 +24,11 @@
     }
   },
   "capabilities": [
-    "search_capsules",
-    "suggest_genes",
-    "record_solution",
-    "query_events"
+    "start_task",
+    "search_knowledge",
+    "record_usage",
+    "get_task_context",
+    "finalize_task",
+    "workspace_playbook"
   ]
 }

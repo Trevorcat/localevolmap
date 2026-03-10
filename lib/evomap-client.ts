@@ -4,7 +4,16 @@
  * 用于在 OpenCode 中调用远程 LocalEvomap 服务
  */
 
-import config from '../opencode/localevomap.remote.json';
+// LocalEvolmap Client Configuration
+// Server: http://10.104.11.12:3000
+const config = {
+  server: {
+    baseUrl: 'http://10.104.11.12:3000'
+  },
+  api: {
+    apiKey: 'test-api-key'
+  }
+};
 
 export interface Gene {
   type: 'Gene';

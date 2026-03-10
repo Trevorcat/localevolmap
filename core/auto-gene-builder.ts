@@ -47,6 +47,9 @@ function inferCategory(signals: Signal[]): Category {
   if (/feature|add|new|create|implement|功能|新增/.test(signalStr)) {
     return 'feature';
   }
+  if (/analysis|retrospective|feedback|review|总结|复盘|反馈/.test(signalStr)) {
+    return 'analysis';
+  }
   
   // 默认类别
   return 'repair';
@@ -92,6 +95,11 @@ function generateDefaultStrategy(signals: Signal[], category: Category): string[
       '分析优化空间',
       '应用优化策略',
       '验证优化效果'
+    ],
+    analysis: [
+      '归纳任务中的错误与修正',
+      '提炼可复用的经验模式',
+      '验证总结可指导后续任务'
     ],
     feature: [
       '理解新功能需求',

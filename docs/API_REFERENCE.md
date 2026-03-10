@@ -1,5 +1,7 @@
 # LocalEvomap API Reference
 
+> 当前标准 agent runtime path 是 **MCP tools/resources + 本地 agent skill**。本页 HTTP API 主要面向 Dashboard、管理和运维场景。
+
 ## 认证
 
 所有写操作需要 Bearer Token：
@@ -155,6 +157,56 @@ Authorization: Bearer YOUR_API_KEY
   ],
   "dryRun": false,
   "strategy": "repair"
+}
+```
+
+### `POST /api/v1/feedback`
+
+提交任务完成后的 retrospective 反馈（需认证）。适用于 agent 已经自行完成任务，需要把“哪些知识真正生效、自己犯过哪些错、用户给了哪些纠正”回灌到 LocalEvomap 的场景。
+
+**请求:**
+```json
+{
+  "signals": ["TypeError", "undefined", "user_bug_report"],
+  "selected_gene": "gene_repair_general",
+  "used_capsule": "capsule_123",
+  "summary": "Task-end retrospective: reused the null-guard capsule, corrected the missed undefined branch, and validated the final fix.",
+  "self_mistakes": ["Missed the undefined branch in the first patch"],
+  "user_corrections": ["User pointed out the remaining failing branch"],
+  "outcome": {
+    "status": "success",
+    "score": 0.92
+  },
+  "validation": {
+    "passed": true,
+    "commands_run": 2,
+    "errors": []
+  },
+  "create_capsule": true
+}
+```
+
+| 字段 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `signals` | `string[]` | ✅ | 任务中观察到的关键结构化信号 |
+| `selected_gene` | `string` | ❌ | 本次采用或参考的基因 ID |
+| `used_capsule` | `string` | ❌ | 本次复用的胶囊 ID |
+| `summary` | `string` | ✅ | 面向未来 agent 的任务总结 |
+| `self_mistakes` | `string[]` | ❌ | agent 自己识别出的错误 |
+| `user_corrections` | `string[]` | ❌ | 用户指出或纠正的错误 |
+| `outcome.status` | `string` | ✅ | `success` / `failed` / `partial` / `skipped` |
+| `outcome.score` | `number` | ✅ | 0 到 1 之间的结果分数 |
+| `validation` | `object` | ❌ | 任务收尾验证结果 |
+| `create_capsule` | `boolean` | ❌ | 是否基于总结自动创建一个新 capsule，默认 `true` |
+
+**成功响应** (200):
+```json
+{
+  "event_id": "feedback_1773200000_ab12cd",
+  "capsule_id": "feedback_capsule_1773200000",
+  "gene_updated": true,
+  "capsule_updated": true,
+  "distill_ready": false
 }
 ```
 

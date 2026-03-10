@@ -1,0 +1,6 @@
+[mcp_servers.local-evomap]
+command = "node"
+args = ["C:/path/to/your/repo/dist/mcp/server.js"]
+
+[mcp_servers.local-evomap.env]
+TASKS_PATH = "C:/path/to/your/repo/data/tasks"

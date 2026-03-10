@@ -122,3 +122,45 @@ export interface ErrorInfo {
   logs?: any[];
   context?: string;
 }
+
+export interface FeedbackPayloadInput {
+  summary: string;
+  signals: string[];
+  selectedGeneId?: string;
+  usedCapsuleId?: string;
+  selfMistakes?: string[];
+  userCorrections?: string[];
+  outcomeStatus: 'success' | 'failed' | 'partial' | 'skipped';
+  outcomeScore: number;
+  validationPassed?: boolean;
+  validationCommandsRun?: number;
+  validationErrors?: string[];
+  createCapsule?: boolean;
+}
+
+export interface FeedbackRequest {
+  signals: string[];
+  selected_gene?: string;
+  used_capsule?: string;
+  summary: string;
+  self_mistakes?: string[];
+  user_corrections?: string[];
+  outcome: {
+    status: 'success' | 'failed' | 'partial' | 'skipped';
+    score: number;
+  };
+  validation?: {
+    passed?: boolean;
+    commands_run?: number;
+    errors?: string[];
+  };
+  create_capsule?: boolean;
+}
+
+export interface FeedbackResponse {
+  event_id: string;
+  capsule_id: string | null;
+  gene_updated: boolean;
+  capsule_updated: boolean;
+  distill_ready: boolean;
+}

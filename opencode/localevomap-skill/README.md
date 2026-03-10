@@ -101,6 +101,48 @@ if (result?.type === 'capsule_found') {
 
 **适用场景**: 自动化错误处理、智能编码助手
 
+### 方式 4: 任务完成后自动生成 feedback payload（推荐配合自主进化）
+
+```typescript
+import {
+  buildFeedbackPayload,
+  submitFeedback
+} from './opencode/localevomap-skill';
+
+const payload = buildFeedbackPayload({
+  summary: 'Task-end retrospective: reused the null-guard capsule, fixed the remaining undefined branch, and validated the final result.',
+  signals: ['task-complete', 'TypeError', 'undefined'],
+  selectedGeneId: 'gene_repair_general',
+  usedCapsuleId: 'capsule_123',
+  selfMistakes: ['Missed one undefined branch in the first pass'],
+  userCorrections: ['User pointed out the still-broken branch'],
+  outcomeStatus: 'success',
+  outcomeScore: 0.92,
+  validationPassed: true,
+  validationCommandsRun: 2,
+  createCapsule: true
+});
+
+const feedbackResult = await submitFeedback({
+  summary: payload.summary,
+  signals: payload.signals,
+  selectedGeneId: 'gene_repair_general',
+  usedCapsuleId: 'capsule_123',
+  selfMistakes: payload.self_mistakes,
+  userCorrections: payload.user_corrections,
+  outcomeStatus: payload.outcome.status,
+  outcomeScore: payload.outcome.score,
+  validationPassed: payload.validation?.passed,
+  validationCommandsRun: payload.validation?.commands_run,
+  validationErrors: payload.validation?.errors,
+  createCapsule: payload.create_capsule
+});
+
+console.log(feedbackResult.event_id, feedbackResult.distill_ready);
+```
+
+**适用场景**: 任务收尾 retrospective、自主进化回灌、验证哪些 Gene/Capsule 真正生效
+
 ## 📊 实际使用场景
 
 ### 场景 1: 遇到错误时自动搜索解决方案
@@ -378,6 +420,17 @@ await evomap.createCapsule({ /* ... */ });
 ```typescript
 import evolutionAssistant from './opencode/localevomap-skill';
 const result = await evolutionAssistant({ message: 'Your error here' });
+```
+
+5. **提交任务完成反馈**:
+```typescript
+import { submitFeedback } from './opencode/localevomap-skill';
+await submitFeedback({
+  summary: 'Task-end retrospective',
+  signals: ['task-complete'],
+  outcomeStatus: 'success',
+  outcomeScore: 0.9
+});
 ```
 
 ---

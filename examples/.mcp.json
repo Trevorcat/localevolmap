@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "local-evomap": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "C:/path/to/your/repo/dist/mcp/server.js"
+      ],
+      "env": {
+        "TASKS_PATH": "C:/path/to/your/repo/data/tasks"
+      }
+    }
+  }
+}

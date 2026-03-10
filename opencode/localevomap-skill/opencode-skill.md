@@ -1,69 +1,34 @@
 ---
-description: "LocalEvomap Evolution Assistant - Search and reuse verified solutions, record new knowledge"
+description: "LocalEvomap MCP Assistant - task-centered MCP workflow for evolution and retrospective feedback"
 agent: build
 ---
 
-# LocalEvomap Evolution Assistant
+# LocalEvomap MCP Assistant
 
-You have access to a LocalEvomap server at `http://your-server.example.com:3000`.
+Use LocalEvomap through MCP only.
 
-## Configuration
+## MCP workflow
 
-- API Base: `http://your-server.example.com:3000/api/v1`
-- API Key: `YOUR_API_KEY`
-- Auth Header: `Authorization: Bearer YOUR_API_KEY`
+1. Call `start_task` when a new task begins.
+2. Read `evomap://workspace/<workspace>/playbook` if workspace-specific guidance is useful.
+3. Use `search_knowledge` when new signals appear.
+4. Call `record_usage` whenever a recommended `Gene` or `Capsule` truly influences the solution.
+5. The agent decides when a task is complete.
+6. Right before final delivery, call `finalize_task` with the retrospective.
 
-## When to Use
+## Retrospective payload
 
-**BEFORE starting any task** (not just on errors), search for existing solutions and strategies.
+`finalize_task` must include:
 
-## Usage Flow
+- `summary`
+- `outcome`
+- `retrospective.signals`
+- `retrospective.selfMistakes`
+- `retrospective.userCorrections`
+- `retrospective.validations`
 
-### Step 1: Search capsules for existing solutions
+## Rules
 
-```bash
-curl -s "http://your-server.example.com:3000/api/v1/capsules/search?signals=TypeError,undefined&minConfidence=0.5" \
-  -H "Authorization: Bearer YOUR_API_KEY"
-```
-
-### Step 2: Search genes for strategies
-
-```bash
-curl -s "http://your-server.example.com:3000/api/v1/genes?category=repair" \
-  -H "Authorization: Bearer YOUR_API_KEY"
-```
-
-### Step 3: Record solution after fixing
-
-The server accepts minimal data and fills defaults automatically:
-
-```bash
-curl -X POST "http://your-server.example.com:3000/api/v1/capsules" \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d "{\"trigger\":[\"TypeError\"],\"summary\":\"Fixed by adding null check\",\"confidence\":0.85}"
-```
-
-### Step 4: Record reusable strategy
-
-```bash
-curl -X POST "http://your-server.example.com:3000/api/v1/genes" \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d "{\"category\":\"repair\",\"signals_match\":[\"TypeError\"],\"strategy\":[\"Check nulls\",\"Add guards\",\"Test\"]}"
-```
-
-## Minimal Required Fields
-
-**Gene**: `category`, `signals_match` (or `signals`), `strategy`
-**Capsule**: `trigger`, `summary`
-
-Everything else is auto-filled by the server.
-
-## API Reference
-
-- `GET /api/v1/genes` - List genes (params: q, category, signal, limit)
-- `POST /api/v1/genes` - Create gene (auth required, flexible schema)
-- `GET /api/v1/capsules/search` - Search capsules (params: signals, minConfidence, limit)
-- `POST /api/v1/capsules` - Create capsule (auth required, flexible schema)
-- `GET /api/v1/events` - List evolution events
+- Do not use direct HTTP calls for the normal agent path.
+- Do not hand-build feedback JSON outside MCP.
+- Only record usage when the knowledge materially influenced the solution.

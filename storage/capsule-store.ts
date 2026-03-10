@@ -28,7 +28,7 @@ export class CapsuleStore {
       const content = await fs.readFile(filePath, 'utf-8');
       return JSON.parse(content) as Capsule;
     } catch (error) {
-      if (error instanceof Error && error.message.includes('ENOENT')) {
+      if ((error as NodeJS.ErrnoException)?.code === 'ENOENT' || (error instanceof Error && error.message.includes('ENOENT'))) {
         return undefined;
       }
       throw error;
@@ -64,6 +64,7 @@ export class CapsuleStore {
    * 添加胶囊
    */
   async add(capsule: Capsule): Promise<void> {
+    await fs.mkdir(this.basePath, { recursive: true });
     // 检查是否已存在
     const existing = await this.get(capsule.id);
     if (existing) {

@@ -1,76 +1,29 @@
-# LocalEvomap Evolution Assistant
+# LocalEvomap MCP Assistant
 
-This project integrates with a LocalEvomap evolution knowledge base server.
+Use LocalEvomap through MCP only.
 
-## Operational Policy
+## Required workflow
 
-1. **BEFORE starting any task**, search LocalEvomap for existing solutions and strategies.
-2. After fixing an issue, **always record the solution** for future reuse.
+1. Call `start_task` at the beginning of each meaningful task.
+2. Read `evomap://workspace/<workspace>/playbook` when workspace guidance would help.
+3. Call `record_usage` whenever a `Gene` or `Capsule` materially affects your solution.
+4. The agent decides when a task is complete.
+5. Immediately before final delivery, call `finalize_task` with a short retrospective.
 
-## Server
+## Rules
 
-- API: `http://your-server.example.com:3000/api/v1`
-- Auth: `Authorization: Bearer YOUR_API_KEY`
-- Dashboard: `http://your-server.example.com:3000`
+- Do not call LocalEvomap HTTP APIs directly from the agent runtime path.
+- Do not build manual feedback payloads outside MCP.
+- Do not finalize tasks with unresolved blockers.
 
-## Commands
+## Required MCP tools
 
-### Search for solutions (capsules)
+- `start_task`
+- `search_knowledge`
+- `record_usage`
+- `get_task_context`
+- `finalize_task`
 
-```bash
-curl -s "http://your-server.example.com:3000/api/v1/capsules/search?signals=TypeError,undefined&minConfidence=0.5" \
-  -H "Authorization: Bearer YOUR_API_KEY"
-```
+## Required MCP resource
 
-If `total > 0`, use the capsule's `summary` field as the fix strategy.
-
-### Search for strategies (genes)
-
-```bash
-curl -s "http://your-server.example.com:3000/api/v1/genes?category=repair" \
-  -H "Authorization: Bearer YOUR_API_KEY"
-```
-
-Use the gene's `strategy` array as step-by-step guidance.
-
-### Record a new solution (minimal)
-
-Server auto-fills missing fields. Only `trigger` and `summary` are required:
-
-```bash
-curl -X POST "http://your-server.example.com:3000/api/v1/capsules" \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d "{\"trigger\":[\"TypeError\",\"undefined\"],\"summary\":\"Fixed by adding null check\",\"confidence\":0.85}"
-```
-
-### Record a new strategy (minimal)
-
-Only `category`, `signals_match`, and `strategy` are required:
-
-```bash
-curl -X POST "http://your-server.example.com:3000/api/v1/genes" \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d "{\"category\":\"repair\",\"signals_match\":[\"TypeError\"],\"strategy\":[\"Check nulls\",\"Add guards\"]}"
-```
-
-Note: `signals` is accepted as alias for `signals_match`.
-
-## API Endpoints
-
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| GET | `/api/v1/genes` | No | List genes |
-| POST | `/api/v1/genes` | Yes | Create gene (flexible schema, auto-fills defaults) |
-| PUT | `/api/v1/genes/:id` | Yes | Update gene |
-| GET | `/api/v1/capsules/search` | No | Search capsules |
-| POST | `/api/v1/capsules` | Yes | Create capsule (flexible schema, auto-fills defaults) |
-| PUT | `/api/v1/capsules/:id` | Yes | Update capsule |
-| GET | `/api/v1/events` | No | List events |
-
-## Concepts
-
-- **Genes**: Strategy patterns — "when you see X signals, try Y approach"
-- **Capsules**: Verified solutions — reusable fixes with confidence scores
-- **Signals**: Patterns from errors, logs, or user intent
+- `evomap://workspace/<workspace>/playbook`

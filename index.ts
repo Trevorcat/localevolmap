@@ -7,6 +7,8 @@
 import type { 
   EvolutionConfig, 
   EvolutionEvent, 
+  FeedbackResult,
+  FeedbackSubmission,
   Gene, 
   Capsule,
   Signal 
@@ -19,7 +21,7 @@ import { EventLogger } from './storage/event-logger';
 import { EvolutionEngine, type EvolutionEngineConfig, type EventLogger as EventLoggerInterface, type EvolutionResult } from './core/evolution-engine';
 import { extractSignals, prioritizeSignals, analyzeSignals, type LogEntry } from './core/signal-extractor';
 import { selectGene, computeDriftIntensity, analyzeGenePool } from './core/gene-selector';
-import { selectCapsule, shouldReuseCapsule, analyzeCapsules } from './core/capsule-manager';
+import { selectCapsule, shouldReuseCapsule, analyzeCapsules, updateCapsuleFeedback } from './core/capsule-manager';
 import { isValidationCommandAllowed, estimateBlastRadius, requiresApproval } from './core/validation-gate';
 import { prepareDistillation, completeDistillation, shouldDistill, type DistillationState } from './core/skill-distiller';
 import { applyEpigeneticMarks, getEpigeneticBoost, pruneExpiredMarks } from './core/epigenetic';
@@ -160,6 +162,132 @@ export class LocalEvomap {
     }
 
     return result;
+  }
+
+  async submitFeedback(feedback: FeedbackSubmission): Promise<FeedbackResult> {
+    if (!this.initialized) {
+      await this.init();
+    }
+
+    const normalizedSignals = Array.from(new Set((feedback.signals || [])
+      .map(signal => String(signal).trim())
+      .filter(Boolean)
+      .slice(0, 20)));
+
+    if (normalizedSignals.length === 0) {
+      throw new Error('Feedback signals are required');
+    }
+
+    const summary = feedback.summary?.trim();
+    if (!summary) {
+      throw new Error('Feedback summary is required');
+    }
+
+    const selectedGeneId = feedback.selected_gene?.trim() || 'unknown';
+    const usedCapsuleId = feedback.used_capsule?.trim() || undefined;
+    const outcomeScore = Number(Math.max(0, Math.min(1, feedback.outcome?.score ?? 0)));
+    const outcomeStatus = feedback.outcome?.status ?? 'skipped';
+    const commandsRun = Math.max(0, feedback.validation?.commands_run ?? 0);
+    const validationPassed = feedback.validation?.passed ?? (outcomeStatus === 'success');
+    const validationErrors = feedback.validation?.errors?.filter(Boolean);
+    const selfMistakes = (feedback.self_mistakes || []).map(item => item.trim()).filter(Boolean).slice(0, 10);
+    const userCorrections = (feedback.user_corrections || []).map(item => item.trim()).filter(Boolean).slice(0, 10);
+    const envFingerprint = this.getRuntimeEnvFingerprint();
+
+    const event: EvolutionEvent = {
+      id: `feedback_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      timestamp: new Date().toISOString(),
+      signals: normalizedSignals,
+      selected_gene: selectedGeneId,
+      used_capsule: usedCapsuleId,
+      outcome: {
+        status: outcomeStatus,
+        score: Number(outcomeScore.toFixed(4)),
+        changes: {
+          files_modified: 0,
+          lines_added: 0,
+          lines_removed: 0
+        }
+      },
+      validation: {
+        passed: validationPassed,
+        commands_run: commandsRun,
+        errors: validationErrors && validationErrors.length > 0 ? validationErrors : undefined
+      },
+      metadata: {
+        session_id: this.config.session_scope || 'local-dev',
+        feedback: {
+          summary,
+          self_mistakes: selfMistakes,
+          user_corrections: userCorrections,
+          source: 'task-retrospective'
+        }
+      }
+    };
+
+    await this.eventLogger.append(event);
+
+    let geneUpdated = false;
+    let capsuleUpdated = false;
+    let createdCapsuleId: string | null = null;
+
+    const selectedGene = selectedGeneId !== 'unknown'
+      ? await this.geneStore.get(selectedGeneId)
+      : undefined;
+    if (selectedGene) {
+      applyEpigeneticMarks(selectedGene, envFingerprint, outcomeStatus);
+      await this.geneStore.upsert(selectedGene);
+      geneUpdated = true;
+    }
+
+    if (usedCapsuleId) {
+      const usedCapsule = await this.capsuleStore.get(usedCapsuleId);
+      if (usedCapsule) {
+        const updatedCapsule = updateCapsuleFeedback(usedCapsule, outcomeStatus, outcomeScore);
+        await this.capsuleStore.update(updatedCapsule);
+        capsuleUpdated = true;
+      }
+    }
+
+    if (feedback.create_capsule !== false && (outcomeStatus === 'success' || outcomeStatus === 'partial')) {
+      const capsule: Capsule = {
+        type: 'Capsule',
+        schema_version: '1.5.0',
+        id: `feedback_capsule_${Date.now()}`,
+        trigger: normalizedSignals,
+        gene: selectedGeneId,
+        summary,
+        confidence: Number(Math.max(0.6, outcomeScore).toFixed(4)),
+        blast_radius: { files: 0, lines: 0 },
+        outcome: {
+          status: outcomeStatus,
+          score: Number(outcomeScore.toFixed(4))
+        },
+        env_fingerprint: envFingerprint,
+        metadata: {
+          created_at: new Date().toISOString(),
+          session_id: this.config.session_scope,
+          source: 'local',
+          validated: validationPassed
+        }
+      };
+
+      await this.capsuleStore.add(capsule);
+      createdCapsuleId = capsule.id;
+    }
+
+    if (this.engine) {
+      this.engine.setGenePool(await this.geneStore.getAll());
+      this.engine.setCapsulePool(await this.capsuleStore.getAll());
+    }
+
+    return {
+      event_id: event.id,
+      capsule_id: createdCapsuleId,
+      gene_updated: geneUpdated,
+      capsule_updated: capsuleUpdated,
+      distill_ready: await this.shouldDistill()
+    };
   }
   
   /**
@@ -703,6 +831,8 @@ export {
 export type {
   EvolutionConfig,
   EvolutionEvent,
+  FeedbackResult,
+  FeedbackSubmission,
   Gene,
   Capsule,
   Signal

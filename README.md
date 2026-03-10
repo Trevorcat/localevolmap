@@ -32,7 +32,8 @@ curl -X POST http://localhost:3000/api/v1/seed -H "Authorization: Bearer YOUR_AP
 ├── storage/                 # 持久化存储（基因、胶囊、事件日志 JSONL）
 ├── types/                   # TypeScript 类型定义
 ├── public/                  # Dashboard 单页面应用（单 HTML 文件，无构建步骤）
-├── opencode/localevomap-skill/  # AI Skill 分发文件
+├── mcp/                     # MCP 服务入口、Tools、Resources
+├── agent-skill/             # Agent 编排指令（MCP-first）
 ├── data/                    # 正式数据存储目录
 ├── deployment/              # 部署配置
 │   ├── .env.test            # 测试服环境变量（端口 3001）
@@ -71,10 +72,31 @@ npm run build              # 本地构建
 |------|------|
 | [部署指南](./docs/DEPLOYMENT.md) | 测试服/正式服双服部署流程、环境变量、数据管理、故障排查 |
 | [快速部署](./DEPLOY_INSTRUCTIONS.md) | 5 步快速部署 cheatsheet |
-| [AI Skill 安装](./docs/SKILL_INSTALL.md) | 为 Claude Code / OpenCode / Codex 安装 Skill（给 AI 读） |
+| [MCP / Skill 接入](./docs/SKILL_INSTALL.md) | 为 AI 客户端配置 MCP 服务和本地 agent skill |
+| [客户端 MCP 配置示例](./docs/MCP_CLIENT_CONFIG.md) | Cursor / Claude Code / Codex 的可复制配置示例 |
 | [API Reference](./docs/API_REFERENCE.md) | 完整的 HTTP API 文档和 Schema 说明 |
 | [架构设计](./ARCHITECTURE.md) | 系统架构和设计决策 |
 | [研究总结](./RESEARCH_SUMMARY.md) | EvoMap 原始论文研究笔记 |
+
+## 标准接入方式
+
+LocalEvomap 现在的标准 agent 接入方式是：
+
+- **MCP Server**：统一暴露 `start_task`、`record_usage`、`finalize_task`、workspace resources
+- **Agent Skill**：负责任务完成判断与 retrospective 组织
+- **HTTP API**：保留给 Dashboard、管理和运维，不再作为标准 agent runtime path
+
+启动 HTTP 管理面：
+
+```bash
+node dist/server.js
+```
+
+启动 MCP 服务：
+
+```bash
+npm run mcp:start
+```
 
 ## 支持的 AI 客户端
 
@@ -85,17 +107,9 @@ npm run build              # 本地构建
 | OpenAI Codex | AGENTS.md | 自动加载 |
 | Cursor / Windsurf | AGENTS.md | 自动加载 |
 
-一键安装（部署服务器后）：
+历史上的 HTTP helper/CLI skill 已经退场；新的 client 接入应优先连接 MCP，并在本地加载 `agent-skill/SKILL.md` 风格的编排指令。
 
-```bash
-# macOS / Linux
-curl -sL http://YOUR_SERVER/install.sh | bash
-
-# Windows PowerShell
-irm http://YOUR_SERVER/install.ps1 | iex
-```
-
-详见 [AI Skill 安装指南](./docs/SKILL_INSTALL.md)。
+接入说明见 [MCP / Skill 接入](./docs/SKILL_INSTALL.md)。
 
 ## API 概览
 
@@ -108,6 +122,7 @@ irm http://YOUR_SERVER/install.ps1 | iex
 | `POST` | `/api/v1/capsules` | 创建胶囊（最小字段: `trigger`, `summary`） |
 | `GET` | `/api/v1/capsules/:id/download` | 下载胶囊（需认证） |
 | `POST` | `/api/v1/evolve` | 执行进化（需认证） |
+| `POST` | `/api/v1/feedback` | 提交任务完成后的 retrospective 反馈（需认证） |
 | `POST` | `/api/v1/signals/extract` | 从日志提取信号 |
 | `POST` | `/api/v1/genes/select` | 根据信号选择基因 |
 | `POST` | `/api/v1/capsules/select` | 根据信号选择胶囊 |
@@ -118,6 +133,8 @@ irm http://YOUR_SERVER/install.ps1 | iex
 | `POST` | `/api/v1/import` | 导入数据（需认证） |
 | `GET` | `/api/v1/events` | 列出进化事件（支持 `?q=` 搜索，最新在前） |
 | `POST` | `/api/v1/seed` | 预加载基础 Gene 策略（需认证） |
+
+任务结束时，agent 会通过 MCP 的 `finalize_task` 提交 retrospective；MCP 再调用 core 演化逻辑，把复用过的 `Gene` / `Capsule` 效果、自身失误和用户纠正统一回灌给 LocalEvomap。
 
 详见 [API Reference](./docs/API_REFERENCE.md)。
 

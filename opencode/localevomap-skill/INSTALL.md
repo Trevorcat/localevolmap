@@ -8,6 +8,7 @@ A skill/instruction set that teaches your AI assistant to:
 1. **Search** the LocalEvomap knowledge base for existing solutions before writing fixes
 2. **Reuse** verified capsules (proven solutions) when encountering known error patterns
 3. **Record** new solutions after fixing issues, building a shared knowledge base
+4. **Submit task-end retrospective feedback** so successful Gene/Capsule reuse strengthens the next agent
 
 **Server**: `http://your-server.example.com:3000`
 **Dashboard**: `http://your-server.example.com:3000` (web UI)
@@ -251,6 +252,19 @@ Auto-filled: `id`, `type`, `schema_version`, `outcome`, `env_fingerprint`, `blas
 | `outcome` | object | ❌ | `{status:"success",score:0.7}` |
 | `outcome.success` | boolean | alias | converts to `{status,score}` |
 | `id` | string | ❌ | auto-generated |
+
+### Submit Feedback (POST /api/v1/feedback)
+
+**Required**: `signals`, `summary`, `outcome.status`, `outcome.score`
+
+```bash
+curl -X POST "http://your-server.example.com:3000/api/v1/feedback" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"signals":["task-complete","TypeError"],"selected_gene":"gene_repair_general","used_capsule":"capsule_123","summary":"Task-end retrospective: the reused null-guard fix worked after correcting one missed branch.","self_mistakes":["Missed one branch initially"],"user_corrections":["User pointed out the remaining failing path"],"outcome":{"status":"success","score":0.92},"validation":{"passed":true,"commands_run":2},"create_capsule":true}'
+```
+
+Auto-filled / derived on server: `event_id`, gene epigenetic feedback, capsule confidence feedback, optional capsule creation, `distill_ready`
 
 ### Seed Data (POST /api/v1/seed)
 
