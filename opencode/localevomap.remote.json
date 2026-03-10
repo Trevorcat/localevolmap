@@ -1,20 +1,20 @@
 {
   "project": "local-evomap",
-  "environment": "production",
+  "environment": "template",
   "server": {
-    "host": "10.104.11.12",
+    "host": "your-server.example.com",
     "port": 3000,
-    "baseUrl": "http://10.104.11.12:3000"
+    "baseUrl": "http://your-server.example.com:3000"
   },
   "ssh": {
-    "user": "itops",
-    "host": "10.104.11.12",
+    "user": "deploy",
+    "host": "your-server.example.com",
     "port": 22,
-    "appDir": "/home/itops/localevolmap",
-    "envFile": "/home/itops/localevolmap/.env"
+    "appDir": "/srv/local-evomap",
+    "envFile": "/srv/local-evomap/.env"
   },
   "playwright": {
-    "baseUrl": "http://10.104.11.12:3000",
+    "baseUrl": "http://your-server.example.com:3000",
     "headless": true,
     "outputDir": "test-results/playwright"
   },
@@ -22,6 +22,10 @@
     "healthEndpoint": "/api/stats",
     "resetEndpoint": "/api/reset",
     "apiV1Prefix": "/api/v1",
-    "apiKey": "test-api-key"
-  }
+    "apiKey": "YOUR_API_KEY"
+  },
+  "notes": [
+    "Keep this file as a checked-in template for other deployers.",
+    "Copy to a private untracked config if you need environment-specific values."
+  ]
 }

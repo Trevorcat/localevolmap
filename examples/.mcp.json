@@ -7,6 +7,9 @@
         "C:/path/to/your/repo/dist/mcp/server.js"
       ],
       "env": {
+        "GENES_PATH": "C:/path/to/your/repo/data/genes",
+        "CAPSULES_PATH": "C:/path/to/your/repo/data/capsules",
+        "EVENTS_PATH": "C:/path/to/your/repo/data/events",
         "TASKS_PATH": "C:/path/to/your/repo/data/tasks"
       }
     }

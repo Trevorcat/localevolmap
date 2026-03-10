@@ -2,18 +2,19 @@
 
 ## 📋 概述
 
-本目录包含 OpenCode 与远程 LocalEvomap 服务的集成配置。
+本目录包含 OpenCode 与远程 LocalEvomap 服务的仓库模板配置。
 
 ## 📁 文件说明
 
-- `localevomap.remote.json` - 远程服务配置
+- `localevomap.remote.example.json` - 推荐复制使用的远程服务模板
+- `localevomap.remote.json` - 仓库内保留的可复用模板
 - `localevomap-skill/` - OpenCode 技能（待创建）
 
 ## 🔧 配置说明
 
 ### 1. 远程服务配置
 
-已配置在 `localevomap.remote.json`：
+推荐从 `localevomap.remote.example.json` 复制并替换占位符：
 
 ```json
 {
@@ -30,6 +31,19 @@
   }
 }
 ```
+
+需要替换的占位符：
+
+- `your-server.example.com`
+- `YOUR_API_KEY`
+- `deploy`
+- `/srv/local-evomap`
+
+## MCP 说明
+
+OpenCode 当前在本仓库里仍以 HTTP helper 模板为主，因为远端服务默认暴露的是 Dashboard + HTTP API，而不是 MCP over HTTP 端点。
+
+如果你的 OpenCode 运行时未来支持本地 `stdio` MCP server，请优先复用 `docs/MCP_CLIENT_CONFIG.md` 中与 `Cursor` / `Claude Code` / `Codex` 相同的 `node dist/mcp/server.js` 接法。
 
 ### 2. 在 OpenCode 中使用
 

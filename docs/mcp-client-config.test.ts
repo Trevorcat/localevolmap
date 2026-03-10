@@ -2,7 +2,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 
 describe('MCP client configuration docs', () => {
-  test('cover Cursor, Claude Code, and Codex examples', async () => {
+  test('cover Cursor, Claude Code, Codex, Kimi, and OpenCode examples', async () => {
     const filePath = path.join(__dirname, 'MCP_CLIENT_CONFIG.md');
     const content = await fs.readFile(filePath, 'utf-8');
 
@@ -12,6 +12,10 @@ describe('MCP client configuration docs', () => {
     expect(content).toContain('.mcp.json');
     expect(content).toContain('OpenAI Codex');
     expect(content).toContain('~/.codex/config.toml');
+    expect(content).toContain('Kimi');
+    expect(content).toContain('examples/kimi.localevomap.json');
+    expect(content).toContain('OpenCode');
+    expect(content).toContain('opencode/localevomap.remote.example.json');
     expect(content).toContain('dist/mcp/server.js');
   });
 });

@@ -1,0 +1,18 @@
+{
+  "skill": "localevomap",
+  "version": "1.0.0",
+  "server": {
+    "host": "your-server.example.com",
+    "port": 3000,
+    "baseUrl": "http://your-server.example.com:3000",
+    "dashboard": "http://your-server.example.com:3000"
+  },
+  "apiKey": "YOUR_API_KEY",
+  "enabled": true,
+  "autoSearchOnError": true,
+  "minConfidence": 0.7,
+  "notes": [
+    "Copy this file to .kimi/localevolmap.json for your local setup.",
+    "Replace host, baseUrl, and apiKey before use."
+  ]
+}

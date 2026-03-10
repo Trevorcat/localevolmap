@@ -62,7 +62,7 @@ Dashboard 默认可通过 `http://localhost:3000` 访问。
 ├── core/                    # 核心逻辑：信号提取、选择、反馈、进化服务
 ├── data/                    # 本地数据目录
 ├── docs/                    # 设计、API、部署与接入文档
-├── examples/                # Cursor / Claude Code / Codex MCP 配置示例
+├── examples/                # Cursor / Claude Code / Codex / Kimi 配置模板
 ├── mcp/                     # MCP Server 实现与测试
 ├── public/                  # Dashboard 前端资源
 ├── storage/                 # Genes / Capsules / Events / Task Session 存储
@@ -76,13 +76,15 @@ Dashboard 默认可通过 `http://localhost:3000` 访问。
 | 文档 | 说明 |
 |------|------|
 | `docs/SKILL_INSTALL.md` | MCP-first 接入说明与 agent-skill 使用方式 |
-| `docs/MCP_CLIENT_CONFIG.md` | Cursor / Claude Code / Codex 的可复制配置示例 |
+| `docs/MCP_CLIENT_CONFIG.md` | Cursor / Claude Code / Codex / Kimi / OpenCode 的可复制配置模板 |
 | `docs/API_REFERENCE.md` | HTTP API 与 MCP 相关能力说明 |
 | `docs/DEPLOYMENT.md` | 双环境部署流程 |
 | `agent-skill/SKILL.md` | Agent 如何判断完成、何时提交 retrospective |
 | `examples/.cursor/mcp.json` | Cursor MCP 示例 |
 | `examples/.mcp.json` | Claude Code MCP 示例 |
 | `examples/codex.config.toml` | Codex MCP 示例 |
+| `examples/kimi.localevomap.json` | Kimi HTTP helper 配置模板 |
+| `opencode/localevomap.remote.example.json` | OpenCode 远端配置模板 |
 
 ## 支持的客户端形态
 
@@ -91,7 +93,8 @@ Dashboard 默认可通过 `http://localhost:3000` 访问。
 | Cursor | MCP + 本地 skill |
 | Claude Code | MCP + 本地 skill |
 | Codex | MCP + 本地 skill |
-| OpenCode | 可参考现有 skill 文档，但新接入应优先 MCP |
+| Kimi | HTTP helper 配置模板 |
+| OpenCode | HTTP helper / 部署模板；新运行时接入应优先 MCP |
 
 ## HTTP API 概览
 

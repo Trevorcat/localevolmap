@@ -19,10 +19,10 @@ node dist/mcp/server.js
 
 For client configs, prefer an **absolute path** to `dist/mcp/server.js`.
 
-Windows example:
+Template example:
 
 ```text
-E:/projects/test_model/capability/dist/mcp/server.js
+C:/path/to/your/repo/dist/mcp/server.js
 ```
 
 ## Common stdio shape
@@ -30,7 +30,7 @@ E:/projects/test_model/capability/dist/mcp/server.js
 Most MCP clients need the same information:
 
 - command: `node`
-- args: `E:/projects/test_model/capability/dist/mcp/server.js`
+- args: `C:/path/to/your/repo/dist/mcp/server.js`
 - optional env: `GENES_PATH`, `CAPSULES_PATH`, `EVENTS_PATH`, `TASKS_PATH`
 
 Example with env:
@@ -39,15 +39,21 @@ Example with env:
 {
   "type": "stdio",
   "command": "node",
-  "args": ["E:/projects/test_model/capability/dist/mcp/server.js"],
+  "args": ["C:/path/to/your/repo/dist/mcp/server.js"],
   "env": {
-    "GENES_PATH": "E:/projects/test_model/capability/data/genes",
-    "CAPSULES_PATH": "E:/projects/test_model/capability/data/capsules",
-    "EVENTS_PATH": "E:/projects/test_model/capability/data/events",
-    "TASKS_PATH": "E:/projects/test_model/capability/data/tasks"
+    "GENES_PATH": "C:/path/to/your/repo/data/genes",
+    "CAPSULES_PATH": "C:/path/to/your/repo/data/capsules",
+    "EVENTS_PATH": "C:/path/to/your/repo/data/events",
+    "TASKS_PATH": "C:/path/to/your/repo/data/tasks"
   }
 }
 ```
+
+Before using any checked-in template, replace:
+
+- `C:/path/to/your/repo` with your real absolute repo path
+- `YOUR_API_KEY` with your real API key for HTTP-based helpers
+- `your-server.example.com` with your actual host name or IP
 
 ## Cursor
 
@@ -55,7 +61,7 @@ Cursor uses an MCP config file named `mcp.json`.
 
 ### Project-scoped
 
-Create `E:/projects/test_model/capability/.cursor/mcp.json`:
+Copy `examples/.cursor/mcp.json` to your project or global Cursor config and replace the placeholders.
 
 ```json
 {
@@ -63,13 +69,13 @@ Create `E:/projects/test_model/capability/.cursor/mcp.json`:
     "local-evomap": {
       "type": "stdio",
       "command": "node",
-      "args": ["E:/projects/test_model/capability/dist/mcp/server.js"]
+      "args": ["C:/path/to/your/repo/dist/mcp/server.js"]
     }
   }
 }
 ```
 
-Repository template: `E:/projects/test_model/capability/examples/.cursor/mcp.json`
+Repository template: `examples/.cursor/mcp.json`
 
 ### Global
 
@@ -82,12 +88,12 @@ Claude Code supports both CLI registration and project-scoped `.mcp.json`.
 ### CLI registration
 
 ```bash
-claude mcp add-json local-evomap '{"type":"stdio","command":"node","args":["E:/projects/test_model/capability/dist/mcp/server.js"]}'
+claude mcp add-json local-evomap '{"type":"stdio","command":"node","args":["C:/path/to/your/repo/dist/mcp/server.js"]}'
 ```
 
 ### Project-scoped
 
-Create `E:/projects/test_model/capability/.mcp.json`:
+Copy `examples/.mcp.json` into your project root as `.mcp.json` and replace the placeholders.
 
 ```json
 {
@@ -95,13 +101,13 @@ Create `E:/projects/test_model/capability/.mcp.json`:
     "local-evomap": {
       "type": "stdio",
       "command": "node",
-      "args": ["E:/projects/test_model/capability/dist/mcp/server.js"]
+      "args": ["C:/path/to/your/repo/dist/mcp/server.js"]
     }
   }
 }
 ```
 
-Repository template: `E:/projects/test_model/capability/examples/.mcp.json`
+Repository template: `examples/.mcp.json`
 
 ## OpenAI Codex
 
@@ -110,13 +116,13 @@ Codex supports both CLI registration and `~/.codex/config.toml`.
 ### CLI registration
 
 ```bash
-codex mcp add local-evomap -- node E:/projects/test_model/capability/dist/mcp/server.js
+codex mcp add local-evomap -- node C:/path/to/your/repo/dist/mcp/server.js
 ```
 
 With env variables:
 
 ```bash
-codex mcp add local-evomap --env TASKS_PATH=E:/projects/test_model/capability/data/tasks -- node E:/projects/test_model/capability/dist/mcp/server.js
+codex mcp add local-evomap --env TASKS_PATH=C:/path/to/your/repo/data/tasks -- node C:/path/to/your/repo/dist/mcp/server.js
 ```
 
 ### `~/.codex/config.toml`
@@ -124,7 +130,7 @@ codex mcp add local-evomap --env TASKS_PATH=E:/projects/test_model/capability/da
 ```toml
 [mcp_servers.local-evomap]
 command = "node"
-args = ["E:/projects/test_model/capability/dist/mcp/server.js"]
+args = ["C:/path/to/your/repo/dist/mcp/server.js"]
 ```
 
 Optional env block:
@@ -132,13 +138,61 @@ Optional env block:
 ```toml
 [mcp_servers.local-evomap]
 command = "node"
-args = ["E:/projects/test_model/capability/dist/mcp/server.js"]
+args = ["C:/path/to/your/repo/dist/mcp/server.js"]
 
 [mcp_servers.local-evomap.env]
-TASKS_PATH = "E:/projects/test_model/capability/data/tasks"
+TASKS_PATH = "C:/path/to/your/repo/data/tasks"
 ```
 
-Repository template: `E:/projects/test_model/capability/examples/codex.config.toml`
+Repository template: `examples/codex.config.toml`
+
+## Kimi
+
+Kimi in this repository uses an HTTP helper config instead of an MCP stdio config.
+
+Copy and edit:
+
+```text
+examples/kimi.localevomap.json
+```
+
+Then save your local working copy to:
+
+```text
+.kimi/localevolmap.json
+```
+
+The repository tracks the `examples/` template and ignores `.kimi/` local state. Replace these placeholders before use:
+
+- `your-server.example.com`
+- `YOUR_API_KEY`
+
+Use Kimi against the LocalEvomap HTTP API when you want hosted access to `genes`, `capsules`, and retrospective helper flows.
+
+## OpenCode
+
+OpenCode currently uses repository templates for HTTP helper integration and remote deployment metadata.
+
+Copy and edit:
+
+```text
+opencode/localevomap.remote.example.json
+```
+
+The repository also keeps a reusable template at:
+
+```text
+opencode/localevomap.remote.json
+```
+
+These templates include:
+
+- remote server base URL
+- SSH deployment metadata
+- Playwright base URL
+- `/api/v1` prefix and `YOUR_API_KEY`
+
+OpenCode templates are HTTP-oriented today. If you later add MCP support to your OpenCode runtime, reuse the same `stdio` shape shown above for Cursor, Claude Code, and Codex.
 
 ## Other MCP clients
 
@@ -154,7 +208,7 @@ If a client supports stdio MCP servers, map the same values into that client's c
 After registering the MCP server, also load the local workflow instructions from:
 
 ```text
-E:/projects/test_model/capability/agent-skill/SKILL.md
+agent-skill/SKILL.md
 ```
 
 That skill tells the agent to:
