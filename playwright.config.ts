@@ -20,5 +20,10 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  webServer: undefined,
+  webServer: {
+    command: 'node dist/server.js',
+    url: process.env.BASE_URL || 'http://localhost:3000',
+    reuseExistingServer: true,
+    timeout: 120000,
+  },
 });

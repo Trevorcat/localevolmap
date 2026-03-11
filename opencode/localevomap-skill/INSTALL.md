@@ -10,6 +10,8 @@ A skill/instruction set that teaches your AI assistant to:
 3. **Record** new solutions after fixing issues, building a shared knowledge base
 4. **Submit task-end retrospective feedback** so successful Gene/Capsule reuse strengthens the next agent
 
+For MCP-capable clients, the server also publishes a bootstrap manifest so the client can verify runtime + skill versions on startup.
+
 **Server**: `http://your-server.example.com:3000`
 **Dashboard**: `http://your-server.example.com:3000` (web UI)
 **API**: `http://your-server.example.com:3000/api/v1`
@@ -151,6 +153,12 @@ Invoke-WebRequest -Uri "http://your-server.example.com:3000/skill/codex" -OutFil
 
 Codex will auto-load AGENTS.md on next session.
 
+If you run Codex through MCP, prefer configuring these env vars in the MCP server entry:
+
+- `LOCAL_EVOMAP_CLIENT=codex`
+- `LOCAL_EVOMAP_SERVER_URL=http://your-server.example.com:3000`
+- `LOCAL_EVOMAP_SKILL_PATH=~/.codex/AGENTS.md`
+
 ---
 
 ### Cursor / Windsurf / Other AI IDEs
@@ -168,6 +176,8 @@ curl -sL http://your-server.example.com:3000/skill/codex -o AGENTS.md
 Invoke-WebRequest -Uri "http://your-server.example.com:3000/skill/codex" -OutFile "AGENTS.md" -UseBasicParsing
 ```
 
+For Cursor MCP bootstrap and automatic skill updates, prefer a dedicated rule file such as `~/.cursor/rules/localevomap.mdc` and set `LOCAL_EVOMAP_CLIENT=cursor` plus `LOCAL_EVOMAP_SKILL_PATH` in the MCP env.
+
 ---
 
 ## Verify Installation
@@ -184,6 +194,15 @@ curl -s http://your-server.example.com:3000/api/v1/genes | head -c 200
 ```
 
 Expected: JSON response with `total` and `genes` fields.
+
+For MCP bootstrap verification, also check:
+
+```bash
+curl -s http://your-server.example.com:3000/api/v1/agent-manifest | head -c 200
+curl -s http://your-server.example.com:3000/skill/codex | head -c 200
+```
+
+When the MCP runtime starts successfully, `get_runtime_status` should report `ready` or `update_available`. If the server is unreachable, the MCP should still start but formal tools remain disabled.
 
 ---
 

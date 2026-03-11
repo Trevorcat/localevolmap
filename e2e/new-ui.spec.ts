@@ -19,7 +19,7 @@ test.describe('New Multi-Page Dashboard UI E2E', () => {
         await expect(page.locator('.nav-link:has-text("Dashboard")')).toHaveClass(/active/);
         
         // Check dashboard content
-        await expect(page.locator('.stat-card')).toHaveCount(3);
+        await expect(page.locator('.stat-card')).toHaveCount(8);
         
         await page.screenshot({ path: 'e2e/screenshots/new-ui-dashboard.png' });
     });
@@ -100,6 +100,6 @@ test.describe('New Multi-Page Dashboard UI E2E', () => {
         
         // Dashboard should show updated stats
         await page.click('.nav-link:has-text("Dashboard")');
-        await expect(page.locator('.stat-card')).toHaveCount(3);
+        await expect(page.locator('.stat-card')).toHaveCount(8);
     });
 });

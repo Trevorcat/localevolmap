@@ -14,6 +14,58 @@ Authorization: Bearer YOUR_API_KEY
 
 ---
 
+## Agent Bootstrap API
+
+这组接口用于让 MCP 在启动时确认：当前 runtime 和本地 skill 是否仍然是服务端认可的最新版本。
+
+### `GET /api/v1/agent-manifest`
+
+返回服务端权威 manifest，包含：
+
+- `mcp.runtime`
+- `skills.codex`
+- `skills.claude-code`
+- `skills.cursor`
+- `skills.opencode`
+- `skills.kimi`
+
+每个条目都包含：`version`、`hash`、`breaking`、`download_url`、`auto_update_supported`。
+
+### `POST /api/v1/agent/check`
+
+根据 agent 上报的本地状态，返回兼容性判断结果。
+
+**请求**:
+
+```json
+{
+  "client": "codex",
+  "manifest_version_seen": "2026.03.11.1",
+  "mcp_version": "0.1.0",
+  "mcp_hash": "sha256-...",
+  "skill_version": "1.1.0",
+  "skill_hash": "sha256-..."
+}
+```
+
+**响应**:
+
+```json
+{
+  "status": "ready",
+  "blocking": false,
+  "manifest_current": true,
+  "client": "codex",
+  "runtime": { "current": true, "local": { "version": "0.1.0", "hash": "sha256-..." }, "target": { "version": "0.1.0", "hash": "sha256-...", "breaking": true, "download_url": "/api/v1/agent-manifest", "auto_update_supported": false, "source_path": "mcp/server.ts" } },
+  "skill": { "current": true, "local": { "version": "1.1.0", "hash": "sha256-..." }, "target": { "version": "1.1.0", "hash": "sha256-...", "breaking": true, "download_url": "/skill/codex", "auto_update_supported": true, "source_path": "opencode/localevomap-skill/codex-agents.md" } },
+  "reasons": []
+}
+```
+
+`status` 目前会返回：`ready`、`update_available`、`blocked`。
+
+---
+
 ## Gene API
 
 ### `GET /api/v1/genes`

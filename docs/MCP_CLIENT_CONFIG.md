@@ -32,6 +32,7 @@ Most MCP clients need the same information:
 - command: `node`
 - args: `C:/path/to/your/repo/dist/mcp/server.js`
 - optional env: `GENES_PATH`, `CAPSULES_PATH`, `EVENTS_PATH`, `TASKS_PATH`
+- bootstrap env: `LOCAL_EVOMAP_CLIENT`, `LOCAL_EVOMAP_SERVER_URL`, `LOCAL_EVOMAP_SKILL_PATH`
 
 Example with env:
 
@@ -40,8 +41,11 @@ Example with env:
   "type": "stdio",
   "command": "node",
   "args": ["C:/path/to/your/repo/dist/mcp/server.js"],
-  "env": {
-    "GENES_PATH": "C:/path/to/your/repo/data/genes",
+    "env": {
+      "LOCAL_EVOMAP_CLIENT": "codex",
+      "LOCAL_EVOMAP_SERVER_URL": "http://your-server.example.com:3000",
+      "LOCAL_EVOMAP_SKILL_PATH": "C:/Users/your-user/.codex/AGENTS.md",
+      "GENES_PATH": "C:/path/to/your/repo/data/genes",
     "CAPSULES_PATH": "C:/path/to/your/repo/data/capsules",
     "EVENTS_PATH": "C:/path/to/your/repo/data/events",
     "TASKS_PATH": "C:/path/to/your/repo/data/tasks"
@@ -54,6 +58,30 @@ Before using any checked-in template, replace:
 - `C:/path/to/your/repo` with your real absolute repo path
 - `YOUR_API_KEY` with your real API key for HTTP-based helpers
 - `your-server.example.com` with your actual host name or IP
+
+## Bootstrap behavior
+
+At startup, the MCP runtime now checks:
+
+- `GET /api/v1/agent-manifest`
+- `POST /api/v1/agent/check`
+
+The always-available diagnostic tool is `get_runtime_status`.
+
+- If bootstrap status is `ready` or `update_available`, formal tools/resources are available
+- If bootstrap status is `blocked`, `unreachable`, `booting`, `updating`, or `update_failed`, only `get_runtime_status` remains available
+- server unreachable disables formal tools
+
+Supported automatic skill updates:
+
+- `codex`
+- `claude-code`
+- `cursor`
+
+Unsupported automatic skill updates in the current release:
+
+- `opencode`
+- `kimi`
 
 ## Cursor
 
@@ -76,6 +104,12 @@ Copy `examples/.cursor/mcp.json` to your project or global Cursor config and rep
 ```
 
 Repository template: `examples/.cursor/mcp.json`
+
+Recommended local skill path for automatic skill updates:
+
+```text
+~/.cursor/rules/localevomap.mdc
+```
 
 ### Global
 
@@ -108,6 +142,12 @@ Copy `examples/.mcp.json` into your project root as `.mcp.json` and replace the 
 ```
 
 Repository template: `examples/.mcp.json`
+
+Recommended local skill path for automatic skill updates:
+
+```text
+~/.claude/CLAUDE.md
+```
 
 ## OpenAI Codex
 
@@ -146,6 +186,12 @@ TASKS_PATH = "C:/path/to/your/repo/data/tasks"
 
 Repository template: `examples/codex.config.toml`
 
+Recommended local skill path for automatic skill updates:
+
+```text
+~/.codex/AGENTS.md
+```
+
 ## Kimi
 
 Kimi in this repository uses an HTTP helper config instead of an MCP stdio config.
@@ -168,6 +214,8 @@ The repository tracks the `examples/` template and ignores `.kimi/` local state.
 - `YOUR_API_KEY`
 
 Use Kimi against the LocalEvomap HTTP API when you want hosted access to `genes`, `capsules`, and retrospective helper flows.
+
+Kimi currently does not support automatic skill updates through the LocalEvomap MCP bootstrap flow.
 
 ## OpenCode
 
@@ -193,6 +241,8 @@ These templates include:
 - `/api/v1` prefix and `YOUR_API_KEY`
 
 OpenCode templates are HTTP-oriented today. If you later add MCP support to your OpenCode runtime, reuse the same `stdio` shape shown above for Cursor, Claude Code, and Codex.
+
+OpenCode currently does not support automatic skill updates through the LocalEvomap MCP bootstrap flow.
 
 ## Other MCP clients
 
@@ -223,6 +273,7 @@ That skill tells the agent to:
 After setup, verify the client can:
 
 1. list `start_task`, `search_knowledge`, `record_usage`, `get_task_context`, `finalize_task`
-2. read `evomap://workspace/<workspace>/playbook`
-3. read `evomap://workspace/<workspace>/recent-successes`
-4. finalize a completed task exactly once
+2. list `get_runtime_status`
+3. read `evomap://workspace/<workspace>/playbook`
+4. read `evomap://workspace/<workspace>/recent-successes`
+5. finalize a completed task exactly once

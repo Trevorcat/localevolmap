@@ -13,8 +13,8 @@ test.describe('LocalEvomap Core E2E', () => {
         await expect(page.locator('.nav-link:has-text("Capsules")')).toBeVisible();
         await expect(page.locator('.nav-link:has-text("Events")')).toBeVisible();
         
-        // Dashboard should show 3 stat cards
-        await expect(page.locator('.stat-card')).toHaveCount(3);
+        // Dashboard should show multiple stat cards
+        await expect(page.locator('.stat-card')).toHaveCount(8);
         
         // Take initial screenshot
         await page.screenshot({ path: 'e2e/screenshots/initial-load.png' });
@@ -109,7 +109,7 @@ test.describe('LocalEvomap Core E2E', () => {
         await page.click('.nav-link:has-text("Dashboard")');
         
         // Dashboard shows stat cards
-        await expect(page.locator('.stat-card')).toHaveCount(3);
+        await expect(page.locator('.stat-card')).toHaveCount(8);
         
         // Navigate to Events page to check timeline
         await page.click('.nav-link:has-text("Events")');

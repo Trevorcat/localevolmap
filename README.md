@@ -55,6 +55,23 @@ Dashboard 默认可通过 `http://localhost:3000` 访问。
 6. Agent 自主判断任务是否完成；完成后调用 `finalize_task`
 7. `finalize_task` 写入 retrospective、效果反馈，并在满足条件时触发 distill
 
+## Agent Bootstrap / 版本治理
+
+现在 `local-evomap` MCP 在启动时会先向服务端做一次 bootstrap 检查：
+
+- `GET /api/v1/agent-manifest`：获取服务端权威版本清单（MCP runtime + 各客户端 skill）
+- `POST /api/v1/agent/check`：上报本地 runtime / skill 版本与 hash，判断是否 `ready`、`update_available` 或 `blocked`
+- `get_runtime_status`：MCP 永远暴露的诊断工具，用来查看当前 bootstrap 状态与可用能力
+
+当前状态机：`booting`、`updating`、`ready`、`update_available`、`blocked`、`unreachable`、`update_failed`。
+
+关键行为：
+
+- 服务端不可达时，MCP 仍能启动，但会禁用正式能力；只保留 `get_runtime_status`
+- `codex`、`claude-code`、`cursor` 支持按服务端 manifest 自动拉取并更新 skill
+- `opencode`、`kimi` 当前只做版本提示，不自动改本地 skill
+- 只有 `ready` / `update_available` 状态会暴露 `start_task`、`record_usage`、`finalize_task` 等正式工具与 workspace 资源
+
 ## 项目结构
 
 ```text
@@ -101,6 +118,8 @@ Dashboard 默认可通过 `http://localhost:3000` 访问。
 | 方法 | 端点 | 说明 |
 |------|------|------|
 | `GET` | `/api/v1/genes` | 列出基因 |
+| `GET` | `/api/v1/agent-manifest` | 返回服务端权威的 runtime / skill manifest |
+| `POST` | `/api/v1/agent/check` | 判断当前 agent runtime / skill 是否最新 |
 | `POST` | `/api/v1/genes` | 创建基因 |
 | `GET` | `/api/v1/capsules/search` | 搜索胶囊 |
 | `POST` | `/api/v1/capsules` | 创建胶囊（已知时建议显式传 `gene`） |
@@ -123,6 +142,7 @@ Dashboard 默认可通过 `http://localhost:3000` 访问。
 - 运行前请先配置 API Key / 环境变量
 - 本仓库会生成截图、临时 JSON、DOM 抓取文件等调试产物，这些文件应保留为本地调试用途，不应进入版本库
 - 对 Agent 行为的标准约束以 `agent-skill/SKILL.md` 和 `mcp/server.ts` 为准
+- 若要启用自动 skill 更新，请在客户端 MCP 配置中提供 `LOCAL_EVOMAP_CLIENT`、`LOCAL_EVOMAP_SERVER_URL`，并建议显式配置 `LOCAL_EVOMAP_SKILL_PATH`
 
 ## License
 

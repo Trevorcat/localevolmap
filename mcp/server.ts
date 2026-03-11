@@ -1,14 +1,19 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { createHash } from 'crypto';
 import { z } from 'zod';
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio';
 import { LocalEvomap, DEFAULT_CONFIG } from '../index';
 import { EvolutionService } from '../core/evolution-service';
 import { TaskSessionStore } from '../storage/task-session-store';
+import { BootstrapRuntimeState, createReadyBootstrapState, initializeBootstrapState } from './bootstrap';
+import { resolveSkillTargetPath } from './skill-updater';
+import type { AgentClient } from '../types/agent-bootstrap-schema';
 
 export interface CreateMcpServerOptions {
   evolutionService: EvolutionService;
+  bootstrapState?: BootstrapRuntimeState;
 }
 
 type ToolSchema = z.ZodTypeAny;
@@ -31,8 +36,10 @@ export class LocalEvomapMcpServer {
   private readonly sdkServer: McpServer;
   private readonly tools = new Map<string, ToolDefinition>();
   private readonly resources: ResourceDefinition[] = [];
+  private readonly bootstrapState: BootstrapRuntimeState;
 
   constructor(private readonly options: CreateMcpServerOptions) {
+    this.bootstrapState = options.bootstrapState ?? createReadyBootstrapState('codex');
     this.sdkServer = new McpServer(
       { name: 'local-evomap-mcp', version: '0.1.0' },
       {
@@ -44,8 +51,12 @@ export class LocalEvomapMcpServer {
       }
     );
 
-    this.registerTools();
-    this.registerResources();
+    this.registerStatusTool();
+
+    if (this.shouldExposeFormalCapabilities()) {
+      this.registerTools();
+      this.registerResources();
+    }
   }
 
   async listTools(): Promise<Array<{ name: string; description: string }>> {
@@ -80,6 +91,17 @@ export class LocalEvomapMcpServer {
   async connectStdio(): Promise<void> {
     const transport = new StdioServerTransport();
     await this.sdkServer.connect(transport);
+  }
+
+  private shouldExposeFormalCapabilities(): boolean {
+    return this.bootstrapState.status === 'ready' || this.bootstrapState.status === 'update_available';
+  }
+
+  private registerStatusTool(): void {
+    const statusSchema = z.object({}).strict();
+    this.registerTool('get_runtime_status', 'Report MCP bootstrap state, compatibility, and exposed capabilities.', statusSchema, async () => {
+      return this.bootstrapState;
+    });
   }
 
   private registerTools(): void {
@@ -293,9 +315,19 @@ function resolveProjectRoot(): string {
     : path.resolve(__dirname, '..');
 }
 
+function computeFileHash(filePath: string): string {
+  const content = fs.readFileSync(filePath, 'utf-8');
+  return `sha256-${createHash('sha256').update(content).digest('base64')}`;
+}
+
 export async function createDefaultMcpServer(): Promise<LocalEvomapMcpServer> {
   const projectRoot = resolveProjectRoot();
   loadEnvFile(path.join(projectRoot, '.env'));
+
+  const client = ((process.env.LOCAL_EVOMAP_CLIENT || 'codex') as AgentClient);
+  const skillPath = process.env.LOCAL_EVOMAP_SKILL_PATH || resolveSkillTargetPath(client);
+  const serverUrl = process.env.LOCAL_EVOMAP_SERVER_URL || 'http://10.104.11.12:3000';
+  const runtimeHash = computeFileHash(path.join(projectRoot, 'mcp', 'server.ts'));
 
   const genesPath = process.env.GENES_PATH || DEFAULT_CONFIG.genes_path;
   const capsulesPath = process.env.CAPSULES_PATH || DEFAULT_CONFIG.capsules_path;
@@ -316,8 +348,18 @@ export async function createDefaultMcpServer(): Promise<LocalEvomapMcpServer> {
   const taskStore = new TaskSessionStore(tasksPath);
   await taskStore.init();
 
+  const bootstrapState = await initializeBootstrapState({
+    client,
+    serverUrl,
+    mcpVersion: '0.1.0',
+    runtimeHash,
+    skillPath,
+    skillVersion: process.env.LOCAL_EVOMAP_SKILL_VERSION,
+  });
+
   return createMcpServer({
-    evolutionService: new EvolutionService({ evomap, taskStore })
+    evolutionService: new EvolutionService({ evomap, taskStore }),
+    bootstrapState,
   });
 }
 

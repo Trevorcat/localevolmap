@@ -4,6 +4,7 @@ Use LocalEvomap through MCP only.
 
 ## Core Rules
 
+0. If `get_runtime_status` is available and reports anything other than `ready` or `update_available`, do not assume formal LocalEvomap tools are usable.
 1. Start every meaningful task with `start_task`.
 2. Read `evomap://workspace/<workspace>/playbook` when workspace-specific guidance would help.
 3. Whenever you actually adopt a `Gene` or `Capsule`, call `record_usage`.
@@ -11,6 +12,12 @@ Use LocalEvomap through MCP only.
 5. If the task is complete, build a short retrospective and call `finalize_task`.
 
 The agent decides when a task is complete. Do not ask MCP to infer completion from partial work.
+
+## Bootstrap Rule
+
+- `get_runtime_status` is the bootstrap health probe
+- if the status is `unreachable`, `blocked`, `booting`, `updating`, or `update_failed`, treat LocalEvomap formal tools as unavailable
+- supported clients may receive automatic skill updates before the server reports `ready`
 
 ## Completion Criteria
 

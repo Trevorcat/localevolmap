@@ -11,6 +11,8 @@ import { resolveCapsuleGene, resolveCapsuleGenes } from './core/capsule-gene-res
 import { InvalidSignalContextError } from './core/signal-extractor';
 import { matchPatternToSignals, NoMatchingGeneError, AllGenesBannedError } from './core/gene-selector';
 import { normalizeSignals } from './types/signal-registry';
+import { evaluateAgentCompatibility, loadAgentManifest } from './core/agent-manifest';
+import type { AgentCheckRequest } from './types/agent-bootstrap-schema';
 
 // 加载 .env 文件（无依赖实现，避免引入 dotenv）
 function loadEnvFile(envPath: string): void {
@@ -42,6 +44,7 @@ loadEnvFile(path.join(__dirname, '.env'));
 
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0';
+const PROJECT_ROOT = __dirname.endsWith('dist') ? path.resolve(__dirname, '..') : __dirname;
 
 const corsOriginsRaw = process.env.CORS_ORIGINS || '*';
 const corsOrigins = corsOriginsRaw.split(',').map((item) => item.trim()).filter(Boolean);
@@ -160,7 +163,8 @@ async function getEvomap(): Promise<LocalEvomap> {
     return evomap;
 }
 
-const server = http.createServer(async (req, res) => {
+export function createHttpServer(): http.Server {
+return http.createServer(async (req, res) => {
     // CORS & Headers
     const reqOrigin = req.headers.origin;
     res.setHeader('Access-Control-Allow-Origin', resolveCorsOrigin(reqOrigin));
@@ -193,7 +197,7 @@ const server = http.createServer(async (req, res) => {
 
     // Skill distribution endpoints
     if (url.pathname === '/install.sh' || url.pathname === '/install.ps1' || url.pathname === '/INSTALL.md') {
-        const projectRoot = __dirname.endsWith('dist') ? path.resolve(__dirname, '..') : __dirname;
+        const projectRoot = PROJECT_ROOT;
         const fileName = url.pathname.slice(1); // remove leading /
         const filePath = path.join(projectRoot, 'opencode', 'localevomap-skill', fileName);
         const mimeMap: Record<string, string> = {
@@ -215,12 +219,15 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (url.pathname.startsWith('/skill/') || url.pathname === '/skill') {
-        const projectRoot = __dirname.endsWith('dist') ? path.resolve(__dirname, '..') : __dirname;
+        const projectRoot = PROJECT_ROOT;
         const skillDir = path.join(projectRoot, 'opencode', 'localevomap-skill');
         
         // Map client types to files
         const clientFileMap: Record<string, string> = {
             'claude': 'claude-code.md',
+            'claude-code': 'claude-code.md',
+            'cursor': 'cursor.md',
+            'kimi': 'kimi.md',
             'opencode': 'opencode-skill.md',
             'codex': 'codex-agents.md',
         };
@@ -352,6 +359,7 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(404);
     res.end('Not found');
 });
+}
 
 /**
  * Handle Hub API v1 requests
@@ -364,6 +372,16 @@ async function handleHubApi(
     res.setHeader('Content-Type', 'application/json');
     
     const pathname = url.pathname;
+
+    if (req.method === 'GET' && pathname === '/api/v1/agent-manifest') {
+        await handleAgentManifest(req, res);
+        return;
+    }
+
+    if (req.method === 'POST' && pathname === '/api/v1/agent/check') {
+        await handleAgentCheck(req, res);
+        return;
+    }
     
     try {
         const evomap = await getEvomap();
@@ -544,6 +562,42 @@ async function handleHubApi(
         res.writeHead(500);
         res.end(JSON.stringify({ error: 'Internal server error' }));
     }
+}
+
+async function handleAgentManifest(
+    req: http.IncomingMessage,
+    res: http.ServerResponse
+): Promise<void> {
+    const manifest = await loadAgentManifest(PROJECT_ROOT);
+    res.writeHead(200);
+    res.end(JSON.stringify(manifest));
+}
+
+async function handleAgentCheck(
+    req: http.IncomingMessage,
+    res: http.ServerResponse
+): Promise<void> {
+    const body = await readRequestBody(req);
+
+    let parsed: AgentCheckRequest;
+    try {
+        parsed = JSON.parse(body || '{}') as AgentCheckRequest;
+    } catch (error) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: 'Invalid JSON body', detail: (error as Error).message }));
+        return;
+    }
+
+    if (!parsed.client) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: 'client is required' }));
+        return;
+    }
+
+    const manifest = await loadAgentManifest(PROJECT_ROOT);
+    const result = evaluateAgentCompatibility(manifest, parsed);
+    res.writeHead(200);
+    res.end(JSON.stringify(result));
 }
 
 /**
@@ -1779,6 +1833,9 @@ function handlePendingReject(
     res.end(JSON.stringify({ message: 'Evolution rejected', id: pendingId }));
 }
 
-server.listen(PORT, HOST, () => {
-    console.log(`LocalEvomap Core Server running at http://${HOST}:${PORT}`);
-});
+if (require.main === module) {
+    const server = createHttpServer();
+    server.listen(PORT, HOST, () => {
+        console.log(`LocalEvomap Core Server running at http://${HOST}:${PORT}`);
+    });
+}

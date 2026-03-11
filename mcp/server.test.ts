@@ -6,6 +6,7 @@ import { TaskSessionStore } from '../storage/task-session-store';
 import { EvolutionService } from '../core/evolution-service';
 import { createMcpServer } from './server';
 import type { Capsule, Gene } from '../types/gene-capsule-schema';
+import type { BootstrapRuntimeState } from './bootstrap';
 
 describe('LocalEvomap MCP server', () => {
   const currentPlatform = (['linux', 'darwin', 'win32'].includes(process.platform) ? process.platform : 'linux') as 'linux' | 'darwin' | 'win32';
@@ -15,7 +16,7 @@ describe('LocalEvomap MCP server', () => {
     return fs.mkdtemp(path.join(os.tmpdir(), 'localevomap-mcp-server-'));
   }
 
-  async function createServer() {
+  async function createServer(bootstrapState?: BootstrapRuntimeState) {
     const root = await createTempRoot();
     const evomap = new LocalEvomap({
       ...DEFAULT_CONFIG,
@@ -30,7 +31,23 @@ describe('LocalEvomap MCP server', () => {
     await taskStore.init();
 
     const evolutionService = new EvolutionService({ evomap, taskStore });
-    return { server: createMcpServer({ evolutionService }), evomap };
+    return { server: createMcpServer({ evolutionService, bootstrapState }), evomap };
+  }
+
+  function buildBootstrapState(status: BootstrapRuntimeState['status']): BootstrapRuntimeState {
+    return {
+      status,
+      client: 'codex',
+      checkedAt: '2026-03-11T00:00:00.000Z',
+      availableTools: status === 'ready' || status === 'update_available'
+        ? ['get_runtime_status', 'start_task', 'search_knowledge', 'record_usage', 'get_task_context', 'finalize_task']
+        : ['get_runtime_status'],
+      availableResources: status === 'ready' || status === 'update_available'
+        ? ['workspace_playbook', 'workspace_recent_successes']
+        : [],
+      manifestVersion: '2026.03.11.1',
+      details: [],
+    };
   }
 
   afterEach(async () => {
@@ -42,7 +59,7 @@ describe('LocalEvomap MCP server', () => {
   });
 
   test('registers all required MCP tools', async () => {
-    const { server } = await createServer();
+    const { server } = await createServer(buildBootstrapState('ready'));
     const tools = await server.listTools();
 
     expect(tools.map((tool: { name: string }) => tool.name)).toEqual(expect.arrayContaining([
@@ -55,7 +72,7 @@ describe('LocalEvomap MCP server', () => {
   });
 
   test('makes finalize_task idempotent per taskId', async () => {
-    const { server, evomap } = await createServer();
+    const { server, evomap } = await createServer(buildBootstrapState('ready'));
 
     const gene: Gene = {
       type: 'Gene',
@@ -120,7 +137,7 @@ describe('LocalEvomap MCP server', () => {
   });
 
   test('returns a workspace playbook resource after finalized tasks', async () => {
-    const { server, evomap } = await createServer();
+    const { server, evomap } = await createServer(buildBootstrapState('ready'));
 
     const gene: Gene = {
       type: 'Gene',
@@ -186,7 +203,7 @@ describe('LocalEvomap MCP server', () => {
   });
 
   test('returns recent successful task summaries for a workspace', async () => {
-    const { server, evomap } = await createServer();
+    const { server, evomap } = await createServer(buildBootstrapState('ready'));
 
     const gene: Gene = {
       type: 'Gene',
@@ -249,5 +266,27 @@ describe('LocalEvomap MCP server', () => {
     expect(payload.workspace).toBe('capability');
     expect(payload.summaries).toContain('Published the recent successes workspace resource.');
     expect(payload.capsules).toContain(capsule.id);
+  });
+
+  test('registers only get_runtime_status when bootstrap state is unreachable', async () => {
+    const { server } = await createServer(buildBootstrapState('unreachable'));
+    const tools = await server.listTools();
+
+    expect(tools.map((tool: { name: string }) => tool.name)).toEqual(['get_runtime_status']);
+    await expect(server.callTool('start_task', {
+      goal: 'blocked',
+      workspace: 'capability',
+      client: 'codex',
+    })).rejects.toThrow('Unknown MCP tool');
+  });
+
+  test('reports bootstrap runtime status through MCP', async () => {
+    const bootstrapState = buildBootstrapState('unreachable');
+    const { server } = await createServer(bootstrapState);
+
+    const result = await server.callTool('get_runtime_status', {});
+
+    expect(result.status).toBe('unreachable');
+    expect(result.availableTools).toEqual(['get_runtime_status']);
   });
 });
