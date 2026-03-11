@@ -350,7 +350,8 @@ Content-Type: application/json
   "capsule": {
     "id": "capsule_1772790521565",
     "trigger": ["log_error", "error_type"],
-    "summary": "Fixed by adding optional chaining",
+  "gene": "gene_repair_type_error",
+  "summary": "Fixed by adding optional chaining",
     "confidence": 0.85,
     "outcome": { "status": "success", "score": 0.9 }
   },

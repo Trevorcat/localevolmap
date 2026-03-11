@@ -130,4 +130,31 @@ describe('LocalEvomap feedback', () => {
     const capsules = await evomap.getAllCapsules();
     expect(capsules).toHaveLength(0);
   });
+
+  test('submitFeedback should infer selected gene from signals when omitted', async () => {
+    const { evomap } = await createEvomap();
+
+    await evomap.addGene({
+      type: 'Gene',
+      id: 'gene_feedback_inferred',
+      category: 'repair',
+      signals_match: ['mkdir', '-p', 'Windows'],
+      preconditions: [],
+      strategy: ['use New-Item -Force'],
+      constraints: {}
+    });
+
+    const result = await evomap.submitFeedback({
+      signals: ['mkdir', '-p', 'Windows'],
+      summary: 'Recovered the correct command without explicitly selecting a gene.',
+      outcome: { status: 'success', score: 0.88 },
+      create_capsule: true
+    });
+
+    const createdCapsule = await evomap.getCapsuleById(result.capsule_id!);
+    expect(createdCapsule?.gene).toBe('gene_feedback_inferred');
+
+    const events = await evomap.getRecentEvents(10);
+    expect(events[0]?.selected_gene).toBe('gene_feedback_inferred');
+  });
 });

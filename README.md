@@ -103,7 +103,7 @@ Dashboard 默认可通过 `http://localhost:3000` 访问。
 | `GET` | `/api/v1/genes` | 列出基因 |
 | `POST` | `/api/v1/genes` | 创建基因 |
 | `GET` | `/api/v1/capsules/search` | 搜索胶囊 |
-| `POST` | `/api/v1/capsules` | 创建胶囊 |
+| `POST` | `/api/v1/capsules` | 创建胶囊（已知时建议显式传 `gene`） |
 | `POST` | `/api/v1/evolve` | 执行一次进化 |
 | `POST` | `/api/v1/feedback` | 提交 retrospective 反馈 |
 | `GET` | `/api/v1/events` | 查看事件流 |
@@ -111,6 +111,12 @@ Dashboard 默认可通过 `http://localhost:3000` 访问。
 | `POST` | `/api/v1/distill/complete` | 完成蒸馏 |
 
 更完整的字段与示例请查看 `docs/API_REFERENCE.md`。
+
+补充说明：
+
+- 直接调用 `POST /api/v1/capsules` 时，已知来源基因时应显式传 `gene`
+- 若省略 `gene`，服务端会尝试根据 `trigger` 自动推断；只有无法匹配时才回落到 `unknown`
+- 调用 `POST /api/v1/feedback` 时，若未显式传 `selected_gene`，服务端同样会根据 `signals` 尝试推断
 
 ## 开发说明
 

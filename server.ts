@@ -7,6 +7,7 @@ import type { EvolutionResult, EvolutionChange } from './core/evolution-engine';
 import { LLMProviderError, ApprovalRequiredError } from './core/evolution-engine';
 import type { BlastRadiusEstimate } from './core/validation-gate';
 import { shouldReuseCapsule } from './core/capsule-manager';
+import { resolveCapsuleGene, resolveCapsuleGenes } from './core/capsule-gene-resolver';
 import { InvalidSignalContextError } from './core/signal-extractor';
 import { matchPatternToSignals, NoMatchingGeneError, AllGenesBannedError } from './core/gene-selector';
 import { normalizeSignals } from './types/signal-registry';
@@ -563,6 +564,7 @@ async function handleCapsuleSearch(
     
     // Get all capsules from store
     const allCapsules = await evomap.getAllCapsules();
+    const allGenes = await evomap.getAllGenes();
     
     // Filter by signals if provided
     let filtered = allCapsules.filter(c => {
@@ -587,15 +589,16 @@ async function handleCapsuleSearch(
     // Paginate
     const total = filtered.length;
     filtered = filtered.slice(offset, offset + limit);
+    const resolvedCapsules = resolveCapsuleGenes(filtered, allGenes);
     
     // Extract unique tags and genes
-    const tags = [...new Set(filtered.flatMap(c => c.trigger))];
-    const genes = [...new Set(filtered.map(c => c.gene))];
+    const tags = [...new Set(resolvedCapsules.flatMap(c => c.trigger))];
+    const genes = [...new Set(resolvedCapsules.map(c => c.gene))];
     
     res.writeHead(200);
     res.end(JSON.stringify({
         total,
-        capsules: filtered,
+        capsules: resolvedCapsules,
         tags,
         genes
     }));
@@ -611,6 +614,7 @@ async function handleCapsuleGet(
     capsuleId: string
 ): Promise<void> {
     const capsule = await evomap.getCapsuleById(capsuleId);
+    const genes = await evomap.getAllGenes();
     
     if (!capsule || capsule._deleted) {
         res.writeHead(404);
@@ -619,7 +623,7 @@ async function handleCapsuleGet(
     }
     
     res.writeHead(200);
-    res.end(JSON.stringify(capsule));
+    res.end(JSON.stringify(resolveCapsuleGene(capsule, genes)));
 }
 
 /**
@@ -805,7 +809,8 @@ async function handleCapsuleCreate(
         return;
     }
     try {
-        const capsule = normalizeCapsule(parsed);
+        const allGenes = await evomap.getAllGenes();
+        const capsule = resolveCapsuleGene(normalizeCapsule(parsed), allGenes);
         await evomap.addCapsule(capsule);
         res.writeHead(201);
         res.end(JSON.stringify({ message: 'Capsule created', id: capsule.id }));
@@ -1135,7 +1140,8 @@ async function handleCapsulesList(
     evomap: LocalEvomap
 ): Promise<void> {
     const allCapsules = await evomap.getAllCapsules();
-    const activeCapsules = allCapsules.filter(c => !c._deleted);
+    const allGenes = await evomap.getAllGenes();
+    const activeCapsules = resolveCapsuleGenes(allCapsules.filter(c => !c._deleted), allGenes);
     
     res.writeHead(200);
     res.end(JSON.stringify({

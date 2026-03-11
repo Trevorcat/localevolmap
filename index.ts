@@ -21,6 +21,7 @@ import { EventLogger } from './storage/event-logger';
 import { EvolutionEngine, type EvolutionEngineConfig, type EventLogger as EventLoggerInterface, type EvolutionResult } from './core/evolution-engine';
 import { extractSignals, prioritizeSignals, analyzeSignals, type LogEntry } from './core/signal-extractor';
 import { selectGene, computeDriftIntensity, analyzeGenePool } from './core/gene-selector';
+import { inferGeneIdFromSignals } from './core/capsule-gene-resolver';
 import { selectCapsule, shouldReuseCapsule, analyzeCapsules, updateCapsuleFeedback } from './core/capsule-manager';
 import { isValidationCommandAllowed, estimateBlastRadius, requiresApproval } from './core/validation-gate';
 import { prepareDistillation, completeDistillation, shouldDistill, type DistillationState } from './core/skill-distiller';
@@ -183,7 +184,8 @@ export class LocalEvomap {
       throw new Error('Feedback summary is required');
     }
 
-    const selectedGeneId = feedback.selected_gene?.trim() || 'unknown';
+    const explicitSelectedGeneId = feedback.selected_gene?.trim();
+    let selectedGeneId = explicitSelectedGeneId || 'unknown';
     const usedCapsuleId = feedback.used_capsule?.trim() || undefined;
     const outcomeScore = Number(Math.max(0, Math.min(1, feedback.outcome?.score ?? 0)));
     const outcomeStatus = feedback.outcome?.status ?? 'skipped';
@@ -193,6 +195,11 @@ export class LocalEvomap {
     const selfMistakes = (feedback.self_mistakes || []).map(item => item.trim()).filter(Boolean).slice(0, 10);
     const userCorrections = (feedback.user_corrections || []).map(item => item.trim()).filter(Boolean).slice(0, 10);
     const envFingerprint = this.getRuntimeEnvFingerprint();
+
+    if (!explicitSelectedGeneId) {
+      const genes = await this.geneStore.getAll();
+      selectedGeneId = inferGeneIdFromSignals(normalizedSignals, genes) || 'unknown';
+    }
 
     const event: EvolutionEvent = {
       id: `feedback_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,

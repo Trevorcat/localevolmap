@@ -226,29 +226,31 @@ Auto-filled: `id`, `type`, `preconditions`, `constraints`
 
 **Required**: `trigger`, `summary`
 
+**Recommended**: also send `gene` whenever you know which gene produced the fix. If omitted, the server now tries to infer the best gene from `trigger`, but explicit `gene` is still the most reliable option.
+
 ```bash
 # Linux/macOS
 curl -X POST "http://your-server.example.com:3000/api/v1/capsules" \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"trigger":["TypeError","null"],"summary":"Fixed by adding optional chaining"}'
+  -d '{"trigger":["TypeError","null"],"gene":"gene_repair_type_error","summary":"Fixed by adding optional chaining"}'
 ```
 
 ```powershell
 # Windows
 Invoke-WebRequest -Uri "http://your-server.example.com:3000/api/v1/capsules" -Method POST `
   -Headers @{"Authorization"="Bearer YOUR_API_KEY";"Content-Type"="application/json"} `
-  -Body '{"trigger":["TypeError","null"],"summary":"Fixed by adding optional chaining"}'
+  -Body '{"trigger":["TypeError","null"],"gene":"gene_repair_type_error","summary":"Fixed by adding optional chaining"}'
 ```
 
-Auto-filled: `id`, `type`, `schema_version`, `outcome`, `env_fingerprint`, `blast_radius`, `confidence`, `gene`, `metadata`
+Auto-filled: `id`, `type`, `schema_version`, `outcome`, `env_fingerprint`, `blast_radius`, `confidence`, inferred `gene` when omitted, `metadata`
 
 | Field | Type | Required | Default |
 |-------|------|----------|---------|
 | `trigger` | string[] | ✅ | `[]` |
 | `summary` | string | ✅ | `""` |
 | `confidence` | number (0-1) | ❌ | `0.7` |
-| `gene` | string | ❌ | `"unknown"` |
+| `gene` | string | ❌ | inferred from `trigger`, fallback `"unknown"` |
 | `outcome` | object | ❌ | `{status:"success",score:0.7}` |
 | `outcome.success` | boolean | alias | converts to `{status,score}` |
 | `id` | string | ❌ | auto-generated |

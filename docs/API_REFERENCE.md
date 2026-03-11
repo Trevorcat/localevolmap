@@ -95,9 +95,12 @@ Authorization: Bearer YOUR_API_KEY
 ```json
 {
   "trigger": ["TypeError", "null"],
+  "gene": "gene_repair_type_error",
   "summary": "Fixed by adding optional chaining"
 }
 ```
+
+`gene` is still optional for backwards compatibility, but you should send it when known. If omitted, the server attempts to infer the best matching gene from `trigger`; if no match is found, it falls back to `unknown`.
 
 服务器自动填充: `id`, `type`, `schema_version`, `outcome`, `env_fingerprint`, `blast_radius`, `confidence`, `gene`, `metadata`
 
@@ -106,7 +109,7 @@ Authorization: Bearer YOUR_API_KEY
 | `trigger` | string[] | ✅ | `[]` |
 | `summary` | string | ✅ | `""` |
 | `confidence` | number (0-1) | ❌ | `0.7` |
-| `gene` | string | ❌ | `"unknown"` |
+| `gene` | string | ❌ | 根据 `trigger` 推断，无法推断时为 `"unknown"` |
 | `outcome` | object | ❌ | `{status:"success",score:0.7}` |
 | `outcome.success` | boolean | 别名 | 转换为 `{status,score}` |
 | `id` | string | ❌ | 自动生成 |
