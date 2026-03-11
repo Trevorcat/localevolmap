@@ -1,4 +1,4 @@
-import * as fs from 'fs/promises';
+﻿import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
 import { LocalEvomap, DEFAULT_CONFIG } from '../index';
@@ -268,6 +268,61 @@ describe('LocalEvomap MCP server', () => {
     expect(payload.capsules).toContain(capsule.id);
   });
 
+  test('returns start_task and get_task_context payloads under the documented field names', async () => {
+    const { server, evomap } = await createServer(buildBootstrapState('ready'));
+
+    const gene: Gene = {
+      type: 'Gene',
+      id: 'gene_return_shape',
+      category: 'feature',
+      signals_match: ['return-shape', 'mcp'],
+      preconditions: [],
+      strategy: ['use documented response fields'],
+      constraints: {}
+    };
+
+    const capsule: Capsule = {
+      type: 'Capsule',
+      schema_version: '1.5.0',
+      id: 'capsule_return_shape',
+      trigger: ['return-shape', 'mcp'],
+      gene: gene.id,
+      summary: 'Regression coverage for MCP payload field names.',
+      confidence: 0.9,
+      blast_radius: { files: 1, lines: 3 },
+      outcome: { status: 'success', score: 0.9 },
+      env_fingerprint: { platform: currentPlatform, arch: currentArch, node_version: process.version },
+      metadata: { created_at: '2026-03-11T00:00:00.000Z', source: 'local', validated: true }
+    };
+
+    await evomap.addGene(gene);
+    await evomap.addCapsule(capsule);
+
+    const started = await server.callTool('start_task', {
+      goal: 'verify MCP return shapes',
+      workspace: 'capability',
+      client: 'codex',
+      initialSignals: ['return-shape', 'mcp']
+    });
+
+    expect(started.recommendedGenes.map((item: Gene) => item.id)).toContain(gene.id);
+    expect(started.recommendedCapsules.map((item: Capsule) => item.id)).toContain(capsule.id);
+    expect(started.recommendations).toBeUndefined();
+
+    await server.callTool('record_usage', {
+      taskId: started.taskId,
+      knowledge: [
+        { kind: 'gene', id: gene.id, phase: 'plan' },
+        { kind: 'capsule', id: capsule.id, phase: 'implement' }
+      ]
+    });
+
+    const context = await server.callTool('get_task_context', { taskId: started.taskId });
+
+    expect(context.knowledgeUsed).toHaveLength(2);
+    expect(context.retrospectiveDraft).toBeDefined();
+    expect(context.usage).toBeUndefined();
+  });
   test('registers only get_runtime_status when bootstrap state is unreachable', async () => {
     const { server } = await createServer(buildBootstrapState('unreachable'));
     const tools = await server.listTools();
@@ -290,3 +345,4 @@ describe('LocalEvomap MCP server', () => {
     expect(result.availableTools).toEqual(['get_runtime_status']);
   });
 });
+
