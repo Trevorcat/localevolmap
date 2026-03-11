@@ -14,6 +14,8 @@ server.log
 .env
 .env.local
 .env.production
+.env.prod
+.env.test
 
 # Test output
 coverage/
