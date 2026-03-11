@@ -39,6 +39,10 @@ function loadEnvFile(envPath: string): void {
   }
 }
 
+// 优先加载 ENV_FILE 指定的配置文件（用于 dual 环境）
+if (process.env.ENV_FILE) {
+  loadEnvFile(process.env.ENV_FILE);
+}
 loadEnvFile(path.join(__dirname, '..', '.env'));
 loadEnvFile(path.join(__dirname, '.env'));
 
