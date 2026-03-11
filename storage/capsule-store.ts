@@ -6,8 +6,42 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import type { Capsule, Signal } from '../types/gene-capsule-schema';
+import type { Capsule, OutcomeStatus, Signal } from '../types/gene-capsule-schema';
 import { matchPatternToSignals } from '../core/gene-selector';
+
+const OUTCOME_STATUSES: ReadonlySet<OutcomeStatus> = new Set(['success', 'failed', 'partial', 'skipped']);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isValidCapsule(value: unknown): value is Capsule {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  if (value.type !== 'Capsule' || typeof value.schema_version !== 'string' || typeof value.id !== 'string' || typeof value.gene !== 'string' || typeof value.summary !== 'string' || typeof value.confidence !== 'number') {
+    return false;
+  }
+
+  if (!Array.isArray(value.trigger) || value.trigger.some(item => typeof item !== 'string')) {
+    return false;
+  }
+
+  if (!isRecord(value.blast_radius) || typeof value.blast_radius.files !== 'number' || typeof value.blast_radius.lines !== 'number') {
+    return false;
+  }
+
+  if (!isRecord(value.outcome) || typeof value.outcome.score !== 'number' || !OUTCOME_STATUSES.has(value.outcome.status as OutcomeStatus)) {
+    return false;
+  }
+
+  if (!isRecord(value.env_fingerprint) || typeof value.env_fingerprint.platform !== 'string' || typeof value.env_fingerprint.arch !== 'string') {
+    return false;
+  }
+
+  return true;
+}
 
 export class CapsuleStore {
   constructor(private basePath: string) {}
@@ -26,9 +60,19 @@ export class CapsuleStore {
     try {
       const filePath = path.join(this.basePath, `${this.sanitizeId(id)}.json`);
       const content = await fs.readFile(filePath, 'utf-8');
-      return JSON.parse(content) as Capsule;
+      const parsed = JSON.parse(content) as unknown;
+      if (!isValidCapsule(parsed)) {
+        console.warn(`Skipping invalid capsule file: ${filePath}`);
+        return undefined;
+      }
+
+      return parsed;
     } catch (error) {
       if ((error as NodeJS.ErrnoException)?.code === 'ENOENT' || (error instanceof Error && error.message.includes('ENOENT'))) {
+        return undefined;
+      }
+      if (error instanceof SyntaxError) {
+        console.warn(`Skipping malformed capsule JSON for id ${id}: ${error.message}`);
         return undefined;
       }
       throw error;
