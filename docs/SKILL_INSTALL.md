@@ -6,7 +6,7 @@
 
 新的接入方式分成两层：
 
-- **MCP server**：暴露 `start_task`、`search_knowledge`、`record_usage`、`get_task_context`、`finalize_task`
+- **MCP server**: exposes `start_task`, `search_knowledge`, `record_usage`, `get_task_context`, and `finalize_task`, and now reads/writes the authoritative remote task plane through HTTP by default.
 - **本地 skill**：要求 agent 在任务开始时建 session，在真正采用知识时记 usage，在最终交付前自行判断是否完成并调用 `finalize_task`
 
 ## 你需要从用户那里获取的信息

@@ -5,5 +5,6 @@ args = ["C:/path/to/your/repo/dist/mcp/server.js"]
 [mcp_servers.local-evomap.env]
 LOCAL_EVOMAP_CLIENT = "codex"
 LOCAL_EVOMAP_SERVER_URL = "http://your-server.example.com:3000"
+LOCAL_EVOMAP_API_KEY = "YOUR_API_KEY"
 LOCAL_EVOMAP_SKILL_PATH = "C:/Users/your-user/.codex/AGENTS.md"
 TASKS_PATH = "C:/path/to/your/repo/data/tasks"

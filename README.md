@@ -11,9 +11,9 @@
 
 LocalEvomap 当前采用 **MCP-first** 的标准接入方式：
 
-- **MCP Server**：面向 Agent Runtime 的标准入口，提供 `start_task`、`record_usage`、`finalize_task` 等工具，以及 workspace 资源
+- **MCP Server**: standard Agent Runtime entrypoint. Formal tools and workspace resources now write through the remote authoritative HTTP task plane.
 - **Agent Skill**：负责任务完成判断、复盘组织、自主提交 retrospective
-- **HTTP API**：主要用于 Dashboard、管理、运维和数据导入导出，不再作为标准 Agent Runtime 接口
+- **HTTP API**: serves dashboard, operations, version governance, and the remote task/resource data plane used by MCP.
 
 这意味着：Agent 不再依赖旧式 helper / CLI skill 流程，而是通过 MCP 与 LocalEvomap 交互。
 
@@ -62,6 +62,7 @@ Dashboard 默认可通过 `http://localhost:3000` 访问。
 - `GET /api/v1/agent-manifest`：获取服务端权威版本清单（MCP runtime + 各客户端 skill）
 - `POST /api/v1/agent/check`：上报本地 runtime / skill 版本与 hash，判断是否 `ready`、`update_available` 或 `blocked`
 - `get_runtime_status`：MCP 永远暴露的诊断工具，用来查看当前 bootstrap 状态与可用能力
+- When bootstrap passes, `start_task`, `record_usage`, `get_task_context`, `finalize_task`, and workspace resources all use the remote service instead of local task-session files.
 
 当前状态机：`booting`、`updating`、`ready`、`update_available`、`blocked`、`unreachable`、`update_failed`。
 
@@ -142,7 +143,7 @@ Dashboard 默认可通过 `http://localhost:3000` 访问。
 - 运行前请先配置 API Key / 环境变量
 - 本仓库会生成截图、临时 JSON、DOM 抓取文件等调试产物，这些文件应保留为本地调试用途，不应进入版本库
 - 对 Agent 行为的标准约束以 `agent-skill/SKILL.md` 和 `mcp/server.ts` 为准
-- 若要启用自动 skill 更新，请在客户端 MCP 配置中提供 `LOCAL_EVOMAP_CLIENT`、`LOCAL_EVOMAP_SERVER_URL`，并建议显式配置 `LOCAL_EVOMAP_SKILL_PATH`
+- To enable automatic skill updates and remote MCP writes, configure `LOCAL_EVOMAP_CLIENT`, `LOCAL_EVOMAP_SERVER_URL`, `LOCAL_EVOMAP_API_KEY`, and ideally `LOCAL_EVOMAP_SKILL_PATH` in the client MCP env.
 
 ## License
 

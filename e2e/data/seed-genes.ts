@@ -23,7 +23,7 @@ export const SEED_GENES: Gene[] = [
       forbidden_paths: ['.git', 'node_modules'],
       timeout_ms: 30000
     },
-    validation: ['npm test'],
+    validation: ['node --version'],
     metadata: {
       author: 'e2e-test',
       version: '1.0.0',

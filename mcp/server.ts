@@ -4,15 +4,14 @@ import { createHash } from 'crypto';
 import { z } from 'zod';
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio';
-import { LocalEvomap, DEFAULT_CONFIG } from '../index';
-import { EvolutionService } from '../core/evolution-service';
-import { TaskSessionStore } from '../storage/task-session-store';
+import type { EvolutionBackend } from '../core/evolution-backend';
 import { BootstrapRuntimeState, createReadyBootstrapState, initializeBootstrapState } from './bootstrap';
+import { RemoteEvolutionClient } from './remote-evolution-client';
 import { resolveSkillTargetPath } from './skill-updater';
 import type { AgentClient } from '../types/agent-bootstrap-schema';
 
 export interface CreateMcpServerOptions {
-  evolutionService: EvolutionService;
+  evolutionService: EvolutionBackend;
   bootstrapState?: BootstrapRuntimeState;
 }
 
@@ -329,25 +328,6 @@ export async function createDefaultMcpServer(): Promise<LocalEvomapMcpServer> {
   const serverUrl = process.env.LOCAL_EVOMAP_SERVER_URL || 'http://10.104.11.12:3000';
   const runtimeHash = computeFileHash(path.join(projectRoot, 'mcp', 'server.ts'));
 
-  const genesPath = process.env.GENES_PATH || DEFAULT_CONFIG.genes_path;
-  const capsulesPath = process.env.CAPSULES_PATH || DEFAULT_CONFIG.capsules_path;
-  const eventsPath = process.env.EVENTS_PATH || DEFAULT_CONFIG.events_path;
-  const tasksPath = process.env.TASKS_PATH || path.join(path.dirname(eventsPath), 'tasks');
-
-  const evomap = new LocalEvomap({
-    ...DEFAULT_CONFIG,
-    genes_path: genesPath,
-    capsules_path: capsulesPath,
-    events_path: eventsPath,
-    review_mode: process.env.EVOMAP_REVIEW_MODE !== undefined
-      ? process.env.EVOMAP_REVIEW_MODE === 'true'
-      : DEFAULT_CONFIG.review_mode
-  });
-  await evomap.init();
-
-  const taskStore = new TaskSessionStore(tasksPath);
-  await taskStore.init();
-
   const bootstrapState = await initializeBootstrapState({
     client,
     serverUrl,
@@ -357,8 +337,10 @@ export async function createDefaultMcpServer(): Promise<LocalEvomapMcpServer> {
     skillVersion: process.env.LOCAL_EVOMAP_SKILL_VERSION,
   });
 
+  const apiKey = process.env.LOCAL_EVOMAP_API_KEY || process.env.HUB_API_KEY || 'test-api-key';
+
   return createMcpServer({
-    evolutionService: new EvolutionService({ evomap, taskStore }),
+    evolutionService: new RemoteEvolutionClient({ serverUrl, apiKey }),
     bootstrapState,
   });
 }

@@ -13,6 +13,10 @@ import { matchPatternToSignals, NoMatchingGeneError, AllGenesBannedError } from 
 import { normalizeSignals } from './types/signal-registry';
 import { evaluateAgentCompatibility, loadAgentManifest } from './core/agent-manifest';
 import type { AgentCheckRequest } from './types/agent-bootstrap-schema';
+import { TaskSessionStore } from './storage/task-session-store';
+import { EvolutionService } from './core/evolution-service';
+import { LLMProvider } from './core/llm-provider';
+import { DistillJobStore } from './storage/distill-job-store';
 
 // 加载 .env 文件（无依赖实现，避免引入 dotenv）
 function loadEnvFile(envPath: string): void {
@@ -117,6 +121,9 @@ function checkApiKey(req: http.IncomingMessage): boolean {
 
 // Real LocalEvomap instance
 let evomap: LocalEvomap | null = null;
+let taskStore: TaskSessionStore | null = null;
+let evolutionService: EvolutionService | null = null;
+let distillJobStore: DistillJobStore | null = null;
 
 async function getEvomap(): Promise<LocalEvomap> {
     if (!evomap) {
@@ -165,6 +172,82 @@ async function getEvomap(): Promise<LocalEvomap> {
         }
     }
     return evomap;
+}
+
+async function getEvolutionService(): Promise<EvolutionService> {
+    if (!evolutionService) {
+        const currentEvomap = await getEvomap();
+        const eventsPath = process.env.EVENTS_PATH || DEFAULT_CONFIG.events_path;
+        const tasksPath = process.env.TASKS_PATH || path.join(path.dirname(eventsPath), 'tasks');
+
+        taskStore = new TaskSessionStore(tasksPath);
+        await taskStore.init();
+        evolutionService = new EvolutionService({ evomap: currentEvomap, taskStore });
+    }
+
+    return evolutionService;
+}
+
+async function getDistillJobStore(): Promise<DistillJobStore> {
+    if (!distillJobStore) {
+        const eventsPath = process.env.EVENTS_PATH || DEFAULT_CONFIG.events_path;
+        const jobsPath = process.env.DISTILL_JOBS_PATH || path.join(path.dirname(eventsPath), 'distill-jobs');
+        distillJobStore = new DistillJobStore(jobsPath);
+        await distillJobStore.init();
+    }
+
+    return distillJobStore;
+}
+
+async function runAutomaticDistillation(evomap: LocalEvomap): Promise<{ distillJobId: string; distillStatus: string; distilledGeneId?: string | null }> {
+    const allCapsules = (await evomap.getAllCapsules())
+        .filter(capsule => !capsule._deleted && capsule.outcome.status === 'success')
+        .sort((left, right) => (left.metadata?.created_at || '').localeCompare(right.metadata?.created_at || ''));
+    const sourceCapsuleIds = allCapsules.slice(-20).map(capsule => capsule.id);
+    const fingerprint = 'caps:' + sourceCapsuleIds.join(',');
+
+    const jobStore = await getDistillJobStore();
+    const created = await jobStore.createPending({ sourceCapsuleIds, fingerprint });
+    const running = created.status === 'running' ? created : await jobStore.markRunning(created.jobId);
+
+    const llmProvider = process.env.EVOMAP_LLM_PROVIDER as 'openai' | 'anthropic' | 'local' | undefined;
+    const llmModel = process.env.EVOMAP_LLM_MODEL;
+    const llmApiKey = process.env.LLM_API_KEY || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY;
+    const llmBaseURL = process.env.LOCAL_LLM_BASE_URL;
+
+    if (!llmProvider || !llmModel) {
+        await jobStore.markFailed(running.jobId, 'LLM is not configured for automatic distillation');
+        return { distillJobId: running.jobId, distillStatus: 'failed' };
+    }
+
+    try {
+        const request = await evomap.prepareDistillation();
+        if (!request) {
+            await jobStore.markFailed(running.jobId, 'Distillation conditions are no longer met');
+            return { distillJobId: running.jobId, distillStatus: 'failed' };
+        }
+
+        const prompt = await fs.promises.readFile(request.promptFilePath, 'utf-8');
+        const llm = new LLMProvider({
+            provider: llmProvider,
+            model: llmModel,
+            apiKey: llmApiKey,
+            baseURL: llmBaseURL
+        });
+        const llmResponse = await llm.generateText(prompt);
+        const result = await evomap.completeDistillation(llmResponse.text, sourceCapsuleIds);
+
+        if (!result.success) {
+            await jobStore.markFailed(running.jobId, result.error || 'Distillation validation failed');
+            return { distillJobId: running.jobId, distillStatus: 'failed' };
+        }
+
+        await jobStore.markSucceeded(running.jobId, result.gene?.id ?? null);
+        return { distillJobId: running.jobId, distillStatus: 'succeeded', distilledGeneId: result.gene?.id ?? null };
+    } catch (error) {
+        await jobStore.markFailed(running.jobId, (error as Error).message);
+        return { distillJobId: running.jobId, distillStatus: 'failed' };
+    }
 }
 
 export function createHttpServer(): http.Server {
@@ -519,6 +602,62 @@ async function handleHubApi(
             }
         }
         
+        if (req.method === 'POST' && pathname === '/api/v1/tasks') {
+            await handleTaskCreate(req, res);
+            return;
+        }
+
+        if (pathname.startsWith('/api/v1/tasks/')) {
+            const parts = pathname.split('/').filter(Boolean);
+            const taskId = decodeURIComponent(parts[3] || '');
+            const action = parts[4];
+
+            if (taskId) {
+                if (req.method === 'GET' && !action) {
+                    await handleTaskGet(req, res, taskId);
+                    return;
+                }
+
+                if (req.method === 'POST' && action === 'search') {
+                    await handleTaskSearch(req, res, taskId);
+                    return;
+                }
+
+                if (req.method === 'POST' && action === 'usage') {
+                    await handleTaskUsage(req, res, taskId);
+                    return;
+                }
+
+                if (req.method === 'POST' && action === 'finalize') {
+                    await handleTaskFinalize(req, res, taskId);
+                    return;
+                }
+            }
+        }
+
+        if (req.method === 'POST' && pathname === '/api/v1/knowledge/search') {
+            await handleKnowledgeSearch(req, res);
+            return;
+        }
+
+        if (pathname.startsWith('/api/v1/workspaces/')) {
+            const parts = pathname.split('/').filter(Boolean);
+            const workspace = decodeURIComponent(parts[3] || '');
+            const action = parts[4];
+
+            if (workspace) {
+                if (req.method === 'GET' && action === 'playbook') {
+                    await handleWorkspacePlaybook(req, res, workspace);
+                    return;
+                }
+
+                if (req.method === 'GET' && action === 'recent-successes') {
+                    await handleWorkspaceRecentSuccesses(req, res, workspace);
+                    return;
+                }
+            }
+        }
+
         // Signal extraction endpoint
         if (req.method === 'POST' && pathname === '/api/v1/signals/extract') {
             await handleExtractSignals(req, res, evomap);
@@ -557,6 +696,21 @@ async function handleHubApi(
             await handleDistillStatus(req, res, evomap);
             return;
         }
+        if (req.method === 'GET' && pathname === '/api/v1/distill/jobs') {
+            await handleDistillJobsList(req, res);
+            return;
+        }
+
+        if (pathname.startsWith('/api/v1/distill/jobs/')) {
+            const parts = pathname.split('/').filter(Boolean);
+            const jobId = decodeURIComponent(parts[4] || '');
+
+            if (req.method === 'GET' && jobId) {
+                await handleDistillJobGet(req, res, jobId);
+                return;
+            }
+        }
+
         
         res.writeHead(404);
         res.end(JSON.stringify({ error: 'Hub endpoint not found' }));
@@ -1306,6 +1460,259 @@ async function handleEvolve(
     }
 }
 
+async function handleTaskCreate(
+    req: http.IncomingMessage,
+    res: http.ServerResponse
+): Promise<void> {
+    if (!checkApiKey(req)) {
+        res.writeHead(401);
+        res.end(JSON.stringify({ error: 'Authentication required' }));
+        return;
+    }
+
+    const body = await readRequestBody(req);
+    let parsed: any;
+    try {
+        parsed = JSON.parse(body || '{}');
+    } catch (error) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: 'Invalid JSON body', detail: (error as Error).message }));
+        return;
+    }
+
+    try {
+        const service = await getEvolutionService();
+        const result = await service.startTask({
+            goal: parsed.goal,
+            workspace: parsed.workspace,
+            client: parsed.client,
+            initialSignals: parsed.initialSignals
+        });
+        res.writeHead(200);
+        res.end(JSON.stringify(result));
+    } catch (error) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: 'Task creation failed', detail: (error as Error).message }));
+    }
+}
+
+async function handleTaskGet(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    taskId: string
+): Promise<void> {
+    if (!checkApiKey(req)) {
+        res.writeHead(401);
+        res.end(JSON.stringify({ error: 'Authentication required' }));
+        return;
+    }
+
+    try {
+        const service = await getEvolutionService();
+        const result = await service.getTaskContext({ taskId });
+        res.writeHead(200);
+        res.end(JSON.stringify(result));
+    } catch (error) {
+        res.writeHead(404);
+        res.end(JSON.stringify({ error: 'Task not found', detail: (error as Error).message }));
+    }
+}
+
+async function handleTaskSearch(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    taskId: string
+): Promise<void> {
+    if (!checkApiKey(req)) {
+        res.writeHead(401);
+        res.end(JSON.stringify({ error: 'Authentication required' }));
+        return;
+    }
+
+    const body = await readRequestBody(req);
+    let parsed: any = {};
+    try {
+        parsed = JSON.parse(body || '{}');
+    } catch (error) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: 'Invalid JSON body', detail: (error as Error).message }));
+        return;
+    }
+
+    try {
+        const service = await getEvolutionService();
+        const result = await service.searchKnowledge({
+            taskId,
+            signals: parsed.signals,
+            query: parsed.query,
+            workspace: parsed.workspace,
+            limit: parsed.limit
+        });
+        res.writeHead(200);
+        res.end(JSON.stringify(result));
+    } catch (error) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: 'Task search failed', detail: (error as Error).message }));
+    }
+}
+
+async function handleTaskUsage(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    taskId: string
+): Promise<void> {
+    if (!checkApiKey(req)) {
+        res.writeHead(401);
+        res.end(JSON.stringify({ error: 'Authentication required' }));
+        return;
+    }
+
+    const body = await readRequestBody(req);
+    let parsed: any;
+    try {
+        parsed = JSON.parse(body || '{}');
+    } catch (error) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: 'Invalid JSON body', detail: (error as Error).message }));
+        return;
+    }
+
+    try {
+        const service = await getEvolutionService();
+        const result = await service.recordUsage({ taskId, knowledge: parsed.knowledge || [] });
+        res.writeHead(200);
+        res.end(JSON.stringify(result));
+    } catch (error) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: 'Record usage failed', detail: (error as Error).message }));
+    }
+}
+
+async function handleTaskFinalize(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    taskId: string
+): Promise<void> {
+    if (!checkApiKey(req)) {
+        res.writeHead(401);
+        res.end(JSON.stringify({ error: 'Authentication required' }));
+        return;
+    }
+
+    const body = await readRequestBody(req);
+    let parsed: any;
+    try {
+        parsed = JSON.parse(body || '{}');
+    } catch (error) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: 'Invalid JSON body', detail: (error as Error).message }));
+        return;
+    }
+
+    try {
+        const service = await getEvolutionService();
+        const result = await service.finalizeTask({
+            taskId,
+            summary: parsed.summary,
+            outcome: parsed.outcome,
+            retrospective: parsed.retrospective,
+            createCapsule: parsed.createCapsule
+        });
+
+        let distillMetadata: Record<string, unknown> = {};
+        if (result.distillReady) {
+            distillMetadata = await runAutomaticDistillation(await getEvomap());
+        }
+
+        res.writeHead(200);
+        res.end(JSON.stringify({ ...result, ...distillMetadata }));
+    } catch (error) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: 'Task finalization failed', detail: (error as Error).message }));
+    }
+}
+
+async function handleKnowledgeSearch(
+    req: http.IncomingMessage,
+    res: http.ServerResponse
+): Promise<void> {
+    if (!checkApiKey(req)) {
+        res.writeHead(401);
+        res.end(JSON.stringify({ error: 'Authentication required' }));
+        return;
+    }
+
+    const body = await readRequestBody(req);
+    let parsed: any = {};
+    try {
+        parsed = JSON.parse(body || '{}');
+    } catch (error) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: 'Invalid JSON body', detail: (error as Error).message }));
+        return;
+    }
+
+    try {
+        const service = await getEvolutionService();
+        const result = await service.searchKnowledge({
+            taskId: parsed.taskId,
+            signals: parsed.signals,
+            query: parsed.query,
+            workspace: parsed.workspace,
+            limit: parsed.limit
+        });
+        res.writeHead(200);
+        res.end(JSON.stringify(result));
+    } catch (error) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: 'Knowledge search failed', detail: (error as Error).message }));
+    }
+}
+
+async function handleWorkspacePlaybook(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    workspace: string
+): Promise<void> {
+    if (!checkApiKey(req)) {
+        res.writeHead(401);
+        res.end(JSON.stringify({ error: 'Authentication required' }));
+        return;
+    }
+
+    try {
+        const service = await getEvolutionService();
+        const result = await service.getWorkspacePlaybook(workspace);
+        res.writeHead(200);
+        res.end(JSON.stringify(result));
+    } catch (error) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: 'Workspace playbook failed', detail: (error as Error).message }));
+    }
+}
+
+async function handleWorkspaceRecentSuccesses(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    workspace: string
+): Promise<void> {
+    if (!checkApiKey(req)) {
+        res.writeHead(401);
+        res.end(JSON.stringify({ error: 'Authentication required' }));
+        return;
+    }
+
+    try {
+        const service = await getEvolutionService();
+        const result = await service.getWorkspaceRecentSuccesses(workspace);
+        res.writeHead(200);
+        res.end(JSON.stringify(result));
+    } catch (error) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: 'Workspace recent successes failed', detail: (error as Error).message }));
+    }
+}
+
 async function handleFeedback(
     req: http.IncomingMessage,
     res: http.ServerResponse,
@@ -1639,6 +2046,58 @@ async function handleDistillStatus(
         console.error('[Hub API] Distill status error:', error);
         res.writeHead(500);
         res.end(JSON.stringify({ error: 'Status check failed', detail: (error as Error).message }));
+    }
+}
+
+async function handleDistillJobsList(
+    req: http.IncomingMessage,
+    res: http.ServerResponse
+): Promise<void> {
+    if (!checkApiKey(req)) {
+        res.writeHead(401);
+        res.end(JSON.stringify({ error: 'Authentication required' }));
+        return;
+    }
+
+    try {
+        const jobStore = await getDistillJobStore();
+        const jobs = (await jobStore.getAll())
+            .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+        res.writeHead(200);
+        res.end(JSON.stringify({ jobs }));
+    } catch (error) {
+        console.error('[Hub API] Distill job list error:', error);
+        res.writeHead(500);
+        res.end(JSON.stringify({ error: 'Distill job list failed', detail: (error as Error).message }));
+    }
+}
+
+async function handleDistillJobGet(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    jobId: string
+): Promise<void> {
+    if (!checkApiKey(req)) {
+        res.writeHead(401);
+        res.end(JSON.stringify({ error: 'Authentication required' }));
+        return;
+    }
+
+    try {
+        const jobStore = await getDistillJobStore();
+        const job = await jobStore.get(jobId);
+        if (!job) {
+            res.writeHead(404);
+            res.end(JSON.stringify({ error: 'Distill job not found' }));
+            return;
+        }
+
+        res.writeHead(200);
+        res.end(JSON.stringify(job));
+    } catch (error) {
+        console.error('[Hub API] Distill job get error:', error);
+        res.writeHead(500);
+        res.end(JSON.stringify({ error: 'Distill job lookup failed', detail: (error as Error).message }));
     }
 }
 

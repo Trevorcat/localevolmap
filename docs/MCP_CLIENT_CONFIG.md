@@ -32,7 +32,7 @@ Most MCP clients need the same information:
 - command: `node`
 - args: `C:/path/to/your/repo/dist/mcp/server.js`
 - optional env: `GENES_PATH`, `CAPSULES_PATH`, `EVENTS_PATH`, `TASKS_PATH`
-- bootstrap env: `LOCAL_EVOMAP_CLIENT`, `LOCAL_EVOMAP_SERVER_URL`, `LOCAL_EVOMAP_SKILL_PATH`
+- bootstrap env: `LOCAL_EVOMAP_CLIENT`, `LOCAL_EVOMAP_SERVER_URL`, `LOCAL_EVOMAP_API_KEY`, `LOCAL_EVOMAP_SKILL_PATH`
 
 Example with env:
 
@@ -41,11 +41,12 @@ Example with env:
   "type": "stdio",
   "command": "node",
   "args": ["C:/path/to/your/repo/dist/mcp/server.js"],
-    "env": {
-      "LOCAL_EVOMAP_CLIENT": "codex",
-      "LOCAL_EVOMAP_SERVER_URL": "http://your-server.example.com:3000",
-      "LOCAL_EVOMAP_SKILL_PATH": "C:/Users/your-user/.codex/AGENTS.md",
-      "GENES_PATH": "C:/path/to/your/repo/data/genes",
+  "env": {
+    "LOCAL_EVOMAP_CLIENT": "codex",
+    "LOCAL_EVOMAP_SERVER_URL": "http://your-server.example.com:3000",
+    "LOCAL_EVOMAP_API_KEY": "YOUR_API_KEY",
+    "LOCAL_EVOMAP_SKILL_PATH": "C:/Users/your-user/.codex/AGENTS.md",
+    "GENES_PATH": "C:/path/to/your/repo/data/genes",
     "CAPSULES_PATH": "C:/path/to/your/repo/data/capsules",
     "EVENTS_PATH": "C:/path/to/your/repo/data/events",
     "TASKS_PATH": "C:/path/to/your/repo/data/tasks"
@@ -56,7 +57,7 @@ Example with env:
 Before using any checked-in template, replace:
 
 - `C:/path/to/your/repo` with your real absolute repo path
-- `YOUR_API_KEY` with your real API key for HTTP-based helpers
+- `YOUR_API_KEY` with your real API key for MCP bootstrap + remote task APIs
 - `your-server.example.com` with your actual host name or IP
 
 ## Bootstrap behavior
@@ -68,7 +69,7 @@ At startup, the MCP runtime now checks:
 
 The always-available diagnostic tool is `get_runtime_status`.
 
-- If bootstrap status is `ready` or `update_available`, formal tools/resources are available
+- If bootstrap status is `ready` or `update_available`, formal tools/resources are available and they read/write the remote authoritative task backend
 - If bootstrap status is `blocked`, `unreachable`, `booting`, `updating`, or `update_failed`, only `get_runtime_status` remains available
 - server unreachable disables formal tools
 

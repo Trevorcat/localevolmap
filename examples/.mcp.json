@@ -9,6 +9,7 @@
       "env": {
         "LOCAL_EVOMAP_CLIENT": "claude-code",
         "LOCAL_EVOMAP_SERVER_URL": "http://your-server.example.com:3000",
+        "LOCAL_EVOMAP_API_KEY": "YOUR_API_KEY",
         "LOCAL_EVOMAP_SKILL_PATH": "C:/Users/your-user/.claude/CLAUDE.md",
         "GENES_PATH": "C:/path/to/your/repo/data/genes",
         "CAPSULES_PATH": "C:/path/to/your/repo/data/capsules",

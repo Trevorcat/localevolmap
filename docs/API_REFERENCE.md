@@ -66,6 +66,44 @@ Authorization: Bearer YOUR_API_KEY
 
 ---
 
+## Agent Task / Workspace API
+
+This is the remote authoritative data plane used by MCP formal tools and workspace resources.
+
+### `POST /api/v1/tasks`
+
+Create a remote task session and return the first recommendations.
+
+### `GET /api/v1/tasks/:taskId`
+
+Read the task session context and retrospective draft.
+
+### `POST /api/v1/tasks/:taskId/search`
+
+Search genes and capsules within an existing task context.
+
+### `POST /api/v1/tasks/:taskId/usage`
+
+Persist the genes and capsules actually used by the task.
+
+### `POST /api/v1/tasks/:taskId/finalize`
+
+Persist summary, outcome, retrospective, and trigger automatic distillation when eligible.
+
+### `POST /api/v1/knowledge/search`
+
+Remote knowledge search entry used when no `taskId` is available.
+
+### `GET /api/v1/workspaces/:workspace/playbook`
+
+Return the same payload exposed by `evomap://workspace/<workspace>/playbook`.
+
+### `GET /api/v1/workspaces/:workspace/recent-successes`
+
+Return the same payload exposed by `evomap://workspace/<workspace>/recent-successes`.
+
+---
+
 ## Gene API
 
 ### `GET /api/v1/genes`
@@ -516,6 +554,14 @@ Authorization: Bearer YOUR_API_KEY
   "message": "Distillation conditions not met..."
 }
 ```
+
+### `GET /api/v1/distill/jobs`
+
+List automatic distillation jobs.
+
+### `GET /api/v1/distill/jobs/:jobId`
+
+Read one automatic distillation job.
 
 ### `POST /api/v1/distill/complete` 🔐
 
