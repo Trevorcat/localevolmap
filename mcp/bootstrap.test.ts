@@ -150,6 +150,7 @@ describe('bootstrap initialization', () => {
       expect(state.status).toBe('ready');
       expect(await fs.readFile(targetPath, 'utf-8')).toBe(nextSkillContent);
       expect(state.details).toContain('skill_auto_updated');
+      expect(state.details).not.toContain('skill_outdated');
     } finally {
       await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
     }

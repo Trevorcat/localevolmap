@@ -76,7 +76,7 @@ export async function initializeBootstrapState(options: InitializeBootstrapOptio
       body: JSON.stringify(initialRequest),
     });
 
-    const details = [...check.reasons];
+    let details = [...check.reasons];
 
     if (check.status !== 'ready' && !check.skill.current && check.skill.target.auto_update_supported && options.skillPath) {
       try {
@@ -88,7 +88,6 @@ export async function initializeBootstrapState(options: InitializeBootstrapOptio
         });
 
         if (updateResult.updated) {
-          details.push('skill_auto_updated');
           check = await fetchJson<AgentCheckResponse>(buildAbsoluteUrl(options.serverUrl, '/api/v1/agent/check'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -98,6 +97,7 @@ export async function initializeBootstrapState(options: InitializeBootstrapOptio
               skill_hash: await readSkillHash(options.skillPath),
             } satisfies AgentCheckRequest),
           });
+          details = [...check.reasons, 'skill_auto_updated'];
         }
       } catch (error) {
         return createStatusOnlyBootstrapState('update_failed', options.client, [

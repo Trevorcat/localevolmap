@@ -1,6 +1,7 @@
 ﻿import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
+import * as ts from 'typescript';
 import { LocalEvomap, DEFAULT_CONFIG } from '../index';
 import { TaskSessionStore } from '../storage/task-session-store';
 import { EvolutionService } from '../core/evolution-service';
@@ -56,6 +57,20 @@ describe('LocalEvomap MCP server', () => {
     await Promise.all(entries
       .filter(entry => entry.isDirectory() && entry.name.startsWith('localevomap-mcp-server-'))
       .map(entry => fs.rm(path.join(tmpRoot, entry.name), { recursive: true, force: true })));
+  });
+
+  test('emits Node-compatible MCP SDK subpath imports in compiled output', async () => {
+    const source = await fs.readFile(path.join(__dirname, 'server.ts'), 'utf-8');
+    const transpiled = ts.transpileModule(source, {
+      compilerOptions: {
+        module: ts.ModuleKind.CommonJS,
+        target: ts.ScriptTarget.ES2022,
+      },
+      fileName: path.join(__dirname, 'server.ts'),
+    }).outputText;
+
+    expect(transpiled).toContain('require("@modelcontextprotocol/sdk/server/mcp.js")');
+    expect(transpiled).toContain('require("@modelcontextprotocol/sdk/server/stdio.js")');
   });
 
   test('registers all required MCP tools', async () => {

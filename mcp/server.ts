@@ -2,11 +2,14 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { createHash } from 'crypto';
 import { z } from 'zod';
-import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio';
+import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import type { EvolutionBackend } from '../core/evolution-backend';
+import { EvolutionService } from '../core/evolution-service';
 import { BootstrapRuntimeState, createReadyBootstrapState, initializeBootstrapState } from './bootstrap';
+import { LocalEvomap, DEFAULT_CONFIG } from '../index';
 import { RemoteEvolutionClient } from './remote-evolution-client';
+import { TaskSessionStore } from '../storage/task-session-store';
 import { resolveSkillTargetPath } from './skill-updater';
 import type { AgentClient } from '../types/agent-bootstrap-schema';
 
@@ -319,6 +322,69 @@ function computeFileHash(filePath: string): string {
   return `sha256-${createHash('sha256').update(content).digest('base64')}`;
 }
 
+function hasFormalCapabilities(state: BootstrapRuntimeState): boolean {
+  return state.status === 'ready' || state.status === 'update_available';
+}
+
+function resolveDataPath(projectRoot: string, envKey: string, fallbackSegments: string[]): string {
+  return process.env[envKey] || path.join(projectRoot, ...fallbackSegments);
+}
+
+async function withSuppressedConsole<T>(operation: () => Promise<T>): Promise<T> {
+  const originalLog = console.log;
+  const originalWarn = console.warn;
+
+  console.log = () => undefined;
+  console.warn = () => undefined;
+
+  try {
+    return await operation();
+  } finally {
+    console.log = originalLog;
+    console.warn = originalWarn;
+  }
+}
+
+function createFallbackBootstrapState(client: AgentClient, bootstrapState: BootstrapRuntimeState): BootstrapRuntimeState {
+  return {
+    ...createReadyBootstrapState(client, bootstrapState.manifestVersion, 'update_available'),
+    details: [...bootstrapState.details, `local_backend_fallback:${bootstrapState.status}`]
+  };
+}
+
+async function createEmbeddedEvolutionBackend(projectRoot: string): Promise<EvolutionBackend> {
+  const genesPath = resolveDataPath(projectRoot, 'GENES_PATH', ['data', 'genes']);
+  const capsulesPath = resolveDataPath(projectRoot, 'CAPSULES_PATH', ['data', 'capsules']);
+  const eventsPath = resolveDataPath(projectRoot, 'EVENTS_PATH', ['data', 'events']);
+  const tasksPath = resolveDataPath(projectRoot, 'TASKS_PATH', ['data', 'tasks']);
+
+  const service = await withSuppressedConsole(async () => {
+    const evomap = new LocalEvomap({
+      ...DEFAULT_CONFIG,
+      genes_path: genesPath,
+      capsules_path: capsulesPath,
+      events_path: eventsPath,
+      review_mode: false
+    });
+    await evomap.init();
+
+    const taskStore = new TaskSessionStore(tasksPath);
+    await taskStore.init();
+
+    return new EvolutionService({ evomap, taskStore });
+  });
+
+  return {
+    startTask: input => withSuppressedConsole(() => service.startTask(input)),
+    searchKnowledge: input => withSuppressedConsole(() => service.searchKnowledge(input)),
+    recordUsage: input => withSuppressedConsole(() => service.recordUsage(input)),
+    getTaskContext: input => withSuppressedConsole(() => service.getTaskContext(input)),
+    finalizeTask: input => withSuppressedConsole(() => service.finalizeTask(input)),
+    getWorkspacePlaybook: workspace => withSuppressedConsole(() => service.getWorkspacePlaybook(workspace)),
+    getWorkspaceRecentSuccesses: workspace => withSuppressedConsole(() => service.getWorkspaceRecentSuccesses(workspace))
+  };
+}
+
 export async function createDefaultMcpServer(): Promise<LocalEvomapMcpServer> {
   const projectRoot = resolveProjectRoot();
   loadEnvFile(path.join(projectRoot, '.env'));
@@ -339,9 +405,17 @@ export async function createDefaultMcpServer(): Promise<LocalEvomapMcpServer> {
 
   const apiKey = process.env.LOCAL_EVOMAP_API_KEY || process.env.HUB_API_KEY || 'test-api-key';
 
+  const evolutionService = hasFormalCapabilities(bootstrapState)
+    ? new RemoteEvolutionClient({ serverUrl, apiKey })
+    : await createEmbeddedEvolutionBackend(projectRoot);
+
+  const effectiveBootstrapState = hasFormalCapabilities(bootstrapState)
+    ? bootstrapState
+    : createFallbackBootstrapState(client, bootstrapState);
+
   return createMcpServer({
-    evolutionService: new RemoteEvolutionClient({ serverUrl, apiKey }),
-    bootstrapState,
+    evolutionService,
+    bootstrapState: effectiveBootstrapState,
   });
 }
 
