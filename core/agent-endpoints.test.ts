@@ -168,6 +168,24 @@ describe('agent bootstrap endpoints', () => {
     expect(response.payload.skills.cursor.download_url).toBe('/skill/cursor');
   });
 
+  test('serves the agent bootstrap checklist for all supported clients', async () => {
+    const response = await requestJson(port, 'GET', '/api/v1/agent/bootstrap');
+
+    expect(response.statusCode).toBe(200);
+    expect(response.payload.project.preferred_runtime).toBe('local-mcp');
+    expect(response.payload.clients.codex.mcp_config.server_name).toBe('local-evomap');
+    expect(response.payload.clients.cursor.automation_level).toBe('full');
+    expect(response.payload.clients.kimi.automation_level).toBe('partial');
+  });
+
+  test('filters the agent bootstrap checklist by client', async () => {
+    const response = await requestJson(port, 'GET', '/api/v1/agent/bootstrap?client=codex');
+
+    expect(response.statusCode).toBe(200);
+    expect(Object.keys(response.payload.clients)).toEqual(['codex']);
+    expect(response.payload.clients.codex.mcp_config.config_path).toBe('~/.codex/config.toml');
+  });
+
   test('reports blocked when a breaking skill is outdated', async () => {
     const manifestResponse = await requestJson(port, 'GET', '/api/v1/agent-manifest');
     const manifest = manifestResponse.payload;

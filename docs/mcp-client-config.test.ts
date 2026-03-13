@@ -19,7 +19,10 @@ describe('MCP client configuration docs', () => {
     expect(content).toContain('dist/mcp/server.js');
     expect(content).toContain('get_runtime_status');
     expect(content).toContain('/api/v1/agent-manifest');
+    expect(content).toContain('/api/v1/agent/bootstrap');
     expect(content).toContain('/api/v1/agent/check');
+    expect(content).toContain('automation_level');
+    expect(content).toContain('install skill and local MCP config');
     expect(content).toContain('server unreachable disables formal tools');
     expect(content).toContain('automatic skill updates');
   });

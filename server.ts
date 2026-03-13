@@ -1,4 +1,4 @@
-﻿import * as http from 'http';
+import * as http from 'http';
 import * as fs from 'fs';
 import * as path from 'path';
 import { LocalEvomap, DEFAULT_CONFIG } from './index';
@@ -12,7 +12,9 @@ import { InvalidSignalContextError } from './core/signal-extractor';
 import { matchPatternToSignals, NoMatchingGeneError, AllGenesBannedError } from './core/gene-selector';
 import { normalizeSignals } from './types/signal-registry';
 import { evaluateAgentCompatibility, loadAgentManifest } from './core/agent-manifest';
-import type { AgentCheckRequest } from './types/agent-bootstrap-schema';
+import { buildAgentBootstrapChecklist } from './core/agent-bootstrap-manifest';
+import { isAgentClient } from './types/agent-bootstrap-schema';
+import type { AgentCheckRequest, AgentClient } from './types/agent-bootstrap-schema';
 import { TaskSessionStore } from './storage/task-session-store';
 import { EvolutionService } from './core/evolution-service';
 import { LLMProvider } from './core/llm-provider';
@@ -465,6 +467,11 @@ async function handleHubApi(
         return;
     }
 
+    if (req.method === 'GET' && pathname === '/api/v1/agent/bootstrap') {
+        await handleAgentBootstrap(req, res, url);
+        return;
+    }
+
     if (req.method === 'POST' && pathname === '/api/v1/agent/check') {
         await handleAgentCheck(req, res);
         return;
@@ -720,6 +727,42 @@ async function handleHubApi(
         res.writeHead(500);
         res.end(JSON.stringify({ error: 'Internal server error' }));
     }
+}
+
+function resolveRequestBaseUrl(req: http.IncomingMessage): string {
+    const protocolHeader = req.headers['x-forwarded-proto'];
+    const forwardedProto = Array.isArray(protocolHeader) ? protocolHeader[0] : protocolHeader;
+    const hostHeader = req.headers['x-forwarded-host'] || req.headers.host || `127.0.0.1:${PORT}`;
+    const host = Array.isArray(hostHeader) ? hostHeader[0] : hostHeader;
+    const protocol = forwardedProto || 'http';
+    return `${protocol}://${host}`;
+}
+
+async function handleAgentBootstrap(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    url: URL
+): Promise<void> {
+    const requestedClient = url.searchParams.get('client');
+    let client: AgentClient | undefined;
+
+    if (requestedClient) {
+        if (!isAgentClient(requestedClient)) {
+            res.writeHead(400);
+            res.end(JSON.stringify({ error: 'Unknown agent client', client: requestedClient }));
+            return;
+        }
+        client = requestedClient;
+    }
+
+    const checklist = await buildAgentBootstrapChecklist({
+        projectRoot: PROJECT_ROOT,
+        baseUrl: resolveRequestBaseUrl(req),
+        client,
+    });
+
+    res.writeHead(200);
+    res.end(JSON.stringify(checklist));
 }
 
 async function handleAgentManifest(
@@ -2303,4 +2346,9 @@ if (require.main === module) {
         console.log(`LocalEvomap Core Server running at http://${HOST}:${PORT}`);
     });
 }
+
+
+
+
+
 

@@ -18,6 +18,38 @@ Authorization: Bearer YOUR_API_KEY
 
 这组接口用于让 MCP 在启动时确认：当前 runtime 和本地 skill 是否仍然是服务端认可的最新版本。
 
+### `GET /api/v1/agent/bootstrap`
+
+返回一个给 agent 直接消费的安装清单，用于自动完成：
+
+- 下载本地 skill
+- 执行 `npm install` / `npm run build`
+- 接入本地 MCP runtime
+- 写入客户端 MCP/helper config
+- 执行安装后校验
+
+可选查询参数：
+
+- `client=codex|cursor|claude-code|opencode|kimi`
+
+**响应要点**:
+
+- `schema_version`
+- `project.preferred_runtime = "local-mcp"`
+- `server.bootstrap_url`, `server.manifest_url`, `server.check_url`
+- `runtime`：本地 MCP 入口和构建命令
+- `shared_env`：共享环境变量定义
+- `clients.<client>.automation_level`
+- `clients.<client>.steps`
+- `clients.<client>.post_install_checks`
+
+`automation_level` 当前含义：
+
+- `full`: `codex`、`cursor`、`claude-code`
+- `partial`: `opencode`、`kimi`
+
+Agent 应先执行 `steps`，再调用 `post_install_checks`，最后用 `POST /api/v1/agent/check` 确认 bootstrap 状态。
+
 ### `GET /api/v1/agent-manifest`
 
 返回服务端权威 manifest，包含：
@@ -597,3 +629,4 @@ Read one automatic distillation job.
   "validation": { ... }
 }
 ```
+

@@ -65,7 +65,15 @@ Before using any checked-in template, replace:
 At startup, the MCP runtime now checks:
 
 - `GET /api/v1/agent-manifest`
+- `GET /api/v1/agent/bootstrap`
 - `POST /api/v1/agent/check`
+
+Use `GET /api/v1/agent/bootstrap` when you want an agent-readable checklist that can install skill and local MCP config with a single structured payload.
+
+The `automation_level` field in that checklist means:
+
+- `full`: the client exposes enough local config surface for the agent to download the skill, build the local MCP runtime, and upsert the MCP server config directly
+- `partial`: the checklist still covers skill download, local runtime build, and helper config files, but the last client registration step stays manual today
 
 The always-available diagnostic tool is `get_runtime_status`.
 
@@ -278,3 +286,4 @@ After setup, verify the client can:
 3. read `evomap://workspace/<workspace>/playbook`
 4. read `evomap://workspace/<workspace>/recent-successes`
 5. finalize a completed task exactly once
+
