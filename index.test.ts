@@ -1,4 +1,4 @@
-import * as fs from 'fs/promises';
+﻿import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
 import { LocalEvomap, DEFAULT_CONFIG } from './index';
@@ -96,6 +96,7 @@ describe('LocalEvomap feedback', () => {
       id: result.event_id,
       selected_gene: gene.id,
       used_capsule: capsule.id,
+      knowledge_status: 'recorded',
       outcome: expect.objectContaining({ status: 'success', score: 0.93 })
     }));
     expect(events[0].metadata?.feedback).toEqual(expect.objectContaining({
@@ -131,7 +132,7 @@ describe('LocalEvomap feedback', () => {
     expect(capsules).toHaveLength(0);
   });
 
-  test('submitFeedback should infer selected gene from signals when omitted', async () => {
+  test('submitFeedback should keep legacy inference available when requested implicitly', async () => {
     const { evomap } = await createEvomap();
 
     await evomap.addGene({
@@ -156,5 +157,70 @@ describe('LocalEvomap feedback', () => {
 
     const events = await evomap.getRecentEvents(10);
     expect(events[0]?.selected_gene).toBe('gene_feedback_inferred');
+    expect(events[0]?.knowledge_status).toBe('inferred_legacy');
+  });
+
+  test('submitFeedback should write no_knowledge_used when explicitly told no knowledge was recorded', async () => {
+    const { evomap } = await createEvomap();
+
+    const result = await evomap.submitFeedback({
+      signals: ['plain-task'],
+      summary: 'Completed work without using LocalEvomap knowledge.',
+      outcome: { status: 'success', score: 0.71 },
+      create_capsule: false,
+      knowledge_status: 'no_knowledge_used'
+    });
+
+    const events = await evomap.getRecentEvents(10);
+    expect(events[0]).toEqual(expect.objectContaining({
+      id: result.event_id,
+      selected_gene: null,
+      knowledge_status: 'no_knowledge_used'
+    }));
+  });
+
+  test('submitFeedback should write capsule_only when only a capsule is supplied', async () => {
+    const { evomap } = await createEvomap();
+
+    const gene: Gene = {
+      type: 'Gene',
+      id: 'gene_capsule_only_feedback',
+      category: 'feature',
+      signals_match: ['capsule-only'],
+      preconditions: [],
+      strategy: ['replay capsule'],
+      constraints: {}
+    };
+
+    const capsule: Capsule = {
+      type: 'Capsule',
+      schema_version: '1.5.0',
+      id: 'capsule_only_feedback',
+      trigger: ['capsule-only'],
+      gene: gene.id,
+      summary: 'Capsule-only feedback case',
+      confidence: 0.77,
+      blast_radius: { files: 1, lines: 3 },
+      outcome: { status: 'success', score: 0.77 },
+      env_fingerprint: { platform: 'win32', arch: 'x64' },
+      metadata: { created_at: '2026-03-10T00:00:00.000Z', source: 'local', validated: true }
+    };
+
+    await evomap.addGene(gene);
+    await evomap.addCapsule(capsule);
+
+    await evomap.submitFeedback({
+      signals: ['capsule-only'],
+      used_capsule: capsule.id,
+      summary: 'Used a capsule without recording the gene separately.',
+      outcome: { status: 'success', score: 0.83 },
+      create_capsule: false,
+      knowledge_status: 'capsule_only'
+    });
+
+    const events = await evomap.getRecentEvents(10);
+    expect(events[0]?.selected_gene).toBeNull();
+    expect(events[0]?.used_capsule).toBe(capsule.id);
+    expect(events[0]?.knowledge_status).toBe('capsule_only');
   });
 });

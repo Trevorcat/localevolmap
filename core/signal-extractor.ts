@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Signal Extractor - 信号提取引擎
  *
  * 从运行时日志和历史中提取结构化信号
@@ -270,7 +270,8 @@ function extractPatternSignals(history: EvolutionEvent[], signals: Signal[], wei
 
   const geneFrequency = new Map<string, number>();
   history.forEach(event => {
-    geneFrequency.set(event.selected_gene, (geneFrequency.get(event.selected_gene) || 0) + 1);
+    const geneKey = event.selected_gene || event.knowledge_status || 'unknown';
+    geneFrequency.set(geneKey, (geneFrequency.get(geneKey) || 0) + 1);
   });
 
   const mostUsedGene = Array.from(geneFrequency.entries()).sort((left, right) => right[1] - left[1])[0];
@@ -368,3 +369,4 @@ export function analyzeSignals(signals: Signal[]): SignalStats {
     userRequestCount
   };
 }
+

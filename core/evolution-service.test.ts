@@ -1,4 +1,4 @@
-import * as fs from 'fs/promises';
+﻿import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
 import { LocalEvomap, DEFAULT_CONFIG } from '../index';
@@ -83,7 +83,7 @@ describe('EvolutionService', () => {
     expect(started.workingHints.length).toBeGreaterThan(0);
   });
 
-  test('finalizeTask updates referenced knowledge and returns the event result', async () => {
+  test('finalizeTask marks recorded provenance when a gene usage ref exists', async () => {
     const { service, evomap } = await createService();
 
     const gene: Gene = {
@@ -145,12 +145,117 @@ describe('EvolutionService', () => {
     expect(result.genesUpdated).toContain(gene.id);
     expect(result.capsulesUpdated).toContain(capsule.id);
     expect(result.distillReady).toBe(false);
+    expect(result.knowledgeStatus).toBe('recorded');
+    expect(result.warnings).toEqual([]);
 
     const context = await service.getTaskContext({ taskId: started.taskId });
     expect(context.task.status).toBe('finalized');
     expect(context.task.outcome).toEqual({ status: 'success', score: 0.93 });
+    expect(context.task.finalization?.knowledgeStatus).toBe('recorded');
+    expect(context.task.finalization?.warnings).toEqual([]);
 
     const events = await evomap.getRecentEvents(10);
-    expect(events.some(event => event.id === result.eventId)).toBe(true);
+    expect(events.some(event => event.id === result.eventId && event.knowledge_status === 'recorded')).toBe(true);
+  });
+
+  test('finalizeTask marks capsule_only provenance when only a capsule usage ref exists', async () => {
+    const { service, evomap } = await createService();
+
+    const gene: Gene = {
+      type: 'Gene',
+      id: 'gene_capsule_only',
+      category: 'feature',
+      signals_match: ['capsule-only'],
+      preconditions: [],
+      strategy: ['reuse capsule only'],
+      constraints: {}
+    };
+
+    const capsule: Capsule = {
+      type: 'Capsule',
+      schema_version: '1.5.0',
+      id: 'capsule_capsule_only',
+      trigger: ['capsule-only'],
+      gene: gene.id,
+      summary: 'Capsule-only provenance path.',
+      confidence: 0.79,
+      blast_radius: { files: 1, lines: 4 },
+      outcome: { status: 'success', score: 0.79 },
+      env_fingerprint: { platform: currentPlatform, arch: currentArch, node_version: process.version },
+      metadata: { created_at: '2026-03-10T00:00:00.000Z', source: 'local', validated: true }
+    };
+
+    await evomap.addGene(gene);
+    await evomap.addCapsule(capsule);
+
+    const started = await service.startTask({
+      goal: 'verify capsule-only finalize path',
+      workspace: 'capability',
+      client: 'codex',
+      initialSignals: ['capsule-only']
+    });
+
+    await service.recordUsage({
+      taskId: started.taskId,
+      knowledge: [
+        { kind: 'capsule', id: capsule.id, phase: 'implement', note: 'used capsule without explicit gene record' }
+      ]
+    });
+
+    const result = await service.finalizeTask({
+      taskId: started.taskId,
+      summary: 'Finished with only a capsule usage record.',
+      outcome: { status: 'success', score: 0.81 },
+      retrospective: {
+        signals: ['capsule-only'],
+        selfMistakes: [],
+        userCorrections: [],
+        validations: [{ command: 'npm test', passed: true }]
+      },
+      createCapsule: false
+    });
+
+    expect(result.knowledgeStatus).toBe('capsule_only');
+    expect(result.warnings).toEqual([]);
+
+    const events = await evomap.getRecentEvents(10);
+    expect(events[0]?.selected_gene).toBeNull();
+    expect(events[0]?.used_capsule).toBe(capsule.id);
+    expect(events[0]?.knowledge_status).toBe('capsule_only');
+  });
+
+  test('finalizeTask marks no_knowledge_used provenance and warning when nothing was recorded', async () => {
+    const { service, evomap } = await createService();
+
+    const started = await service.startTask({
+      goal: 'verify no knowledge path',
+      workspace: 'capability',
+      client: 'codex',
+      initialSignals: ['no-knowledge']
+    });
+
+    const result = await service.finalizeTask({
+      taskId: started.taskId,
+      summary: 'Completed without recorded LocalEvomap knowledge.',
+      outcome: { status: 'success', score: 0.74 },
+      retrospective: {
+        signals: ['no-knowledge'],
+        selfMistakes: [],
+        userCorrections: [],
+        validations: [{ command: 'npm run build', passed: true }]
+      },
+      createCapsule: false
+    });
+
+    expect(result.knowledgeStatus).toBe('no_knowledge_used');
+    expect(result.warnings).toContain('Task finalized without recorded gene/capsule usage');
+
+    const context = await service.getTaskContext({ taskId: started.taskId });
+    expect(context.task.finalization?.knowledgeStatus).toBe('no_knowledge_used');
+    expect(context.task.finalization?.warnings).toContain('Task finalized without recorded gene/capsule usage');
+
+    const events = await evomap.getRecentEvents(10);
+    expect(events[0]?.selected_gene).toBeNull();
+    expect(events[0]?.knowledge_status).toBe('no_knowledge_used');
   });
 });

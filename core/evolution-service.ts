@@ -1,4 +1,4 @@
-import type { Capsule, Gene } from '../types/gene-capsule-schema';
+﻿import type { Capsule, Gene, KnowledgeProvenanceStatus } from '../types/gene-capsule-schema';
 import type {
   KnowledgeUsageRef,
   RecordKnowledgeUsageInput,
@@ -87,6 +87,8 @@ export interface FinalizeTaskResult {
   capsulesUpdated: string[];
   capsuleId: string | null;
   distillReady: boolean;
+  knowledgeStatus: KnowledgeProvenanceStatus;
+  warnings: string[];
 }
 
 export interface WorkspacePlaybook {
@@ -200,12 +202,22 @@ export class EvolutionService {
         genesUpdated: task.finalization.genesUpdated,
         capsulesUpdated: task.finalization.capsulesUpdated,
         capsuleId: task.finalization.capsuleId,
-        distillReady: task.finalization.distillReady
+        distillReady: task.finalization.distillReady,
+        knowledgeStatus: task.finalization.knowledgeStatus,
+        warnings: task.finalization.warnings
       };
     }
 
     const usedGene = task.knowledgeRefs.find(ref => ref.kind === 'gene');
     const usedCapsule = task.knowledgeRefs.find(ref => ref.kind === 'capsule');
+    const knowledgeStatus: KnowledgeProvenanceStatus = usedGene
+      ? 'recorded'
+      : usedCapsule
+        ? 'capsule_only'
+        : 'no_knowledge_used';
+    const warnings = knowledgeStatus === 'no_knowledge_used'
+      ? ['Task finalized without recorded gene/capsule usage']
+      : [];
     const validations = input.retrospective.validations || [];
     const validationErrors = validations.filter(item => !item.passed).map(item => item.command);
 
@@ -222,7 +234,8 @@ export class EvolutionService {
         commands_run: validations.length,
         errors: validationErrors.length > 0 ? validationErrors : undefined
       },
-      create_capsule: input.createCapsule
+      create_capsule: input.createCapsule,
+      knowledge_status: knowledgeStatus
     });
 
     const genesUpdated = feedbackResult.gene_updated && usedGene ? [usedGene.id] : [];
@@ -240,7 +253,9 @@ export class EvolutionService {
         capsuleId: feedbackResult.capsule_id,
         distillReady: feedbackResult.distill_ready,
         genesUpdated,
-        capsulesUpdated
+        capsulesUpdated,
+        knowledgeStatus,
+        warnings
       }
     });
 
@@ -250,7 +265,9 @@ export class EvolutionService {
       genesUpdated,
       capsulesUpdated,
       capsuleId: feedbackResult.capsule_id,
-      distillReady: feedbackResult.distill_ready
+      distillReady: feedbackResult.distill_ready,
+      knowledgeStatus,
+      warnings
     };
   }
 
@@ -282,9 +299,9 @@ export class EvolutionService {
 
     return {
       workspace,
-      recommendedGenes: this.rankKeys(geneCounts),
-      recentCapsules: this.rankKeys(capsuleCounts),
-      recentMistakes: this.rankKeys(mistakeCounts),
+      recommendedGenes: this.sortCounts(geneCounts).slice(0, 5).map(([id]) => id),
+      recentCapsules: this.sortCounts(capsuleCounts).slice(0, 5).map(([id]) => id),
+      recentMistakes: this.sortCounts(mistakeCounts).slice(0, 5).map(([id]) => id),
       successfulTaskCount: tasks.length
     };
   }
@@ -293,19 +310,13 @@ export class EvolutionService {
     const tasks = (await this.deps.taskStore.getAll())
       .filter(task => task.workspace === workspace)
       .filter(task => task.status === 'finalized' && task.outcome?.status === 'success')
-      .sort((left, right) => (right.finalizedAt || '').localeCompare(left.finalizedAt || ''));
-
-    const capsuleIds = new Set<string>();
-    for (const task of tasks) {
-      for (const capsuleId of task.finalization?.capsulesUpdated || []) {
-        capsuleIds.add(capsuleId);
-      }
-    }
+      .sort((left, right) => (right.finalizedAt || '').localeCompare(left.finalizedAt || ''))
+      .slice(0, 5);
 
     return {
       workspace,
-      summaries: tasks.map(task => task.retrospective?.summary).filter((value): value is string => Boolean(value)),
-      capsules: Array.from(capsuleIds)
+      summaries: tasks.map(task => task.retrospective?.summary || task.goal),
+      capsules: tasks.flatMap(task => task.finalization?.capsulesUpdated || [])
     };
   }
 
@@ -318,39 +329,30 @@ export class EvolutionService {
   }
 
   private normalizeSignals(signals: string[]): string[] {
-    return Array.from(new Set(signals.map(signal => String(signal).trim()).filter(Boolean)));
+    return Array.from(new Set(signals.map(signal => signal.trim()).filter(Boolean)));
   }
 
   private countGeneMatches(gene: Gene, signals: string[]): number {
-    return gene.signals_match.filter(pattern => matchPatternToSignals(pattern, signals)).length;
+    return gene.signals_match.reduce((count, pattern) => (
+      count + (matchPatternToSignals(pattern, signals) ? 1 : 0)
+    ), 0);
   }
 
   private buildWorkingHints(knowledge: SearchKnowledgeResult): string[] {
     const hints: string[] = [];
 
     if (knowledge.genes.length > 0) {
-      hints.push(`Try gene ${knowledge.genes[0].id} first.`);
+      hints.push(`Top gene: ${knowledge.genes[0].id}`);
     }
 
     if (knowledge.capsules.length > 0) {
-      hints.push(`Reuse capsule ${knowledge.capsules[0].id} if the environment still matches.`);
+      hints.push(`Relevant capsule: ${knowledge.capsules[0].id}`);
     }
 
-    if (hints.length === 0) {
-      hints.push('No matching knowledge found yet; proceed and record new learnings at task end.');
-    }
-
-    return hints;
+    return hints.length > 0 ? hints : ['No direct matches found; proceed carefully and record new learning.'];
   }
 
-  private rankKeys(counts: Map<string, number>): string[] {
-    return Array.from(counts.entries())
-      .sort((left, right) => {
-        if (right[1] !== left[1]) {
-          return right[1] - left[1];
-        }
-        return left[0].localeCompare(right[0]);
-      })
-      .map(([key]) => key);
+  private sortCounts(counts: Map<string, number>): Array<[string, number]> {
+    return Array.from(counts.entries()).sort((left, right) => right[1] - left[1]);
   }
 }

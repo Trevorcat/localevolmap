@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Event Logger - 事件审计日志
  * 
  * 记录所有进化事件，用于审计和回溯
@@ -121,7 +121,8 @@ export class EventLogger {
       byStatus.set(event.outcome.status, (byStatus.get(event.outcome.status) || 0) + 1);
       
       // 按基因统计
-      byGene.set(event.selected_gene, (byGene.get(event.selected_gene) || 0) + 1);
+      const geneKey = event.selected_gene || event.knowledge_status || 'unknown';
+      byGene.set(geneKey, (byGene.get(geneKey) || 0) + 1);
       
       // 成功率
       if (event.outcome.status === 'success') {
@@ -162,3 +163,4 @@ export class EventLogger {
     return backupPath;
   }
 }
+

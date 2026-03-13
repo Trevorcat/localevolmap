@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Local Evomap - 本地进化系统主入口
  * 
  * 整合所有模块，提供统一的进化系统 API
@@ -185,8 +185,9 @@ export class LocalEvomap {
     }
 
     const explicitSelectedGeneId = feedback.selected_gene?.trim();
-    let selectedGeneId = explicitSelectedGeneId || 'unknown';
+    let selectedGeneId: string | null = explicitSelectedGeneId || null;
     const usedCapsuleId = feedback.used_capsule?.trim() || undefined;
+    const usedCapsule = usedCapsuleId ? await this.capsuleStore.get(usedCapsuleId) : undefined;
     const outcomeScore = Number(Math.max(0, Math.min(1, feedback.outcome?.score ?? 0)));
     const outcomeStatus = feedback.outcome?.status ?? 'skipped';
     const commandsRun = Math.max(0, feedback.validation?.commands_run ?? 0);
@@ -196,9 +197,26 @@ export class LocalEvomap {
     const userCorrections = (feedback.user_corrections || []).map(item => item.trim()).filter(Boolean).slice(0, 10);
     const envFingerprint = this.getRuntimeEnvFingerprint();
 
-    if (!explicitSelectedGeneId) {
-      const genes = await this.geneStore.getAll();
-      selectedGeneId = inferGeneIdFromSignals(normalizedSignals, genes) || 'unknown';
+    let knowledgeStatus = feedback.knowledge_status;
+    if (!knowledgeStatus) {
+      if (explicitSelectedGeneId) {
+        knowledgeStatus = 'recorded';
+      } else if (usedCapsuleId) {
+        knowledgeStatus = 'capsule_only';
+      } else {
+        const genes = await this.geneStore.getAll();
+        const inferredGeneId = inferGeneIdFromSignals(normalizedSignals, genes) || null;
+        if (inferredGeneId) {
+          selectedGeneId = inferredGeneId;
+          knowledgeStatus = 'inferred_legacy';
+        } else {
+          knowledgeStatus = 'no_knowledge_used';
+        }
+      }
+    }
+
+    if (knowledgeStatus !== 'recorded' && knowledgeStatus !== 'inferred_legacy') {
+      selectedGeneId = null;
     }
 
     const event: EvolutionEvent = {
@@ -206,6 +224,7 @@ export class LocalEvomap {
       timestamp: new Date().toISOString(),
       signals: normalizedSignals,
       selected_gene: selectedGeneId,
+      knowledge_status: knowledgeStatus,
       used_capsule: usedCapsuleId,
       outcome: {
         status: outcomeStatus,
@@ -238,9 +257,7 @@ export class LocalEvomap {
     let capsuleUpdated = false;
     let createdCapsuleId: string | null = null;
 
-    const selectedGene = selectedGeneId !== 'unknown'
-      ? await this.geneStore.get(selectedGeneId)
-      : undefined;
+    const selectedGene = selectedGeneId ? await this.geneStore.get(selectedGeneId) : undefined;
     if (selectedGene) {
       applyEpigeneticMarks(selectedGene, envFingerprint, outcomeStatus);
       await this.geneStore.upsert(selectedGene);
@@ -248,7 +265,6 @@ export class LocalEvomap {
     }
 
     if (usedCapsuleId) {
-      const usedCapsule = await this.capsuleStore.get(usedCapsuleId);
       if (usedCapsule) {
         const updatedCapsule = updateCapsuleFeedback(usedCapsule, outcomeStatus, outcomeScore);
         await this.capsuleStore.update(updatedCapsule);
@@ -262,7 +278,7 @@ export class LocalEvomap {
         schema_version: '1.5.0',
         id: `feedback_capsule_${Date.now()}`,
         trigger: normalizedSignals,
-        gene: selectedGeneId,
+        gene: selectedGeneId || usedCapsule?.gene || 'unknown',
         summary,
         confidence: Number(Math.max(0.6, outcomeScore).toFixed(4)),
         blast_radius: { files: 0, lines: 0 },
@@ -293,7 +309,8 @@ export class LocalEvomap {
       capsule_id: createdCapsuleId,
       gene_updated: geneUpdated,
       capsule_updated: capsuleUpdated,
-      distill_ready: await this.shouldDistill()
+      distill_ready: await this.shouldDistill(),
+      knowledge_status: knowledgeStatus
     };
   }
   
@@ -862,3 +879,5 @@ export {
   HubRegistry,
   PUBLIC_HUBS
 } from './core/capsule-hub-client';
+
+

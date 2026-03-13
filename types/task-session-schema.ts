@@ -1,8 +1,10 @@
-export type TaskSessionStatus = 'active' | 'finalized';
+﻿export type TaskSessionStatus = 'active' | 'finalized';
 
 export type KnowledgeRefKind = 'gene' | 'capsule';
 
 export type KnowledgeUsagePhase = 'plan' | 'implement' | 'validate';
+
+import type { KnowledgeProvenanceStatus } from './gene-capsule-schema';
 
 export interface ValidationResult {
   command: string;
@@ -29,6 +31,8 @@ export interface TaskFinalization {
   distillReady: boolean;
   genesUpdated: string[];
   capsulesUpdated: string[];
+  knowledgeStatus: KnowledgeProvenanceStatus;
+  warnings: string[];
 }
 
 export interface KnowledgeUsageRef {

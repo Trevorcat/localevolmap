@@ -1369,6 +1369,26 @@
                 .filter(Boolean);
         }
 
+        function formatEventKnowledgeLabel(ev) {
+            if (ev.selected_gene) return ev.selected_gene;
+            if (ev.knowledge_status === 'capsule_only') return 'Capsule used (gene unrecorded)';
+            if (ev.knowledge_status === 'no_knowledge_used') return 'No knowledge recorded';
+            if (ev.knowledge_status === 'inferred_legacy') return 'Legacy inferred / unknown';
+            return 'evolution';
+        }
+
+        function getEventAnalyticsKey(ev) {
+            return ev.selected_gene || `__${ev.knowledge_status || 'unknown'}__`;
+        }
+
+        function getEventAnalyticsLabel(key) {
+            if (key === '__capsule_only__') return 'Capsule used (gene unrecorded)';
+            if (key === '__no_knowledge_used__') return 'No knowledge recorded';
+            if (key === '__inferred_legacy__') return 'Legacy inferred / unknown';
+            if (key === '__unknown__') return 'Unknown';
+            return key;
+        }
+
         // --- Dashboard ---
         async function loadDashboard() {
             try {
@@ -1388,7 +1408,7 @@
                         tl.innerHTML += `
                             <div class="timeline-item">
                                 <span class="timeline-time">${new Date(ev.timestamp).toLocaleString()}</span>
-                                <div class="timeline-content">${ev.selected_gene || 'evolution'} — ${ev.outcome?.status || 'N/A'}</div>
+                                <div class="timeline-content">${formatEventKnowledgeLabel(ev)} — ${ev.outcome?.status || 'N/A'}</div>
                             </div>
                         `;
                     });
@@ -1480,7 +1500,7 @@
                 if(res.events && res.events.length > 0) {
                     res.events.forEach((ev) => {
                         const evId = ev.id || 'N/A';
-                        const geneName = ev.selected_gene || evId;
+                        const geneName = formatEventKnowledgeLabel(ev);
                         const status = ev.outcome?.status || 'unknown';
                         const score = ev.outcome?.score != null ? (ev.outcome.score * 100).toFixed(0) + '%' : '-';
                         const jsonStr = JSON.stringify(ev, null, 2);
@@ -2206,7 +2226,7 @@
                 : '0';
             const capsuleReuses = events.filter(e => e.used_capsule).length;
             const reuseRate = total > 0 ? (capsuleReuses / total * 100).toFixed(0) : '0';
-            const activeGenes = new Set(events.map(e => e.selected_gene)).size;
+            const activeGenes = new Set(events.map(e => getEventAnalyticsKey(e))).size;
 
             document.getElementById('kpi-total').textContent = total;
             document.getElementById('kpi-success-rate').textContent = successRate + '%';
@@ -2221,7 +2241,7 @@
                 const score = e.outcome?.score || 0;
                 const pct = Math.max(10, (score / maxScore) * 100);
                 const status = e.outcome?.status || 'skipped';
-                const title = `${e.selected_gene || 'N/A'}\nStatus: ${status}\nScore: ${(score * 100).toFixed(0)}%\n${new Date(e.timestamp).toLocaleString()}`;
+                const title = `${formatEventKnowledgeLabel(e)}\nStatus: ${status}\nScore: ${(score * 100).toFixed(0)}%\n${new Date(e.timestamp).toLocaleString()}`;
                 return `<div class="trend-bar" data-status="${status}" style="height:${pct}%;" title="${title}"></div>`;
             }).join('');
             document.getElementById('trend-chart').innerHTML = chartHtml;
@@ -2229,7 +2249,7 @@
             // --- Gene Effectiveness ---
             const geneMap = {};
             events.forEach(e => {
-                const gid = e.selected_gene || 'unknown';
+                const gid = getEventAnalyticsKey(e);
                 if (!geneMap[gid]) geneMap[gid] = { hits: 0, success: 0, failed: 0, partial: 0, skipped: 0, totalScore: 0 };
                 geneMap[gid].hits++;
                 geneMap[gid][e.outcome?.status || 'skipped']++;
@@ -2243,8 +2263,12 @@
                     const avg = g.hits > 0 ? (g.totalScore / g.hits * 100).toFixed(0) : '0';
                     const rateNum = parseFloat(rate);
                     const effClass = rateNum >= 70 ? 'high' : rateNum >= 40 ? 'mid' : 'low';
+                    const gidLabel = getEventAnalyticsLabel(gid);
+                    const gidCell = gid.startsWith('__')
+                        ? gidLabel
+                        : `<strong class="clickable-id" onclick="openGeneDetail('${gid}','view')">${gidLabel}</strong>`;
                     return `<tr>
-                        <td><strong class="clickable-id" onclick="openGeneDetail('${gid}','view')">${gid}</strong></td>
+                        <td>${gidCell}</td>
                         <td>${g.hits}</td>
                         <td style="color:#22c55e;">${g.success}</td>
                         <td style="color:#ef4444;">${g.failed}</td>
@@ -2280,7 +2304,7 @@
             const capsuleUseMap = {};
             events.forEach(e => {
                 if (e.used_capsule) {
-                    if (!capsuleUseMap[e.used_capsule]) capsuleUseMap[e.used_capsule] = { count: 0, success: 0, gene: e.selected_gene };
+                    if (!capsuleUseMap[e.used_capsule]) capsuleUseMap[e.used_capsule] = { count: 0, success: 0, gene: formatEventKnowledgeLabel(e) };
                     capsuleUseMap[e.used_capsule].count++;
                     if (e.outcome?.status === 'success') capsuleUseMap[e.used_capsule].success++;
                 }

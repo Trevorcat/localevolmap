@@ -10,6 +10,7 @@ Use LocalEvomap through MCP only.
 3. Whenever you actually adopt a `Gene` or `Capsule`, call `record_usage`.
 4. Before final delivery, decide whether the task is complete.
 5. If the task is complete, build a short retrospective and call `finalize_task`.
+6. If `finalize_task` returns provenance warnings, report them honestly and prefer fixing missing `record_usage` in future runs rather than hiding them.
 
 The agent decides when a task is complete. Do not ask MCP to infer completion from partial work.
 

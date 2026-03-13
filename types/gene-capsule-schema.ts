@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Capability Evolver - Gene/Capsule Schema Definitions
  * 
  * 基于 EvoMap/evolver 的核心数据结构定义
@@ -100,6 +100,8 @@ export type Category =
   | 'test';
 
 export type OutcomeStatus = 'success' | 'failed' | 'partial' | 'skipped';
+
+export type KnowledgeProvenanceStatus = 'recorded' | 'capsule_only' | 'no_knowledge_used' | 'inferred_legacy';
 
 export interface BlastRadius {
   files: number;
@@ -258,7 +260,10 @@ export interface EvolutionEvent {
   signals: Signal[];
   
   /** 选择的基因 */
-  selected_gene: string;
+  selected_gene: string | null;
+  
+  /** 知识来源状态 */
+  knowledge_status?: KnowledgeProvenanceStatus;
   
   /** 使用的胶囊 (可选) */
   used_capsule?: string;
@@ -316,6 +321,7 @@ export interface FeedbackSubmission {
   };
   validation?: FeedbackValidation;
   create_capsule?: boolean;
+  knowledge_status?: KnowledgeProvenanceStatus;
 }
 
 export interface FeedbackResult {
@@ -324,6 +330,7 @@ export interface FeedbackResult {
   gene_updated: boolean;
   capsule_updated: boolean;
   distill_ready: boolean;
+  knowledge_status: KnowledgeProvenanceStatus;
 }
 
 // ============================================================================
@@ -562,3 +569,4 @@ export const EXAMPLE_CONFIG: EvolutionConfig = {
   cacheEnabled: false,
   cacheTtlMs: 3600000
 };
+

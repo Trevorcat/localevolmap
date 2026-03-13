@@ -1,4 +1,4 @@
-import * as http from 'http';
+﻿import * as http from 'http';
 import * as fs from 'fs';
 import * as path from 'path';
 import { LocalEvomap, DEFAULT_CONFIG } from './index';
@@ -1258,6 +1258,7 @@ async function handleEventsList(
         const q = search.toLowerCase();
         events = events.filter((ev: EvolutionEvent) => {
             const gene = (ev.selected_gene || '').toLowerCase();
+              const knowledgeStatus = (ev.knowledge_status || '').toLowerCase();
             const id = (ev.id || '').toLowerCase();
             const status = (ev.outcome?.status || '').toLowerCase();
             const signals = (ev.signals || []).join(' ').toLowerCase();
@@ -2302,3 +2303,4 @@ if (require.main === module) {
         console.log(`LocalEvomap Core Server running at http://${HOST}:${PORT}`);
     });
 }
+
