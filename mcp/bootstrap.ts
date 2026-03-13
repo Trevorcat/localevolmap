@@ -1,5 +1,4 @@
 import * as fs from 'fs/promises';
-import { createHash } from 'crypto';
 import type {
   AgentCheckRequest,
   AgentCheckResponse,
@@ -7,6 +6,7 @@ import type {
   AgentManifest,
   BootstrapStatus,
 } from '../types/agent-bootstrap-schema';
+import { computeStableBootstrapHash } from '../core/agent-manifest';
 import { autoUpdateSkill } from './skill-updater';
 
 export interface BootstrapRuntimeState {
@@ -29,16 +29,12 @@ export interface InitializeBootstrapOptions {
   skillPath?: string;
 }
 
-function computeHash(content: string): string {
-  return `sha256-${createHash('sha256').update(content).digest('base64')}`;
-}
-
 async function readSkillHash(skillPath?: string): Promise<string | undefined> {
   if (!skillPath) return undefined;
 
   try {
     const content = await fs.readFile(skillPath, 'utf-8');
-    return computeHash(content);
+    return computeStableBootstrapHash(content);
   } catch {
     return undefined;
   }

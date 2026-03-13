@@ -4,6 +4,7 @@ import { createHash } from 'crypto';
 import { z } from 'zod';
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { computeStableBootstrapHash } from '../core/agent-manifest';
 import type { EvolutionBackend } from '../core/evolution-backend';
 import { EvolutionService } from '../core/evolution-service';
 import { BootstrapRuntimeState, createReadyBootstrapState, initializeBootstrapState } from './bootstrap';
@@ -319,7 +320,7 @@ function resolveProjectRoot(): string {
 
 function computeFileHash(filePath: string): string {
   const content = fs.readFileSync(filePath, 'utf-8');
-  return `sha256-${createHash('sha256').update(content).digest('base64')}`;
+  return computeStableBootstrapHash(content);
 }
 
 function hasFormalCapabilities(state: BootstrapRuntimeState): boolean {

@@ -11,8 +11,12 @@ import type {
   RawManifestEntry,
 } from '../types/agent-bootstrap-schema';
 
-function buildHash(content: string): string {
-  return `sha256-${createHash('sha256').update(content).digest('base64')}`;
+function normalizeBootstrapContent(content: string): string {
+  return content.replace(/\r\n/g, '\n');
+}
+
+export function computeStableBootstrapHash(content: string): string {
+  return `sha256-${createHash('sha256').update(normalizeBootstrapContent(content)).digest('base64')}`;
 }
 
 async function hydrateEntry(projectRoot: string, entry: RawManifestEntry): Promise<ManifestEntry> {
@@ -23,7 +27,7 @@ async function hydrateEntry(projectRoot: string, entry: RawManifestEntry): Promi
     version: entry.version,
     breaking: entry.breaking ?? false,
     auto_update_supported: entry.auto_update_supported ?? false,
-    hash: buildHash(content),
+    hash: computeStableBootstrapHash(content),
     download_url: entry.source.download_url,
     source_path: entry.source.path,
   };

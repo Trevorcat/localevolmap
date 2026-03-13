@@ -1,8 +1,8 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
-import { createHash } from 'crypto';
 import type { AgentClient } from '../types/agent-bootstrap-schema';
+import { computeStableBootstrapHash } from '../core/agent-manifest';
 
 const AUTO_UPDATE_CLIENTS = new Set<AgentClient>(['codex', 'claude-code', 'cursor']);
 
@@ -18,10 +18,6 @@ export interface AutoUpdateSkillResult {
   reason: string;
   targetPath?: string;
   hash?: string;
-}
-
-function computeHash(content: string): string {
-  return `sha256-${createHash('sha256').update(content).digest('base64')}`;
 }
 
 export function isAutoUpdateSupported(client: AgentClient): boolean {
@@ -58,7 +54,7 @@ export async function autoUpdateSkill(options: AutoUpdateSkillOptions): Promise<
   }
 
   const content = await response.text();
-  const actualHash = computeHash(content);
+  const actualHash = computeStableBootstrapHash(content);
   if (actualHash !== options.expectedHash) {
     throw new Error(`Downloaded skill hash mismatch for ${options.client}`);
   }

@@ -1,5 +1,5 @@
 import * as path from 'path';
-import { loadAgentManifest } from './agent-manifest';
+import { computeStableBootstrapHash, loadAgentManifest } from './agent-manifest';
 
 describe('agent manifest loader', () => {
   test('loads checked-in manifest and computes hashes for tracked files', async () => {
@@ -19,5 +19,12 @@ describe('agent manifest loader', () => {
     expect(manifest.skills.cursor.auto_update_supported).toBe(true);
     expect(manifest.skills.kimi.auto_update_supported).toBe(false);
     expect(manifest.skills.opencode.auto_update_supported).toBe(false);
+  });
+
+  test('normalizes line endings before computing bootstrap hashes', () => {
+    const lf = 'line1\nline2\n';
+    const crlf = 'line1\r\nline2\r\n';
+
+    expect(computeStableBootstrapHash(lf)).toBe(computeStableBootstrapHash(crlf));
   });
 });
