@@ -1,119 +1,228 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# LocalEvomap 进程管理脚本 (PID-based, 无 PM2 依赖)
-# 用法: ./scripts/manage.sh {start|stop|restart|status} {test|prod}
+# =============================================================================
+# LocalEvomap 双环境管理脚本 (PM2 版本)
+# 同一工程目录通过 PM2 运行正式服(3000) + 测试服(3001)
+# =============================================================================
+# 用法：
+#   ./scripts/manage.sh {start|stop|restart|status|logs} {prod|test|all}
+#
+# 示例：
+#   ./scripts/manage.sh start all       # 一键启动双环境
+#   ./scripts/manage.sh stop all        # 停止所有服务
+#   ./scripts/manage.sh status all      # 查看所有服务状态
+#   ./scripts/manage.sh restart prod    # 重启正式服
+#   ./scripts/manage.sh logs test       # 查看测试服日志
+# =============================================================================
 
 ACTION="${1:-}"
 ENV="${2:-}"
 
 if [[ -z "$ACTION" || -z "$ENV" ]]; then
-    echo "用法: $0 {start|stop|restart|status} {test|prod}"
+    echo "用法: $0 {start|stop|restart|status|logs} {prod|test|all}"
     exit 1
 fi
 
-# 根据环境设置路径
-if [[ "$ENV" == "test" ]]; then
-    APP_DIR="/home/itops/localevolmap-test"
-    ENV_FILE="$APP_DIR/.env"
-    LOG_FILE="$APP_DIR/server.log"
-    PID_FILE="$APP_DIR/server.pid"
-    LABEL="[TEST]"
-elif [[ "$ENV" == "prod" ]]; then
-    APP_DIR="/home/itops/localevolmap"
-    ENV_FILE="$APP_DIR/.env"
-    LOG_FILE="$APP_DIR/server.log"
-    PID_FILE="$APP_DIR/server.pid"
-    LABEL="[PROD]"
-else
-    echo "错误: 环境必须是 test 或 prod"
-    exit 1
+APP_DIR="/home/itops/localevolmap"
+PM2_BIN="$(npm root -g)/pm2/bin/pm2"
+
+# 如果没有全局 pm2，尝试用 npx
+if [[ ! -f "$PM2_BIN" ]]; then
+    PM2_BIN="npx pm2"
 fi
 
-# 加载 nvm
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+cd "$APP_DIR"
 
-get_pid() {
-    if [[ -f "$PID_FILE" ]]; then
-        local pid
-        pid=$(cat "$PID_FILE")
-        if kill -0 "$pid" 2>/dev/null; then
-            echo "$pid"
-            return 0
-        fi
-        # PID 文件存在但进程已死
-        rm -f "$PID_FILE"
+# 获取 PM2 进程名
+get_pm2_name() {
+    local env_type="$1"
+    if [[ "$env_type" == "prod" ]]; then
+        echo "localevomap-prod"
+    else
+        echo "localevomap-test"
     fi
-    echo ""
-    return 1
 }
 
-do_start() {
-    local pid
-    pid=$(get_pid || true)
-    if [[ -n "$pid" ]]; then
-        echo "$LABEL 服务已在运行 (PID: $pid)"
+# 获取标签
+get_label() {
+    local env_type="$1"
+    if [[ "$env_type" == "prod" ]]; then
+        echo "[PROD-3000]"
+    else
+        echo "[TEST-3001]"
+    fi
+}
+
+# 获取端口
+get_port() {
+    local env_type="$1"
+    if [[ "$env_type" == "prod" ]]; then
+        echo "3000"
+    else
+        echo "3001"
+    fi
+}
+
+# 检查 PM2 进程是否运行
+is_running() {
+    local env_type="$1"
+    local pm2_name
+    pm2_name=$(get_pm2_name "$env_type")
+    
+    $PM2_BIN describe "$pm2_name" 2>/dev/null | grep -q "online"
+}
+
+do_start_single() {
+    local env_type="$1"
+    local label
+    label=$(get_label "$env_type")
+    local pm2_name
+    pm2_name=$(get_pm2_name "$env_type")
+    local port
+    port=$(get_port "$env_type")
+    
+    if is_running "$env_type"; then
+        echo "$label 服务已在运行 (PM2: $pm2_name)"
         return 0
     fi
 
-    echo "$LABEL 启动服务..."
-    cd "$APP_DIR"
-    nohup node dist/server.js >> "$LOG_FILE" 2>&1 &
-    local new_pid=$!
-    echo "$new_pid" > "$PID_FILE"
+    echo "$label 启动服务 (PM2)..."
     
-    # 等待启动
+    # 使用 PM2 启动特定应用
+    $PM2_BIN start config/ecosystem.config.js --only "$pm2_name"
+    
+    # 保存 PM2 配置
+    $PM2_BIN save
+    
     sleep 2
-    if kill -0 "$new_pid" 2>/dev/null; then
-        echo "$LABEL 服务已启动 (PID: $new_pid)"
-        # 读取端口
-        local port
-        port=$(grep -E "^PORT=" "$ENV_FILE" 2>/dev/null | cut -d= -f2 || echo "unknown")
-        echo "$LABEL 端口: $port"
+    
+    if is_running "$env_type"; then
+        echo "$label 服务已启动 (端口: $port)"
     else
-        echo "$LABEL 启动失败! 查看日志: tail -50 $LOG_FILE"
-        rm -f "$PID_FILE"
-        exit 1
+        echo "$label 启动失败! 查看日志: $PM2_BIN logs $pm2_name"
+        return 1
+    fi
+}
+
+do_stop_single() {
+    local env_type="$1"
+    local label
+    label=$(get_label "$env_type")
+    local pm2_name
+    pm2_name=$(get_pm2_name "$env_type")
+    
+    if ! is_running "$env_type"; then
+        echo "$label 服务未运行"
+        # 确保 PM2 中也删除
+        $PM2_BIN delete "$pm2_name" 2>/dev/null || true
+        return 0
+    fi
+
+    echo "$label 停止服务 (PM2: $pm2_name)..."
+    $PM2_BIN stop "$pm2_name"
+    $PM2_BIN delete "$pm2_name" 2>/dev/null || true
+    
+    echo "$label 服务已停止"
+}
+
+do_restart_single() {
+    local env_type="$1"
+    local label
+    label=$(get_label "$env_type")
+    local pm2_name
+    pm2_name=$(get_pm2_name "$env_type")
+    
+    echo "$label 重启服务 (PM2: $pm2_name)..."
+    
+    if is_running "$env_type"; then
+        $PM2_BIN restart "$pm2_name"
+    else
+        $PM2_BIN start config/ecosystem.config.js --only "$pm2_name"
+    fi
+    
+    $PM2_BIN save
+    echo "$label 服务已重启"
+}
+
+do_status_single() {
+    local env_type="$1"
+    local label
+    label=$(get_label "$env_type")
+    local pm2_name
+    pm2_name=$(get_pm2_name "$env_type")
+    local port
+    port=$(get_port "$env_type")
+    
+    if is_running "$env_type"; then
+        # 获取 PM2 的 PID
+        local pid
+        pid=$($PM2_BIN describe "$pm2_name" 2>/dev/null | grep "pid" | head -1 | awk '{print $2}')
+        echo "$label 🟢 运行中 (PID: $pid, 端口: $port, PM2: $pm2_name)"
+    else
+        echo "$label ⚪ 未运行"
+    fi
+}
+
+do_logs_single() {
+    local env_type="$1"
+    local pm2_name
+    pm2_name=$(get_pm2_name "$env_type")
+    
+    echo "查看 $pm2_name 日志 (按 Ctrl+C 退出)..."
+    $PM2_BIN logs "$pm2_name" --lines 50
+}
+
+do_start() {
+    if [[ "$ENV" == "all" ]]; then
+        do_start_single "prod"
+        do_start_single "test"
+    else
+        do_start_single "$ENV"
     fi
 }
 
 do_stop() {
-    local pid
-    pid=$(get_pid || true)
-    if [[ -z "$pid" ]]; then
-        echo "$LABEL 服务未运行"
-        return 0
+    if [[ "$ENV" == "all" ]]; then
+        do_stop_single "test"
+        do_stop_single "prod"
+    else
+        do_stop_single "$ENV"
     fi
+}
 
-    echo "$LABEL 停止服务 (PID: $pid)..."
-    kill "$pid" 2>/dev/null || true
-    
-    # 等待进程退出
-    local i=0
-    while kill -0 "$pid" 2>/dev/null && [[ $i -lt 10 ]]; do
-        sleep 1
-        ((i++))
-    done
-    
-    if kill -0 "$pid" 2>/dev/null; then
-        echo "$LABEL 强制终止..."
-        kill -9 "$pid" 2>/dev/null || true
+do_restart() {
+    if [[ "$ENV" == "all" ]]; then
+        do_restart_single "prod"
+        do_restart_single "test"
+    else
+        do_restart_single "$ENV"
     fi
-    
-    rm -f "$PID_FILE"
-    echo "$LABEL 服务已停止"
 }
 
 do_status() {
-    local pid
-    pid=$(get_pid || true)
-    if [[ -n "$pid" ]]; then
-        local port
-        port=$(grep -E "^PORT=" "$ENV_FILE" 2>/dev/null | cut -d= -f2 || echo "unknown")
-        echo "$LABEL 运行中 (PID: $pid, 端口: $port)"
+    echo ""
+    echo "╔════════════════════════════════════════╗"
+    echo "║      LocalEvomap Dual 环境状态         ║"
+    echo "╠════════════════════════════════════════╣"
+    if [[ "$ENV" == "all" ]]; then
+        do_status_single "prod"
+        do_status_single "test"
     else
-        echo "$LABEL 未运行"
+        do_status_single "$ENV"
+    fi
+    echo "╚════════════════════════════════════════╝"
+    echo ""
+    echo "PM2 状态:"
+    $PM2_BIN list 2>/dev/null || echo "  无 PM2 进程"
+}
+
+do_logs() {
+    if [[ "$ENV" == "all" ]]; then
+        echo "查看所有日志 (按 Ctrl+C 退出)..."
+        $PM2_BIN logs --lines 50
+    else
+        do_logs_single "$ENV"
     fi
 }
 
@@ -125,16 +234,17 @@ case "$ACTION" in
         do_stop
         ;;
     restart)
-        do_stop
-        sleep 1
-        do_start
+        do_restart
         ;;
     status)
         do_status
         ;;
+    logs)
+        do_logs
+        ;;
     *)
         echo "未知操作: $ACTION"
-        echo "用法: $0 {start|stop|restart|status} {test|prod}"
+        echo "用法: $0 {start|stop|restart|status|logs} {prod|test|all}"
         exit 1
         ;;
 esac

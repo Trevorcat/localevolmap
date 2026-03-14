@@ -413,4 +413,4 @@ ssh itops@your-server.example.com "ps aux | grep 'node.*dist/server'"
 
 - 完整 API 文档：`docs/HTTP_API.md`
 - 部署文档：`docs/DEPLOYMENT_OPENCODE.md`
-- 使用指南：`HOW_TO_USE.md`
+- 使用指南：`docs/HOW_TO_USE.md`

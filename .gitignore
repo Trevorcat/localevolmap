@@ -3,12 +3,15 @@ node_modules/
 
 # Build output
 dist/
+dist.bak/
 
 # Logs
 logs/
 *.log
 npm-debug.log*
-server.log
+
+# PID files
+*.pid
 
 # Environment files
 .env
@@ -16,6 +19,7 @@ server.log
 .env.production
 .env.prod
 .env.test
+.env.bak*
 
 # Test output
 coverage/
@@ -42,9 +46,11 @@ temp/
 .kimi/
 .playwright-mcp/
 
-# Ad-hoc debug artifacts
+# Ad-hoc debug artifacts & scripts
 *-dom.html
 *-tbody.html
+check-*.mjs
+test-*.mjs
 *-page.png
 *-modal.png
 *-dashboard.png
@@ -58,10 +64,13 @@ tmp_*.json
 # PM2
 .pm2/
 
-# Data directory (if needed)
+# Runtime data
+data/prod/
+data/test/
 data/genes/*.json
 data/capsules/*.json
 data/events/*.json
+data-cleanup-backups/
 
 # Local deployment secrets
 deployment/.env.test
@@ -70,5 +79,10 @@ deployment/.env.prod
 # Generated debug artifacts
 e2e/screenshots/
 public/e2e-*.png
+public/image.png
 tmp_test.json
 nul
+
+# Redundant root scripts (use scripts/ or dual-manage.sh)
+/start.sh
+/manage.sh

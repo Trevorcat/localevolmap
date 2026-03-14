@@ -395,7 +395,7 @@ const capsules = await evomap.searchCapsules({
 
 - **API 文档**: `docs/HTTP_API.md`
 - **部署文档**: `docs/DEPLOYMENT_OPENCODE.md`
-- **使用指南**: `HOW_TO_USE.md`
+- **使用指南**: `docs/HOW_TO_USE.md`
 - **技能文档**: `opencode/localevomap-skill/README.md`
 
 ## 💡 快速开始
