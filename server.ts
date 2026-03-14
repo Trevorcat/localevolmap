@@ -267,7 +267,7 @@ return http.createServer(async (req, res) => {
 
     // Serve static files
     if (url.pathname === '/' || url.pathname === '/index.html') {
-        const filePath = path.join(__dirname, 'index.html');
+        const filePath = path.join(PROJECT_ROOT, 'index.html');
         fs.readFile(filePath, (err, data) => {
             if (err) {
                 res.writeHead(500);
@@ -284,7 +284,7 @@ return http.createServer(async (req, res) => {
     if (url.pathname === '/install.sh' || url.pathname === '/install.ps1' || url.pathname === '/INSTALL.md') {
         const projectRoot = PROJECT_ROOT;
         const fileName = url.pathname.slice(1); // remove leading /
-        const filePath = path.join(projectRoot, 'opencode', 'localevomap-skill', fileName);
+        const filePath = path.join(projectRoot, 'skill', fileName);
         const mimeMap: Record<string, string> = {
             '.sh': 'text/x-shellscript; charset=utf-8',
             '.ps1': 'text/plain; charset=utf-8',
