@@ -1,7 +1,7 @@
 import { EvolutionEngine, type EventLogger, type EvolutionEngineConfig } from './evolution-engine';
-import { GeneStore } from '../storage/gene-store';
-import { CapsuleStore } from '../storage/capsule-store';
-import type { EvolutionEvent, Gene } from '../types/gene-capsule-schema';
+import { GeneStore } from './storage/gene-store';
+import { CapsuleStore } from './storage/capsule-store';
+import type { EvolutionEvent, Gene } from './types/gene-capsule-schema';
 
 const testGene: Gene = {
   type: 'Gene',

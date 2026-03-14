@@ -34,7 +34,7 @@ npm ci
 ### 2) 设置可执行权限
 
 ```bash
-chmod +x deployment/*.sh scripts/*.sh
+chmod +x deployment/*.sh deployment/scripts/*.sh
 ```
 
 ### 3) 执行部署脚本
@@ -80,7 +80,7 @@ HOST=0.0.0.0 PORT=3000 CORS_ORIGINS="https://app.example.com" npm start
 API 测试：
 
 ```bash
-BASE_URL="http://<server-ip>:3000" bash scripts/test-api.sh
+BASE_URL="http://<server-ip>:3000" bash deployment/scripts/test-api.sh
 ```
 
 ---
@@ -99,7 +99,7 @@ REMOTE_USER=ubuntu REMOTE_HOST=<server-ip> bash deployment/setup-ssh-key.sh
 
 ```bash
 REMOTE_HOST=<server-ip> REMOTE_USER=ubuntu APP_DIR=/opt/local-evomap \
-bash scripts/opencode-remote-command.sh "pm2 status"
+bash deployment/scripts/opencode-remote-command.sh "pm2 status"
 ```
 
 更多说明见：`docs/SSH_OPENCODE.md`
@@ -111,7 +111,7 @@ bash scripts/opencode-remote-command.sh "pm2 status"
 远程服务 smoke 测试：
 
 ```bash
-BASE_URL="http://<server-ip>:3000" PLAYWRIGHT_HEADLESS=true bash scripts/opencode-browser-example.sh
+BASE_URL="http://<server-ip>:3000" PLAYWRIGHT_HEADLESS=true bash deployment/scripts/opencode-browser-example.sh
 ```
 
 远程机执行 E2E：
@@ -119,7 +119,7 @@ BASE_URL="http://<server-ip>:3000" PLAYWRIGHT_HEADLESS=true bash scripts/opencod
 ```bash
 REMOTE_HOST=<server-ip> REMOTE_USER=ubuntu APP_DIR=/opt/local-evomap \
 BASE_URL="http://127.0.0.1:3000" PLAYWRIGHT_HEADLESS=true \
-bash scripts/run-playwright-remote.sh
+bash deployment/scripts/run-playwright-remote.sh
 ```
 
 更多说明见：`docs/PLAYWRIGHT_REMOTE.md`
@@ -128,12 +128,12 @@ bash scripts/run-playwright-remote.sh
 
 ## F. OpenCode 集成配置
 
-模板文件：`opencode/localevomap.remote.example.json`
+模板文件：`docs/examples/localevomap.remote.example.json`
 
 建议复制为私有文件（不要提交敏感信息）：
 
 ```bash
-cp opencode/localevomap.remote.example.json opencode/localevomap.remote.json
+cp docs/examples/localevomap.remote.example.json docs/examples/localevomap.remote.json
 ```
 
 按实际环境修改：
@@ -149,20 +149,20 @@ cp opencode/localevomap.remote.example.json opencode/localevomap.remote.json
 ### 1) HTTP API
 
 ```bash
-BASE_URL="http://<server-ip>:3000" bash scripts/opencode-http-example.sh
+BASE_URL="http://<server-ip>:3000" bash deployment/scripts/opencode-http-example.sh
 ```
 
 ### 2) SSH 命令执行
 
 ```bash
 REMOTE_HOST=<server-ip> REMOTE_USER=ubuntu APP_DIR=/opt/local-evomap \
-bash scripts/opencode-ssh-example.sh
+bash deployment/scripts/opencode-ssh-example.sh
 ```
 
 ### 3) 浏览器自动化
 
 ```bash
-BASE_URL="http://<server-ip>:3000" PLAYWRIGHT_HEADLESS=true bash scripts/opencode-browser-example.sh
+BASE_URL="http://<server-ip>:3000" PLAYWRIGHT_HEADLESS=true bash deployment/scripts/opencode-browser-example.sh
 ```
 
 ---
@@ -172,7 +172,7 @@ BASE_URL="http://<server-ip>:3000" PLAYWRIGHT_HEADLESS=true bash scripts/opencod
 ```bash
 BASE_URL="http://<server-ip>:3000" \
 REMOTE_HOST=<server-ip> REMOTE_USER=ubuntu APP_DIR=/opt/local-evomap \
-bash scripts/verify-opencode-integration.sh
+bash deployment/scripts/verify-opencode-integration.sh
 ```
 
 说明：

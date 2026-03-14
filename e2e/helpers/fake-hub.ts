@@ -8,7 +8,7 @@
 import * as http from 'http';
 import * as net from 'net';
 import * as crypto from 'crypto';
-import type { Capsule } from '../../types/gene-capsule-schema';
+import type { Capsule } from '../../core/types/gene-capsule-schema';
 
 // ============================================================================
 // 响应场景类型

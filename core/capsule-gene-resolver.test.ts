@@ -1,4 +1,4 @@
-import type { Capsule, Gene } from '../types/gene-capsule-schema';
+import type { Capsule, Gene } from './types/gene-capsule-schema';
 import { resolveCapsuleGene, resolveCapsuleGenes } from './capsule-gene-resolver';
 
 const genes: Gene[] = [

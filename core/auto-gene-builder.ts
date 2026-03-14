@@ -5,7 +5,7 @@
  * 当没有现有基因匹配当前信号时，自动创建一个新基因
  */
 
-import type { Gene, Signal, Category } from '../types/gene-capsule-schema';
+import type { Gene, Signal, Category } from './types/gene-capsule-schema';
 
 // ============================================================================
 // 常量

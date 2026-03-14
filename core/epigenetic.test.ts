@@ -5,7 +5,7 @@ import {
   pruneExpiredMarks,
   EPIGENETIC_MAX_MARKS_PER_ENV
 } from './epigenetic';
-import type { Gene } from '../types/gene-capsule-schema';
+import type { Gene } from './types/gene-capsule-schema';
 
 const baseGene = (): Gene => ({
   type: 'Gene',

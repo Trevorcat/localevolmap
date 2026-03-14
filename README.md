@@ -13,7 +13,7 @@ LocalEvomap 当前采用 **MCP-first** 的标准接入方式：
 
 - **MCP Server**: standard Agent Runtime entrypoint. Formal tools and workspace resources now write through the remote authoritative HTTP task plane.
 - **Agent Skill**：负责任务完成判断、复盘组织、自主提交 retrospective
-- **HTTP API**: serves dashboard, operations, version governance, and the remote task/resource data plane used by MCP.
+- **HTTP API**: serves dashboard, operations, version governance, the remote task/resource data plane used by MCP, and unified plugin capabilities such as mapping.
 
 这意味着：Agent 不再依赖旧式 helper / CLI skill 流程，而是通过 MCP 与 LocalEvomap 交互。
 
@@ -49,7 +49,7 @@ Dashboard 默认可通过 `http://localhost:3000` 访问。
 
 1. 启动 `HTTP API` 与 `MCP Server`
 2. 在 Agent 客户端中接入 MCP 配置
-3. 本地加载 `agent-skill/SKILL.md` 风格的任务编排说明
+3. 本地加载 `skill/SKILL.md` 风格的任务编排说明
 4. 任务开始时调用 `start_task`
 5. 任务过程中通过 `record_usage` 记录实际生效的基因 / 胶囊 / 经验
 6. Agent 自主判断任务是否完成；完成后调用 `finalize_task`
@@ -76,16 +76,17 @@ Dashboard 默认可通过 `http://localhost:3000` 访问。
 ## 项目结构
 
 ```text
-├── agent-skill/             # Agent 侧任务编排说明（MCP-first）
-├── core/                    # 核心逻辑：信号提取、选择、反馈、进化服务
-├── data/                    # 本地数据目录
+├── skill/                   # Agent Skill（MCP 工作流、安装脚本、类型定义）
+├── core/                    # 核心逻辑与插件桥接层
+├── data/                    # 本地数据目录（含插件运行数据）
 ├── docs/                    # 设计、API、部署与接入文档
-├── examples/                # Cursor / Claude Code / Codex / Kimi 配置模板
+├── docs/examples/           # Cursor / Claude Code / Codex / Kimi 配置模板
 ├── mcp/                     # MCP Server 实现与测试
+├── plugins/                 # 内部 capability/plugin 源码（如 cloud_mapping）
 ├── public/                  # Dashboard 前端资源
 ├── storage/                 # Genes / Capsules / Events / Task Session 存储
 ├── types/                   # TypeScript 类型定义
-├── server.ts                # HTTP API 入口
+├── server.ts                # LocalEvomap 统一 HTTP API 入口
 └── index.ts                 # LocalEvomap 主入口
 ```
 
@@ -93,16 +94,18 @@ Dashboard 默认可通过 `http://localhost:3000` 访问。
 
 | 文档 | 说明 |
 |------|------|
-| `docs/SKILL_INSTALL.md` | MCP-first 接入说明与 agent-skill 使用方式 |
+| `docs/SKILL_INSTALL.md` | MCP-first 接入说明与 skill 使用方式 |
 | `docs/MCP_CLIENT_CONFIG.md` | Cursor / Claude Code / Codex / Kimi / OpenCode 的可复制配置模板 |
 | `docs/API_REFERENCE.md` | HTTP API 与 MCP 相关能力说明 |
 | `docs/DEPLOYMENT.md` | 双环境部署流程 |
-| `agent-skill/SKILL.md` | Agent 如何判断完成、何时提交 retrospective |
-| `examples/.cursor/mcp.json` | Cursor MCP 示例 |
-| `examples/.mcp.json` | Claude Code MCP 示例 |
-| `examples/codex.config.toml` | Codex MCP 示例 |
-| `examples/kimi.localevomap.json` | Kimi HTTP helper 配置模板 |
-| `opencode/localevomap.remote.example.json` | OpenCode 远端配置模板 |
+| `plugins.json` | 内部插件启用清单与运行配置 |
+| `plugins/cloud_mapping/plugin.json` | mapping 插件清单 |
+| `skill/SKILL.md` | Agent 如何判断完成、何时提交 retrospective |
+| `docs/examples/.cursor/mcp.json` | Cursor MCP 示例 |
+| `docs/examples/.mcp.json` | Claude Code MCP 示例 |
+| `docs/examples/codex.config.toml` | Codex MCP 示例 |
+| `docs/examples/kimi.localevomap.json` | Kimi HTTP helper 配置模板 |
+| `docs/examples/localevomap.remote.example.json` | 远端配置模板（适用于 HTTP helper 客户端） |
 
 ## 支持的客户端形态
 
@@ -121,6 +124,9 @@ Dashboard 默认可通过 `http://localhost:3000` 访问。
 | `GET` | `/api/v1/genes` | 列出基因 |
 | `GET` | `/api/v1/agent-manifest` | 返回服务端权威的 runtime / skill manifest |
 | `POST` | `/api/v1/agent/check` | 判断当前 agent runtime / skill 是否最新 |
+| `GET` | `/api/v1/mapping/health` | 查询统一 mapping capability 状态 |
+| `POST` | `/api/v1/mapping/ingest/profiles` | 通过统一服务写入 mapping profiles |
+| `POST` | `/api/v1/mapping/query/candidates` | 通过统一服务查询 mapping 候选 |
 | `POST` | `/api/v1/genes` | 创建基因 |
 | `GET` | `/api/v1/capsules/search` | 搜索胶囊 |
 | `POST` | `/api/v1/capsules` | 创建胶囊（已知时建议显式传 `gene`） |
@@ -142,7 +148,7 @@ Dashboard 默认可通过 `http://localhost:3000` 访问。
 
 - 运行前请先配置 API Key / 环境变量
 - 本仓库会生成截图、临时 JSON、DOM 抓取文件等调试产物，这些文件应保留为本地调试用途，不应进入版本库
-- 对 Agent 行为的标准约束以 `agent-skill/SKILL.md` 和 `mcp/server.ts` 为准
+- 对 Agent 行为的标准约束以 `skill/SKILL.md` 和 `mcp/server.ts` 为准
 - To enable automatic skill updates and remote MCP writes, configure `LOCAL_EVOMAP_CLIENT`, `LOCAL_EVOMAP_SERVER_URL`, `LOCAL_EVOMAP_API_KEY`, and ideally `LOCAL_EVOMAP_SKILL_PATH` in the client MCP env.
 
 ## License

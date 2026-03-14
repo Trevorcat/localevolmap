@@ -21,7 +21,7 @@ BASE_URL="http://<server-ip>:3000" PLAYWRIGHT_HEADLESS=true npm run test:e2e
 ```bash
 REMOTE_HOST=<server-ip> REMOTE_USER=ubuntu APP_DIR=/opt/local-evomap \
   BASE_URL="http://127.0.0.1:3000" PLAYWRIGHT_HEADLESS=true \
-  bash scripts/run-playwright-remote.sh
+  bash deployment/scripts/run-playwright-remote.sh
 ```
 
 ---

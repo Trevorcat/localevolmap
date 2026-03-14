@@ -1,3 +1,24 @@
+# 统一插件能力补充
+
+## Mapping 作为同一服务中的内部插件
+
+当前架构将 `plugins/cloud_mapping` 视为 LocalEvomap 的内部 capability plugin，而不是第二个对外服务。
+
+- Agent 只连接一个 LocalEvomap HTTP/MCP 入口
+- `server.ts` 在 `/api/v1/mapping/*` 下统一暴露 mapping 能力
+- `mcp/server.ts` 在同一 MCP 服务内注册 mapping tools
+- Python `cloud_mapping` 仅作为 loopback sidecar，由 Node 插件管理器托管
+- 插件运行数据写入 `data/plugins/cloud_mapping/`，不污染插件源码目录
+
+## 插件框架职责
+
+- `core/plugins/plugin-registry.ts`：扫描 `plugins/*/plugin.json` 并与 `config/plugins.json` 合并
+- `core/plugins/plugin-manager.ts`：维护插件生命周期与状态
+- `core/plugins/python-sidecar-runtime.ts`：启动与探活 Python sidecar
+- `core/plugins/mapping-proxy.ts`：统一转发 mapping 请求并做错误归一
+
+---
+
 # 本地 Evomap 实现架构设计
 
 ## 1. 核心模块划分

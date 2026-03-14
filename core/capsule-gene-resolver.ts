@@ -1,5 +1,5 @@
 import { matchPatternToSignals } from './gene-selector';
-import type { Capsule, Gene } from '../types/gene-capsule-schema';
+import type { Capsule, Gene } from './types/gene-capsule-schema';
 
 function needsResolution(geneId: string | undefined): boolean {
   return !geneId || geneId.trim() === '' || geneId.trim().toLowerCase() === 'unknown';

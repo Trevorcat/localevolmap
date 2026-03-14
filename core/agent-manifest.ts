@@ -9,7 +9,7 @@ import type {
   ManifestEntry,
   RawAgentManifest,
   RawManifestEntry,
-} from '../types/agent-bootstrap-schema';
+} from './types/agent-bootstrap-schema';
 
 function normalizeBootstrapContent(content: string): string {
   return content.replace(/\r\n/g, '\n');
@@ -34,7 +34,7 @@ async function hydrateEntry(projectRoot: string, entry: RawManifestEntry): Promi
 }
 
 export async function loadAgentManifest(projectRoot: string = path.resolve(__dirname, '..')): Promise<AgentManifest> {
-  const manifestPath = path.resolve(projectRoot, 'config', 'agent-manifest.json');
+  const manifestPath = path.resolve(projectRoot, 'agent-manifest.json');
   const raw = JSON.parse(await fs.readFile(manifestPath, 'utf-8')) as RawAgentManifest;
 
   const clients: AgentClient[] = ['codex', 'claude-code', 'cursor', 'opencode', 'kimi'];

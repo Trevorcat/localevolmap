@@ -2,7 +2,7 @@
  * E2E 测试用胶囊种子数据
  */
 
-import type { Capsule } from '../../types/gene-capsule-schema';
+import type { Capsule } from '../../core/types/gene-capsule-schema';
 
 export const SEED_CAPSULES: Capsule[] = [
   {

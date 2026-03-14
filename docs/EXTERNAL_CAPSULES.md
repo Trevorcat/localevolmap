@@ -316,7 +316,7 @@ Response: Full Capsule JSON object
 
 ### 参考实现
 
-见 `examples/hub-server.ts` - 一个简单的 Hub 服务器实现。
+见 `docs/examples/hub-server.ts` - 一个简单的 Hub 服务器实现。
 
 ## 安全考虑
 

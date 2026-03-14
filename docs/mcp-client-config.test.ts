@@ -13,9 +13,9 @@ describe('MCP client configuration docs', () => {
     expect(content).toContain('OpenAI Codex');
     expect(content).toContain('~/.codex/config.toml');
     expect(content).toContain('Kimi');
-    expect(content).toContain('examples/kimi.localevomap.json');
+    expect(content).toContain('docs/examples/kimi.localevomap.json');
     expect(content).toContain('OpenCode');
-    expect(content).toContain('opencode/localevomap.remote.example.json');
+    expect(content).toContain('docs/examples/localevomap.remote.example.json');
     expect(content).toContain('dist/mcp/server.js');
     expect(content).toContain('get_runtime_status');
     expect(content).toContain('/api/v1/agent-manifest');

@@ -11,7 +11,7 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import type { Gene, Capsule, Signal, Category, DistillationRequest, DistillationResult } from '../types/gene-capsule-schema';
+import type { Gene, Capsule, Signal, Category, DistillationRequest, DistillationResult } from './types/gene-capsule-schema';
 import { DISTILLED_PREFIX, computeSignalOverlap, matchPatternToSignals } from './gene-selector';
 
 // ============================================================================

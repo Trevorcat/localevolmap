@@ -25,7 +25,7 @@ describe('createDefaultMcpServer local fallback', () => {
     process.env.TASKS_PATH = path.join(root, 'tasks');
     process.env.LOCAL_EVOMAP_SERVER_URL = 'http://127.0.0.1:9';
     process.env.LOCAL_EVOMAP_CLIENT = 'codex';
-    process.env.LOCAL_EVOMAP_SKILL_PATH = path.resolve('opencode/localevomap-skill/codex-agents.md');
+    process.env.LOCAL_EVOMAP_SKILL_PATH = path.resolve('skill/SKILL.md');
     process.env.HUB_API_KEY = 'test-api-key';
     process.env.LOCAL_EVOMAP_API_KEY = 'test-api-key';
   });

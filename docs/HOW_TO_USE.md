@@ -187,7 +187,7 @@ curl http://your-server.example.com:3000/api/v1/events/event_123
 
 ### 配置文件
 
-已创建：`opencode/localevomap.remote.json`
+已创建：`docs/examples/localevomap.remote.json`
 
 配置内容：
 ```json

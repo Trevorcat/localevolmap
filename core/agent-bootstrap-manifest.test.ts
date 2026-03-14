@@ -1,6 +1,6 @@
 import * as path from 'path';
 import { buildAgentBootstrapChecklist } from './agent-bootstrap-manifest';
-import type { AgentBootstrapClientChecklist } from '../types/agent-bootstrap-schema';
+import type { AgentBootstrapClientChecklist } from './types/agent-bootstrap-schema';
 
 describe('agent bootstrap checklist builder', () => {
   test('builds an agent-readable install checklist for supported clients', async () => {

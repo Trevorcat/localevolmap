@@ -2,7 +2,7 @@
  * E2E 测试用基因种子数据
  */
 
-import type { Gene } from '../../types/gene-capsule-schema';
+import type { Gene } from '../../core/types/gene-capsule-schema';
 
 export const SEED_GENES: Gene[] = [
   {

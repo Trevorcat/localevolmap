@@ -9,14 +9,15 @@ import type { EvolutionBackend } from '../core/evolution-backend';
 import { EvolutionService } from '../core/evolution-service';
 import { BootstrapRuntimeState, createReadyBootstrapState, initializeBootstrapState } from './bootstrap';
 import { LocalEvomap, DEFAULT_CONFIG } from '../index';
-import { RemoteEvolutionClient } from './remote-evolution-client';
-import { TaskSessionStore } from '../storage/task-session-store';
+import { RemoteEvolutionClient, type MappingCapabilityClient } from './remote-evolution-client';
+import { TaskSessionStore } from '../core/storage/task-session-store';
 import { resolveSkillTargetPath } from './skill-updater';
-import type { AgentClient } from '../types/agent-bootstrap-schema';
+import type { AgentClient } from '../core/types/agent-bootstrap-schema';
 
 export interface CreateMcpServerOptions {
   evolutionService: EvolutionBackend;
   bootstrapState?: BootstrapRuntimeState;
+  mappingClient?: MappingCapabilityClient;
 }
 
 type ToolSchema = z.ZodTypeAny;
@@ -103,7 +104,36 @@ export class LocalEvomapMcpServer {
   private registerStatusTool(): void {
     const statusSchema = z.object({}).strict();
     this.registerTool('get_runtime_status', 'Report MCP bootstrap state, compatibility, and exposed capabilities.', statusSchema, async () => {
-      return this.bootstrapState;
+            const runtimeStatus = {
+        ...this.bootstrapState,
+        availableTools: Array.from(this.tools.keys())
+      } as Record<string, unknown>;
+
+      if (!this.options.mappingClient) {
+        return runtimeStatus;
+      }
+
+      try {
+        const mappingStatus = await this.options.mappingClient.getMappingStatus();
+        return {
+          ...runtimeStatus,
+          plugins: {
+            cloud_mapping: mappingStatus
+          }
+        };
+      } catch (error) {
+        return {
+          ...runtimeStatus,
+          plugins: {
+            cloud_mapping: {
+              id: 'cloud_mapping',
+              enabled: true,
+              state: 'failed',
+              error: (error as Error).message
+            }
+          }
+        };
+      }
     });
   }
 
@@ -176,6 +206,29 @@ export class LocalEvomapMcpServer {
     this.registerTool('finalize_task', 'Finalize a task and feed the retrospective back into LocalEvomap.', finalizeTaskSchema, async args => {
       return this.options.evolutionService.finalizeTask(args);
     });
+
+    if (this.options.mappingClient) {
+      const mappingStatusSchema = z.object({}).strict();
+      const mappingIngestSchema = z.object({
+        profiles: z.array(z.record(z.string(), z.any()))
+      });
+      const mappingQuerySchema = z.object({
+        query_profile: z.record(z.string(), z.any()),
+        limit: z.number().int().min(1).max(50).optional()
+      });
+
+      this.registerTool('mapping_get_status', 'Report the status of the cloud mapping capability exposed by LocalEvomap.', mappingStatusSchema, async () => {
+        return this.options.mappingClient!.getMappingStatus();
+      });
+
+      this.registerTool('mapping_ingest_profiles', 'Ingest workbook/csv profiles through the unified LocalEvomap mapping capability.', mappingIngestSchema, async args => {
+        return this.options.mappingClient!.ingestMappingProfiles(args);
+      });
+
+      this.registerTool('mapping_query_candidates', 'Query mapping candidates through the unified LocalEvomap mapping capability.', mappingQuerySchema, async args => {
+        return this.options.mappingClient!.queryMappingCandidates(args);
+      });
+    }
   }
 
   private registerResources(): void {
@@ -417,6 +470,7 @@ export async function createDefaultMcpServer(): Promise<LocalEvomapMcpServer> {
   return createMcpServer({
     evolutionService,
     bootstrapState: effectiveBootstrapState,
+    mappingClient: evolutionService instanceof RemoteEvolutionClient ? evolutionService : undefined,
   });
 }
 

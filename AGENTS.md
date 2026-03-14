@@ -13,23 +13,23 @@ LocalEvomap 是一个 AI Agent 自进化系统，在同一工程目录下通过 
 
 ## 服务管理
 
-所有服务操作通过 `scripts/manage.sh` 完成，需要两个参数：`{动作} {环境}`。
+所有服务操作通过 `deployment/scripts/manage.sh` 完成，需要两个参数：`{动作} {环境}`。
 
 ```bash
 # 一键启动双环境
-./scripts/manage.sh start all
+./deployment/scripts/manage.sh start all
 
 # 停止所有服务
-./scripts/manage.sh stop all
+./deployment/scripts/manage.sh stop all
 
 # 重启正式服
-./scripts/manage.sh restart prod
+./deployment/scripts/manage.sh restart prod
 
 # 查看服务状态
-./scripts/manage.sh status all
+./deployment/scripts/manage.sh status all
 
 # 查看日志
-./scripts/manage.sh logs test
+./deployment/scripts/manage.sh logs test
 ```
 
 动作：`start | stop | restart | status | logs`
@@ -45,7 +45,7 @@ git pull origin master
 npm run build
 
 # 重启服务使更新生效
-./scripts/manage.sh restart all
+./deployment/scripts/manage.sh restart all
 ```
 
 如果依赖有变化：
@@ -54,7 +54,7 @@ npm run build
 git pull origin master
 npm ci
 npm run build
-./scripts/manage.sh restart all
+./deployment/scripts/manage.sh restart all
 ```
 
 ## 常用开发命令
@@ -76,7 +76,7 @@ mcp/          MCP 服务端（Agent 通过 MCP 协议交互）
 storage/      持久化层（基因、胶囊、事件存储）
 types/        TypeScript 类型定义
 config/       配置文件（agent-manifest、PM2 ecosystem）
-scripts/      运维脚本（manage.sh、部署脚本等）
+deployment/scripts/  运维脚本（manage.sh、部署脚本等）
 deployment/   远程部署相关（deploy.sh、health-check 等）
 e2e/          端到端测试
 docs/         所有文档
@@ -89,6 +89,6 @@ lib/          客户端 SDK
 ## 注意事项
 
 - 修改代码后必须 `npm run build` 才能生效（服务运行的是 `dist/` 下的编译产物）
-- 不要手动启动 `node dist/server.js`，统一使用 `scripts/manage.sh` 通过 PM2 管理
+- 不要手动启动 `node dist/server.js`，统一使用 `deployment/scripts/manage.sh` 通过 PM2 管理
 - `.env.prod` 和 `.env.test` 包含敏感配置，不要提交到 git
 - `data/prod/` 和 `data/test/` 是运行时数据，不在版本管理中

@@ -1,17 +1,17 @@
-﻿/**
+/**
  * Signal Extractor - 信号提取引擎
  *
  * 从运行时日志和历史中提取结构化信号
  */
 
 import { z } from 'zod';
-import type { EvolutionEvent, Signal } from '../types/gene-capsule-schema';
+import type { EvolutionEvent, Signal } from './types/gene-capsule-schema';
 import {
   deduplicateDynamicSignals,
   getSignalConfidence,
   getSignalSource,
   normalizeSignal
-} from '../types/signal-registry';
+} from './types/signal-registry';
 
 export const PERF_BOTTLENECK_LATENCY_MS = 5000;
 export const PERF_CRITICAL_LATENCY_MS = 10000;

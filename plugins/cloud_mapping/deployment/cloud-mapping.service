@@ -1,0 +1,13 @@
+[Unit]
+Description=Cloud Mapping FastAPI Service
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/itops/cloud-mapping
+ExecStart=/home/itops/miniforge3/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8010
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

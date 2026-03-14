@@ -76,11 +76,11 @@ curl -i -X OPTIONS "http://127.0.0.1:3000/api/stats" \
 使用脚本：
 
 ```bash
-bash scripts/test-api.sh
+bash deployment/scripts/test-api.sh
 ```
 
 如果服务不在本机 3000：
 
 ```bash
-BASE_URL="http://your-server:3000" bash scripts/test-api.sh
+BASE_URL="http://your-server:3000" bash deployment/scripts/test-api.sh
 ```

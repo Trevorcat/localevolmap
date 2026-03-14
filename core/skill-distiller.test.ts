@@ -9,7 +9,7 @@ import {
   synthesizeGeneAlgorithmic,
   type DistillationState
 } from './skill-distiller';
-import type { Capsule, Gene } from '../types/gene-capsule-schema';
+import type { Capsule, Gene } from './types/gene-capsule-schema';
 
 const createCapsule = (id: string, gene: string, trigger: string[], createdAt: string, status: Capsule['outcome']['status'] = 'success'): Capsule => ({
   type: 'Capsule',

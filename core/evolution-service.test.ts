@@ -1,10 +1,10 @@
-﻿import * as fs from 'fs/promises';
+import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
 import { LocalEvomap, DEFAULT_CONFIG } from '../index';
-import { TaskSessionStore } from '../storage/task-session-store';
+import { TaskSessionStore } from './storage/task-session-store';
 import { EvolutionService } from './evolution-service';
-import type { Capsule, Gene } from '../types/gene-capsule-schema';
+import type { Capsule, Gene } from './types/gene-capsule-schema';
 
 describe('EvolutionService', () => {
   const currentPlatform = (['linux', 'darwin', 'win32'].includes(process.platform) ? process.platform : 'linux') as 'linux' | 'darwin' | 'win32';

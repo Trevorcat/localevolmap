@@ -14,7 +14,7 @@ import type {
   Capsule,
   OutcomeStatus,
   Signal
-} from '../types/gene-capsule-schema';
+} from './types/gene-capsule-schema';
 import { extractSignals } from './signal-extractor';
 import { selectGene, banGenesFromFailedCapsules, NoMatchingGeneError, AllGenesBannedError } from './gene-selector';
 import { selectCapsule, shouldReuseCapsule, updateCapsuleFeedback } from './capsule-manager';
@@ -29,8 +29,8 @@ import {
 import { buildAutoGene } from './auto-gene-builder';
 import { applyEpigeneticMarks } from './epigenetic';
 import { shouldDistill, synthesizeGeneAlgorithmic, type DistillationState } from './skill-distiller';
-import type { CapsuleStore } from '../storage/capsule-store';
-import type { GeneStore } from '../storage/gene-store';
+import type { CapsuleStore } from './storage/capsule-store';
+import type { GeneStore } from './storage/gene-store';
 
 export interface EvolutionEngineConfig extends EvolutionConfig {
   /** @planned — 回滚能力，预留接口，当前版本未实现 */

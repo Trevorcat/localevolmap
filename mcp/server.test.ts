@@ -1,12 +1,12 @@
-﻿import * as fs from 'fs/promises';
+import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
 import * as ts from 'typescript';
 import { LocalEvomap, DEFAULT_CONFIG } from '../index';
-import { TaskSessionStore } from '../storage/task-session-store';
+import { TaskSessionStore } from '../core/storage/task-session-store';
 import { EvolutionService } from '../core/evolution-service';
 import { createMcpServer } from './server';
-import type { Capsule, Gene } from '../types/gene-capsule-schema';
+import type { Capsule, Gene } from '../core/types/gene-capsule-schema';
 import type { BootstrapRuntimeState } from './bootstrap';
 
 describe('LocalEvomap MCP server', () => {
@@ -17,7 +17,7 @@ describe('LocalEvomap MCP server', () => {
     return fs.mkdtemp(path.join(os.tmpdir(), 'localevomap-mcp-server-'));
   }
 
-  async function createServer(bootstrapState?: BootstrapRuntimeState) {
+  async function createServer(bootstrapState?: BootstrapRuntimeState, mappingClient?: any) {
     const root = await createTempRoot();
     const evomap = new LocalEvomap({
       ...DEFAULT_CONFIG,
@@ -32,7 +32,7 @@ describe('LocalEvomap MCP server', () => {
     await taskStore.init();
 
     const evolutionService = new EvolutionService({ evomap, taskStore });
-    return { server: createMcpServer({ evolutionService, bootstrapState }), evomap };
+    return { server: createMcpServer({ evolutionService, bootstrapState, mappingClient }), evomap };
   }
 
   function buildBootstrapState(status: BootstrapRuntimeState['status']): BootstrapRuntimeState {
@@ -359,5 +359,37 @@ describe('LocalEvomap MCP server', () => {
     expect(result.status).toBe('unreachable');
     expect(result.availableTools).toEqual(['get_runtime_status']);
   });
-});
 
+  test('exposes mapping tools and includes plugin status in runtime diagnostics', async () => {
+    const mappingClient = {
+      getMappingStatus: jest.fn().mockResolvedValue({
+        id: 'cloud_mapping',
+        enabled: true,
+        state: 'ready',
+        capabilities: { mcp: ['mapping_get_status', 'mapping_query_candidates'], http: ['/api/v1/mapping'] },
+        upstream: { status: 'ok' }
+      }),
+      ingestMappingProfiles: jest.fn().mockResolvedValue({ ingested: 1, table_profile_ids: [1] }),
+      queryMappingCandidates: jest.fn().mockResolvedValue({ initial_candidate_count: 5, candidates: [] })
+    };
+
+    const { server } = await createServer(buildBootstrapState('ready'), mappingClient);
+    const tools = await server.listTools();
+
+    expect(tools.map((tool: { name: string }) => tool.name)).toEqual(expect.arrayContaining([
+      'mapping_get_status',
+      'mapping_ingest_profiles',
+      'mapping_query_candidates'
+    ]));
+
+    const runtimeStatus = await server.callTool('get_runtime_status', {});
+    expect(runtimeStatus.plugins.cloud_mapping.state).toBe('ready');
+    expect(runtimeStatus.availableTools).toContain('mapping_query_candidates');
+
+    const mappingStatus = await server.callTool('mapping_get_status', {});
+    expect(mappingStatus.id).toBe('cloud_mapping');
+
+    await server.callTool('mapping_query_candidates', { query_profile: { kind: 'xlsx' }, limit: 3 });
+    expect(mappingClient.queryMappingCandidates).toHaveBeenCalled();
+  });
+});

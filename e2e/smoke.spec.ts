@@ -18,7 +18,7 @@ import {
   buildEmptyLogs
 } from './fixtures/test-fixtures';
 import type { TempEvomapContext } from './fixtures/test-fixtures';
-import type { EvolutionEvent } from '../types/gene-capsule-schema';
+import type { EvolutionEvent } from '../core/types/gene-capsule-schema';
 import * as fs from 'fs/promises';
 
 // ============================================================================

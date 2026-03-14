@@ -5,7 +5,7 @@ import type {
   AgentClient,
   AgentManifest,
   BootstrapStatus,
-} from '../types/agent-bootstrap-schema';
+} from '../core/types/agent-bootstrap-schema';
 import { computeStableBootstrapHash } from '../core/agent-manifest';
 import { autoUpdateSkill } from './skill-updater';
 

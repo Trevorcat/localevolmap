@@ -5,8 +5,8 @@ import * as path from 'path';
 import { AddressInfo } from 'net';
 import { LocalEvomap, DEFAULT_CONFIG } from '../index';
 import { createHttpServer } from '../server';
-import { DistillJobStore } from '../storage/distill-job-store';
-import type { Capsule, Gene } from '../types/gene-capsule-schema';
+import { DistillJobStore } from './storage/distill-job-store';
+import type { Capsule, Gene } from './types/gene-capsule-schema';
 
 function requestJson(
   port: number,
@@ -156,7 +156,7 @@ describe('agent bootstrap endpoints', () => {
     expect(response.payload.clients.codex.mcp_config.config_path).toBe('~/.codex/config.toml');
   });
 
-  test('reports blocked when a breaking skill is outdated', async () => {
+  test('reports update_available when a non-breaking skill is outdated', async () => {
     const manifestResponse = await requestJson(port, 'GET', '/api/v1/agent-manifest');
     const manifest = manifestResponse.payload;
 
@@ -170,8 +170,8 @@ describe('agent bootstrap endpoints', () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(response.payload.status).toBe('blocked');
-    expect(response.payload.blocking).toBe(true);
+    expect(response.payload.status).toBe('update_available');
+    expect(response.payload.blocking).toBe(false);
   });
 
   test('creates a remote task session with MCP-compatible response fields', async () => {

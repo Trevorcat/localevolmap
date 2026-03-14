@@ -1,0 +1,27 @@
+{
+  "id": "cloud_mapping",
+  "displayName": "Cloud Mapping",
+  "version": "0.1.0",
+  "runtime": {
+    "kind": "python-sidecar",
+    "cwd": ".",
+    "command": ["python", "-m", "uvicorn", "cloud_mapping.app.main:app"],
+    "pythonPathEntries": ["plugins"]
+  },
+  "health": {
+    "path": "/health"
+  },
+  "capabilities": {
+    "http": [
+      {
+        "publicBase": "/api/v1/mapping",
+        "upstreamBase": "/api/v1"
+      }
+    ],
+    "mcp": [
+      "mapping_get_status",
+      "mapping_ingest_profiles",
+      "mapping_query_candidates"
+    ]
+  }
+}

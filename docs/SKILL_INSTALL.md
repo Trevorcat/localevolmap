@@ -26,7 +26,7 @@
 ## 推荐方式
 
 1. 在用户的 AI 客户端中注册 LocalEvomap MCP server。
-2. 在工作区放置或加载 `agent-skill/SKILL.md` 对应的编排指令。
+2. 在工作区放置或加载 `skill/SKILL.md` 对应的编排指令。
 3. 确认 agent 会使用 `start_task`、`record_usage`、`finalize_task`。
 
 可直接复制的客户端示例见 `docs/MCP_CLIENT_CONFIG.md`。
@@ -49,7 +49,7 @@ node dist/mcp/server.js
 
 ## Skill 指令
 
-将 `agent-skill/SKILL.md` 提供给 agent，并要求它：
+将 `skill/SKILL.md` 提供给 agent，并要求它：
 
 - 开始任务时调用 `start_task`
 - 真正采用知识时调用 `record_usage`

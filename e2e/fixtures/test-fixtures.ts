@@ -9,7 +9,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import { LocalEvomap } from '../../index';
-import type { EvolutionConfig } from '../../types/gene-capsule-schema';
+import type { EvolutionConfig } from '../../core/types/gene-capsule-schema';
 import { SEED_GENES } from '../data/seed-genes';
 import { SEED_CAPSULES } from '../data/seed-capsules';
 

@@ -4,7 +4,7 @@ import * as os from 'os';
 import * as path from 'path';
 import { createHash } from 'crypto';
 import { AddressInfo } from 'net';
-import type { AgentManifest } from '../types/agent-bootstrap-schema';
+import type { AgentManifest } from '../core/types/agent-bootstrap-schema';
 import { initializeBootstrapState } from './bootstrap';
 
 function hash(text: string): string {
@@ -59,7 +59,7 @@ describe('bootstrap initialization', () => {
           auto_update_supported: true,
           hash: hash(nextSkillContent),
           download_url: '/skill/codex',
-          source_path: 'opencode/localevomap-skill/codex-agents.md',
+          source_path: 'skill/SKILL.md',
         },
         'claude-code': {
           version: '1.1.0',
@@ -67,7 +67,7 @@ describe('bootstrap initialization', () => {
           auto_update_supported: true,
           hash: hash('# claude\n'),
           download_url: '/skill/claude-code',
-          source_path: 'opencode/localevomap-skill/claude-code.md',
+          source_path: 'skill/SKILL.md',
         },
         cursor: {
           version: '1.1.0',
@@ -75,7 +75,7 @@ describe('bootstrap initialization', () => {
           auto_update_supported: true,
           hash: hash('# cursor\n'),
           download_url: '/skill/cursor',
-          source_path: 'opencode/localevomap-skill/cursor.md',
+          source_path: 'skill/SKILL.md',
         },
         opencode: {
           version: '1.1.0',
@@ -83,7 +83,7 @@ describe('bootstrap initialization', () => {
           auto_update_supported: false,
           hash: hash('# opencode\n'),
           download_url: '/skill/opencode',
-          source_path: 'opencode/localevomap-skill/opencode-skill.md',
+          source_path: 'skill/SKILL.md',
         },
         kimi: {
           version: '1.1.0',
@@ -91,7 +91,7 @@ describe('bootstrap initialization', () => {
           auto_update_supported: false,
           hash: hash('# kimi\n'),
           download_url: '/skill/kimi',
-          source_path: 'opencode/localevomap-skill/kimi.md',
+          source_path: 'skill/SKILL.md',
         },
       },
     };

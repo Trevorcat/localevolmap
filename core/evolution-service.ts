@@ -1,4 +1,4 @@
-﻿import type { Capsule, Gene, KnowledgeProvenanceStatus } from '../types/gene-capsule-schema';
+import type { Capsule, Gene, KnowledgeProvenanceStatus } from './types/gene-capsule-schema';
 import type {
   KnowledgeUsageRef,
   RecordKnowledgeUsageInput,
@@ -6,11 +6,11 @@ import type {
   TaskRetrospective,
   TaskSession,
   ValidationResult
-} from '../types/task-session-schema';
+} from './types/task-session-schema';
 import { matchPatternToSignals } from './gene-selector';
 import { findMatchingCapsules } from './capsule-manager';
 import type { LocalEvomap } from '../index';
-import { TaskSessionStore } from '../storage/task-session-store';
+import { TaskSessionStore } from './storage/task-session-store';
 
 export interface EvolutionServiceDeps {
   evomap: LocalEvomap;

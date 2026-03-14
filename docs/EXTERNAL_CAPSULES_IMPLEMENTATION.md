@@ -9,8 +9,8 @@
 | **Hub 客户端** | `core/capsule-hub-client.ts` | ✅ 完成 |
 | **Hub 注册表** | `core/capsule-hub-client.ts` (HubRegistry) | ✅ 完成 |
 | **集成到主入口** | `index.ts` | ✅ 完成 |
-| **示例 Hub 服务器** | `examples/hub-server.ts` | ✅ 完成 |
-| **使用示例** | `examples/use-external-capsules.ts` | ✅ 完成 |
+| **示例 Hub 服务器** | `docs/examples/hub-server.ts` | ✅ 完成 |
+| **使用示例** | `docs/examples/use-external-capsules.ts` | ✅ 完成 |
 
 ### 2. 功能特性
 
@@ -178,7 +178,7 @@ Authorization: Bearer {apiKey}
 
 ```bash
 cd capability
-npx ts-node examples/hub-server.ts
+npx ts-node docs/examples/hub-server.ts
 ```
 
 输出：
@@ -202,7 +202,7 @@ npx ts-node examples/hub-server.ts
 ### 2. 运行客户端示例
 
 ```bash
-npx ts-node examples/use-external-capsules.ts
+npx ts-node docs/examples/use-external-capsules.ts
 ```
 
 预期输出：

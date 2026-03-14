@@ -2,7 +2,7 @@
  * Capsule Manager - 胶囊管理器
  */
 
-import type { Capsule, EnvFingerprint, Signal } from '../types/gene-capsule-schema';
+import type { Capsule, EnvFingerprint, Signal } from './types/gene-capsule-schema';
 import { matchPatternToSignals } from './gene-selector';
 
 export interface CapsuleStore {

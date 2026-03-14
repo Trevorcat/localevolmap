@@ -1,7 +1,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
-import type { AgentClient } from '../types/agent-bootstrap-schema';
+import type { AgentClient } from '../core/types/agent-bootstrap-schema';
 import { computeStableBootstrapHash } from '../core/agent-manifest';
 
 const AUTO_UPDATE_CLIENTS = new Set<AgentClient>(['codex', 'claude-code', 'cursor']);

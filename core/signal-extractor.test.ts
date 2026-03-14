@@ -14,7 +14,7 @@ import {
   type ExtractedSignals,
   type SignalStats
 } from './signal-extractor';
-import type { Signal, EvolutionEvent } from '../types/gene-capsule-schema';
+import type { Signal, EvolutionEvent } from './types/gene-capsule-schema';
 
 describe('Signal Extractor', () => {
   

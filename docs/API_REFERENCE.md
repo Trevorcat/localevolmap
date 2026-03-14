@@ -89,7 +89,7 @@ Agent 应先执行 `steps`，再调用 `post_install_checks`，最后用 `POST /
   "manifest_current": true,
   "client": "codex",
   "runtime": { "current": true, "local": { "version": "0.1.0", "hash": "sha256-..." }, "target": { "version": "0.1.0", "hash": "sha256-...", "breaking": true, "download_url": "/api/v1/agent-manifest", "auto_update_supported": false, "source_path": "mcp/server.ts" } },
-  "skill": { "current": true, "local": { "version": "1.1.0", "hash": "sha256-..." }, "target": { "version": "1.1.0", "hash": "sha256-...", "breaking": true, "download_url": "/skill/codex", "auto_update_supported": true, "source_path": "opencode/localevomap-skill/codex-agents.md" } },
+  "skill": { "current": true, "local": { "version": "1.2.0", "hash": "sha256-..." }, "target": { "version": "1.2.0", "hash": "sha256-...", "breaking": false, "download_url": "/skill/codex", "auto_update_supported": true, "source_path": "skill/SKILL.md" } },
   "reasons": []
 }
 ```

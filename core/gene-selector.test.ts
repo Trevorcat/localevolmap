@@ -8,7 +8,7 @@ import {
   selectGene,
   analyzeGenePool 
 } from '../core/gene-selector';
-import type { Gene, Signal } from '../types/gene-capsule-schema';
+import type { Gene, Signal } from './types/gene-capsule-schema';
 
 describe('Gene Selector', () => {
   describe('computeDriftIntensity', () => {

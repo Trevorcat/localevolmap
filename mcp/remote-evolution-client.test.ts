@@ -1,4 +1,4 @@
-﻿import * as fs from 'fs/promises';
+import * as fs from 'fs/promises';
 import * as http from 'http';
 import * as os from 'os';
 import * as path from 'path';
@@ -6,7 +6,7 @@ import { AddressInfo } from 'net';
 import { LocalEvomap, DEFAULT_CONFIG } from '../index';
 import { createHttpServer } from '../server';
 import { RemoteEvolutionClient } from './remote-evolution-client';
-import type { Capsule, Gene } from '../types/gene-capsule-schema';
+import type { Capsule, Gene } from '../core/types/gene-capsule-schema';
 
 describe('RemoteEvolutionClient', () => {
   let server: http.Server;
@@ -66,7 +66,19 @@ describe('RemoteEvolutionClient', () => {
     await evomap.addGene(gene);
     await evomap.addCapsule(capsule);
 
-    server = createHttpServer();
+    server = createHttpServer({
+      mappingProxy: {
+        getStatus: async () => ({
+          id: 'cloud_mapping',
+          enabled: true,
+          state: 'ready',
+          capabilities: { mcp: ['mapping_get_status', 'mapping_query_candidates'], http: ['/api/v1/mapping'] },
+          upstream: { status: 'ok', port: 18110 }
+        }),
+        ingestProfiles: async () => ({ ingested: 1, table_profile_ids: [1] }),
+        queryCandidates: async () => ({ initial_candidate_count: 8, candidates: [] })
+      }
+    });
     await new Promise<void>(resolve => server.listen(0, '127.0.0.1', () => resolve()));
     port = (server.address() as AddressInfo).port;
   });
@@ -134,5 +146,22 @@ describe('RemoteEvolutionClient', () => {
     expect(playbook.recentCapsules).toContain('capsule_remote_client');
     expect(recentSuccesses.workspace).toBe('capability');
     expect(recentSuccesses.summaries).toContain('Remote lifecycle completed through HTTP APIs.');
+  });
+
+  test('reads mapping status and candidate queries through unified LocalEvomap endpoints', async () => {
+    const client = new RemoteEvolutionClient({
+      serverUrl: `http://127.0.0.1:${port}`,
+      apiKey: 'test-api-key'
+    });
+
+    const status = await client.getMappingStatus();
+    const result = await client.queryMappingCandidates({
+      query_profile: { kind: 'xlsx', logical_name: 'CommercialWorkbook' },
+      limit: 3
+    });
+
+    expect(status.id).toBe('cloud_mapping');
+    expect(status.capabilities.mcp).toContain('mapping_query_candidates');
+    expect(result).toHaveProperty('initial_candidate_count');
   });
 });

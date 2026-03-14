@@ -4,11 +4,11 @@ import * as path from 'path';
 describe('MCP example config files', () => {
   test('provide Cursor, Claude Code, Codex, Kimi, and OpenCode example files', async () => {
     const root = path.resolve(__dirname, '..');
-    const cursorPath = path.join(root, 'examples', '.cursor', 'mcp.json');
-    const claudePath = path.join(root, 'examples', '.mcp.json');
-    const codexPath = path.join(root, 'examples', 'codex.config.toml');
-    const kimiPath = path.join(root, 'examples', 'kimi.localevomap.json');
-    const opencodePath = path.join(root, 'opencode', 'localevomap.remote.example.json');
+    const cursorPath = path.join(root, 'docs', 'examples', '.cursor', 'mcp.json');
+    const claudePath = path.join(root, 'docs', 'examples', '.mcp.json');
+    const codexPath = path.join(root, 'docs', 'examples', 'codex.config.toml');
+    const kimiPath = path.join(root, 'docs', 'examples', 'kimi.localevomap.json');
+    const opencodePath = path.join(root, 'docs', 'examples', 'localevomap.remote.example.json');
 
     const [cursorContent, claudeContent, codexContent, kimiContent, opencodeContent] = await Promise.all([
       fs.readFile(cursorPath, 'utf-8'),

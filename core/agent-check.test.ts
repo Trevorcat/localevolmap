@@ -20,7 +20,7 @@ describe('agent compatibility evaluation', () => {
     expect(result.skill.current).toBe(true);
   });
 
-  test('returns blocked for breaking skill mismatch', async () => {
+  test('reports update_available for non-breaking skill mismatch', async () => {
     const manifest = await loadAgentManifest(path.resolve(__dirname, '..'));
 
     const result = evaluateAgentCompatibility(manifest, {
@@ -32,9 +32,9 @@ describe('agent compatibility evaluation', () => {
       skill_hash: 'sha256-old',
     });
 
-    expect(result.status).toBe('blocked');
-    expect(result.blocking).toBe(true);
+    expect(result.status).toBe('update_available');
+    expect(result.blocking).toBe(false);
     expect(result.skill.current).toBe(false);
-    expect(result.skill.target.breaking).toBe(true);
+    expect(result.skill.target.breaking).toBe(false);
   });
 });

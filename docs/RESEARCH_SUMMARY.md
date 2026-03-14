@@ -39,7 +39,7 @@
     "max_files": 20,
     "forbidden_paths": [".git", "node_modules"]
   },
-  "validation": ["node scripts/validate-modules.js ./src/evolve"]
+  "validation": ["node deployment/scripts/validate-modules.js ./src/evolve"]
 }
 ```
 

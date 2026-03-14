@@ -12,12 +12,12 @@ import type {
   Gene, 
   Capsule,
   Signal 
-} from './types/gene-capsule-schema';
+} from './core/types/gene-capsule-schema';
 import type { CapsuleHubConfig, HubSearchOptions, HubSearchResult } from './core/capsule-hub-client';
 import { CapsuleHubClient, HubRegistry, PUBLIC_HUBS } from './core/capsule-hub-client';
-import { GeneStore } from './storage/gene-store';
-import { CapsuleStore } from './storage/capsule-store';
-import { EventLogger } from './storage/event-logger';
+import { GeneStore } from './core/storage/gene-store';
+import { CapsuleStore } from './core/storage/capsule-store';
+import { EventLogger } from './core/storage/event-logger';
 import { EvolutionEngine, type EvolutionEngineConfig, type EventLogger as EventLoggerInterface, type EvolutionResult } from './core/evolution-engine';
 import { extractSignals, prioritizeSignals, analyzeSignals, type LogEntry } from './core/signal-extractor';
 import { selectGene, computeDriftIntensity, analyzeGenePool } from './core/gene-selector';
@@ -28,7 +28,7 @@ import { prepareDistillation, completeDistillation, shouldDistill, type Distilla
 import { applyEpigeneticMarks, getEpigeneticBoost, pruneExpiredMarks } from './core/epigenetic';
 import { buildAutoGene, isAutoGene } from './core/auto-gene-builder';
 import { banGenesFromFailedCapsules, computeSignalOverlap, DISTILLED_PREFIX, DISTILLED_SCORE_FACTOR } from './core/gene-selector';
-import type { DistillationRequest, DistillationResult } from './types/gene-capsule-schema';
+import type { DistillationRequest, DistillationResult } from './core/types/gene-capsule-schema';
 import * as path from 'path';
 
 // ============================================================================
@@ -854,12 +854,12 @@ export type {
   Gene,
   Capsule,
   Signal
-} from './types/gene-capsule-schema';
+} from './core/types/gene-capsule-schema';
 
 export type {
   DistillationRequest,
   DistillationResult
-} from './types/gene-capsule-schema';
+} from './core/types/gene-capsule-schema';
 
 export type {
   CapsuleHubConfig,

@@ -14,13 +14,52 @@ import type {
   WorkspaceRecentSuccesses,
 } from '../core/evolution-backend';
 
+export interface MappingStatusResult {
+  id: string;
+  enabled: boolean;
+  state: string;
+  capabilities: {
+    mcp: string[];
+    http: string[];
+  };
+  upstream?: Record<string, unknown> | null;
+  [key: string]: unknown;
+}
+
+export interface MappingIngestProfilesInput {
+  profiles: Array<Record<string, unknown>>;
+}
+
+export interface MappingIngestProfilesResult {
+  ingested: number;
+  table_profile_ids: number[];
+  [key: string]: unknown;
+}
+
+export interface MappingQueryCandidatesInput {
+  query_profile: Record<string, unknown>;
+  limit?: number;
+}
+
+export interface MappingQueryCandidatesResult {
+  initial_candidate_count: number;
+  candidates: Array<Record<string, unknown>>;
+  [key: string]: unknown;
+}
+
+export interface MappingCapabilityClient {
+  getMappingStatus(): Promise<MappingStatusResult>;
+  ingestMappingProfiles(input: MappingIngestProfilesInput): Promise<MappingIngestProfilesResult>;
+  queryMappingCandidates(input: MappingQueryCandidatesInput): Promise<MappingQueryCandidatesResult>;
+}
+
 export interface RemoteEvolutionClientOptions {
   serverUrl: string;
   apiKey: string;
   fetchImpl?: typeof fetch;
 }
 
-export class RemoteEvolutionClient implements EvolutionBackend {
+export class RemoteEvolutionClient implements EvolutionBackend, MappingCapabilityClient {
   private readonly serverUrl: string;
   private readonly apiKey: string;
   private readonly fetchImpl: typeof fetch;
@@ -69,6 +108,18 @@ export class RemoteEvolutionClient implements EvolutionBackend {
 
   async getWorkspaceRecentSuccesses(workspace: string): Promise<WorkspaceRecentSuccesses> {
     return this.requestJson<WorkspaceRecentSuccesses>('GET', `/api/v1/workspaces/${encodeURIComponent(workspace)}/recent-successes`);
+  }
+
+  async getMappingStatus(): Promise<MappingStatusResult> {
+    return this.requestJson<MappingStatusResult>('GET', '/api/v1/mapping/health');
+  }
+
+  async ingestMappingProfiles(input: MappingIngestProfilesInput): Promise<MappingIngestProfilesResult> {
+    return this.requestJson<MappingIngestProfilesResult>('POST', '/api/v1/mapping/ingest/profiles', input);
+  }
+
+  async queryMappingCandidates(input: MappingQueryCandidatesInput): Promise<MappingQueryCandidatesResult> {
+    return this.requestJson<MappingQueryCandidatesResult>('POST', '/api/v1/mapping/query/candidates', input);
   }
 
   private async requestJson<T>(method: 'GET' | 'POST', pathname: string, body?: unknown): Promise<T> {

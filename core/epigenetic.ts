@@ -2,7 +2,7 @@
  * Epigenetic Module - 表观遗传标记
  */
 
-import type { EnvFingerprint, EpigeneticMark, Gene, OutcomeStatus } from '../types/gene-capsule-schema';
+import type { EnvFingerprint, EpigeneticMark, Gene, OutcomeStatus } from './types/gene-capsule-schema';
 
 /**
  * 非对称奖惩设计 (2:1)

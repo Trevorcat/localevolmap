@@ -1,4 +1,4 @@
-﻿import * as fs from 'fs/promises';
+import * as fs from 'fs/promises';
 import * as http from 'http';
 import * as os from 'os';
 import * as path from 'path';
@@ -6,7 +6,7 @@ import { AddressInfo } from 'net';
 import { LocalEvomap, DEFAULT_CONFIG } from '../index';
 import { createHttpServer } from '../server';
 import { createDefaultMcpServer } from './server';
-import type { Capsule, Gene } from '../types/gene-capsule-schema';
+import type { Capsule, Gene } from '../core/types/gene-capsule-schema';
 
 describe('createDefaultMcpServer remote integration', () => {
   let remoteServer: http.Server;
@@ -36,7 +36,7 @@ describe('createDefaultMcpServer remote integration', () => {
     process.env.HUB_API_KEY = 'test-api-key';
     process.env.LOCAL_EVOMAP_API_KEY = 'test-api-key';
     process.env.LOCAL_EVOMAP_CLIENT = 'codex';
-    process.env.LOCAL_EVOMAP_SKILL_PATH = path.resolve('opencode/localevomap-skill/codex-agents.md');
+    process.env.LOCAL_EVOMAP_SKILL_PATH = path.resolve('skill/SKILL.md');
 
     const evomap = new LocalEvomap({
       ...DEFAULT_CONFIG,

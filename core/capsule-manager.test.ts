@@ -19,7 +19,7 @@ import {
   type ScoredCapsule
 } from './capsule-manager';
 
-import type { Capsule, Signal, EnvFingerprint } from '../types/gene-capsule-schema';
+import type { Capsule, Signal, EnvFingerprint } from './types/gene-capsule-schema';
 
 // ============================================================================
 // Test Fixtures

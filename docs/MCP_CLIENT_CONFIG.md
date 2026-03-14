@@ -98,7 +98,7 @@ Cursor uses an MCP config file named `mcp.json`.
 
 ### Project-scoped
 
-Copy `examples/.cursor/mcp.json` to your project or global Cursor config and replace the placeholders.
+Copy `docs/examples/.cursor/mcp.json` to your project or global Cursor config and replace the placeholders.
 
 ```json
 {
@@ -112,7 +112,7 @@ Copy `examples/.cursor/mcp.json` to your project or global Cursor config and rep
 }
 ```
 
-Repository template: `examples/.cursor/mcp.json`
+Repository template: `docs/examples/.cursor/mcp.json`
 
 Recommended local skill path for automatic skill updates:
 
@@ -136,7 +136,7 @@ claude mcp add-json local-evomap '{"type":"stdio","command":"node","args":["C:/p
 
 ### Project-scoped
 
-Copy `examples/.mcp.json` into your project root as `.mcp.json` and replace the placeholders.
+Copy `docs/examples/.mcp.json` into your project root as `.mcp.json` and replace the placeholders.
 
 ```json
 {
@@ -150,7 +150,7 @@ Copy `examples/.mcp.json` into your project root as `.mcp.json` and replace the 
 }
 ```
 
-Repository template: `examples/.mcp.json`
+Repository template: `docs/examples/.mcp.json`
 
 Recommended local skill path for automatic skill updates:
 
@@ -193,7 +193,7 @@ args = ["C:/path/to/your/repo/dist/mcp/server.js"]
 TASKS_PATH = "C:/path/to/your/repo/data/tasks"
 ```
 
-Repository template: `examples/codex.config.toml`
+Repository template: `docs/examples/codex.config.toml`
 
 Recommended local skill path for automatic skill updates:
 
@@ -208,7 +208,7 @@ Kimi in this repository uses an HTTP helper config instead of an MCP stdio confi
 Copy and edit:
 
 ```text
-examples/kimi.localevomap.json
+docs/examples/kimi.localevomap.json
 ```
 
 Then save your local working copy to:
@@ -217,7 +217,7 @@ Then save your local working copy to:
 .kimi/localevolmap.json
 ```
 
-The repository tracks the `examples/` template and ignores `.kimi/` local state. Replace these placeholders before use:
+The repository tracks the `docs/examples/` template and ignores `.kimi/` local state. Replace these placeholders before use:
 
 - `your-server.example.com`
 - `YOUR_API_KEY`
@@ -233,13 +233,13 @@ OpenCode currently uses repository templates for HTTP helper integration and rem
 Copy and edit:
 
 ```text
-opencode/localevomap.remote.example.json
+docs/examples/localevomap.remote.example.json
 ```
 
 The repository also keeps a reusable template at:
 
 ```text
-opencode/localevomap.remote.json
+docs/examples/localevomap.remote.json
 ```
 
 These templates include:
@@ -267,7 +267,7 @@ If a client supports stdio MCP servers, map the same values into that client's c
 After registering the MCP server, also load the local workflow instructions from:
 
 ```text
-agent-skill/SKILL.md
+skill/SKILL.md
 ```
 
 That skill tells the agent to:

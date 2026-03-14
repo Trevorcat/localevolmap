@@ -1,0 +1,61 @@
+{
+  "manifest_version": "2026.03.11.1",
+  "mcp": {
+    "runtime": {
+      "version": "0.1.0",
+      "breaking": true,
+      "auto_update_supported": false,
+      "source": {
+        "path": "mcp/server.ts",
+        "download_url": "/api/v1/agent-manifest"
+      }
+    }
+  },
+  "skills": {
+    "codex": {
+      "version": "1.2.0",
+      "breaking": false,
+      "auto_update_supported": true,
+      "source": {
+        "path": "skill/SKILL.md",
+        "download_url": "/skill/codex"
+      }
+    },
+    "claude-code": {
+      "version": "1.2.0",
+      "breaking": false,
+      "auto_update_supported": true,
+      "source": {
+        "path": "skill/SKILL.md",
+        "download_url": "/skill/claude-code"
+      }
+    },
+    "cursor": {
+      "version": "1.2.0",
+      "breaking": false,
+      "auto_update_supported": true,
+      "source": {
+        "path": "skill/SKILL.md",
+        "download_url": "/skill/cursor"
+      }
+    },
+    "opencode": {
+      "version": "1.2.0",
+      "breaking": false,
+      "auto_update_supported": false,
+      "source": {
+        "path": "skill/SKILL.md",
+        "download_url": "/skill/opencode"
+      }
+    },
+    "kimi": {
+      "version": "1.2.0",
+      "breaking": false,
+      "auto_update_supported": false,
+      "source": {
+        "path": "skill/SKILL.md",
+        "download_url": "/skill/kimi"
+      }
+    }
+  }
+}

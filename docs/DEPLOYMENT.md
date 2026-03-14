@@ -34,7 +34,7 @@
 │   ├── capsules/
 │   ├── events/
 │   └── seed-genes.json
-├── opencode/       # AI Skill 文件
+├── skill/          # Agent Skill 文件
 ├── .env            # 正式服配置（来自 deployment/.env.prod）
 ├── manage.sh       # 进程管理脚本
 ├── server.log      # 日志
@@ -53,7 +53,7 @@
 │   └── events/
 ├── data/
 │   └── seed-genes.json  # seed 数据源
-├── opencode/       # AI Skill 文件
+├── skill/          # Agent Skill 文件
 ├── .env            # 测试服配置（来自 deployment/.env.test）
 ├── manage.sh       # 进程管理脚本
 ├── server.log      # 日志
@@ -69,7 +69,7 @@ deployment/
 ├── .env.prod       # 正式服环境变量模板（端口 3000，data 路径）
 └── ...
 
-scripts/
+deployment/scripts/
 ├── manage.sh       # 进程管理：start/stop/restart/status test/prod
 ├── deploy-test.sh  # 构建 + 上传 + 重启测试服
 ├── deploy-prod.sh  # 构建 + 上传 + 重启正式服
@@ -105,7 +105,7 @@ npm run build
 **方式 A：使用部署脚本（推荐）**
 
 ```bash
-./scripts/deploy-test.sh
+./deployment/scripts/deploy-test.sh
 ```
 
 **方式 B：手动部署**
@@ -116,7 +116,7 @@ scp -r dist deploy@your-server.example.com:/home/itops/localevolmap-test/
 
 # 上传配置
 scp deployment/.env.test deploy@your-server.example.com:/home/itops/localevolmap-test/.env
-scp scripts/manage.sh deploy@your-server.example.com:/home/itops/localevolmap-test/
+scp deployment/scripts/manage.sh deploy@your-server.example.com:/home/itops/localevolmap-test/
 scp package.json deploy@your-server.example.com:/home/itops/localevolmap-test/
 
 # 上传其他需要的文件
@@ -153,7 +153,7 @@ ssh deploy@your-server.example.com "curl -s -X POST http://localhost:3001/api/v1
 **方式 A：使用推进脚本（推荐）**
 
 ```bash
-./scripts/promote.sh
+./deployment/scripts/promote.sh
 ```
 
 这会：
@@ -165,7 +165,7 @@ ssh deploy@your-server.example.com "curl -s -X POST http://localhost:3001/api/v1
 **方式 B：直接部署正式服**
 
 ```bash
-./scripts/deploy-prod.sh
+./deployment/scripts/deploy-prod.sh
 ```
 
 ### 6. 验证正式服

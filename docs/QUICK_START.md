@@ -45,10 +45,10 @@ npx playwright test e2e/browser.spec.ts --headed
 
 #### 方式 A: HTTP API 调用
 
-创建文件 `scripts/opencode-http-example.sh`（已存在），或直接运行：
+创建文件 `deployment/scripts/opencode-http-example.sh`（已存在），或直接运行：
 
 ```bash
-bash scripts/opencode-http-example.sh
+bash deployment/scripts/opencode-http-example.sh
 ```
 
 这个脚本会：
@@ -61,7 +61,7 @@ bash scripts/opencode-http-example.sh
 #### 方式 B: 浏览器自动化
 
 ```bash
-bash scripts/opencode-browser-example.sh
+bash deployment/scripts/opencode-browser-example.sh
 ```
 
 这将使用 Playwright 在浏览器中执行完整的 E2E 测试。
@@ -108,7 +108,7 @@ start http://localhost:3000 # Windows
 
 ### 修改端口
 
-编辑 `deployment/.env.production.example` 或直接设置环境变量：
+编辑 `deployment/.env.prod.example` 或直接设置环境变量：
 
 ```bash
 PORT=8080 npm start

@@ -13,9 +13,9 @@
 ### Task 1: Refresh client templates
 
 **Files:**
-- Modify: `E:/projects/test_model/capability/examples/.cursor/mcp.json`
-- Modify: `E:/projects/test_model/capability/examples/.mcp.json`
-- Add: `E:/projects/test_model/capability/examples/kimi.localevomap.json`
+- Modify: `E:/projects/test_model/capability/docs/examples/.cursor/mcp.json`
+- Modify: `E:/projects/test_model/capability/docs/examples/.mcp.json`
+- Add: `E:/projects/test_model/capability/docs/examples/kimi.localevomap.json`
 - Modify: `E:/projects/test_model/capability/.kimi/localevolmap.json`
 - Modify: `E:/projects/test_model/capability/opencode/localevomap.remote.example.json`
 - Modify: `E:/projects/test_model/capability/opencode/localevomap.remote.json`

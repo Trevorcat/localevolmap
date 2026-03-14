@@ -8,7 +8,7 @@ import type {
   AgentBootstrapStep,
   AgentClient,
   BuildAgentBootstrapChecklistOptions,
-} from '../types/agent-bootstrap-schema';
+} from './types/agent-bootstrap-schema';
 
 const BOOTSTRAP_PATH = '/api/v1/agent/bootstrap';
 const MANIFEST_PATH = '/api/v1/agent-manifest';
@@ -255,13 +255,13 @@ function buildClientChecklist(client: AgentClient, manifest: Awaited<ReturnType<
           server_name: SERVER_NAME,
           transport: 'stdio',
           config_path: '~/.codex/config.toml',
-          template_path: 'examples/codex.config.toml',
+          template_path: 'docs/examples/codex.config.toml',
           command: 'node',
           args: [MCP_ENTRYPOINT_TOKEN],
           env_names: ['LOCAL_EVOMAP_CLIENT', 'LOCAL_EVOMAP_SERVER_URL', 'LOCAL_EVOMAP_API_KEY', 'LOCAL_EVOMAP_SKILL_PATH', 'GENES_PATH', 'CAPSULES_PATH', 'EVENTS_PATH', 'TASKS_PATH'],
         },
         env: pickEnv(['LOCAL_EVOMAP_CLIENT', 'LOCAL_EVOMAP_SERVER_URL', 'LOCAL_EVOMAP_API_KEY', 'LOCAL_EVOMAP_SKILL_PATH', 'GENES_PATH', 'CAPSULES_PATH', 'EVENTS_PATH', 'TASKS_PATH']),
-        steps: buildStdioSteps(client, '~/.codex/AGENTS.md', '~/.codex/config.toml', 'examples/codex.config.toml'),
+        steps: buildStdioSteps(client, '~/.codex/AGENTS.md', '~/.codex/config.toml', 'docs/examples/codex.config.toml'),
         post_install_checks: buildPostInstallChecks(client, manifest.manifest_version, runtime.version, runtime.hash, skill.version, skill.hash, '~/.codex/AGENTS.md'),
         limitations: [],
       };
@@ -280,13 +280,13 @@ function buildClientChecklist(client: AgentClient, manifest: Awaited<ReturnType<
           server_name: SERVER_NAME,
           transport: 'stdio',
           config_path: '.cursor/mcp.json',
-          template_path: 'examples/.cursor/mcp.json',
+          template_path: 'docs/examples/.cursor/mcp.json',
           command: 'node',
           args: [MCP_ENTRYPOINT_TOKEN],
           env_names: ['LOCAL_EVOMAP_CLIENT', 'LOCAL_EVOMAP_SERVER_URL', 'LOCAL_EVOMAP_API_KEY', 'LOCAL_EVOMAP_SKILL_PATH', 'GENES_PATH', 'CAPSULES_PATH', 'EVENTS_PATH', 'TASKS_PATH'],
         },
         env: pickEnv(['LOCAL_EVOMAP_CLIENT', 'LOCAL_EVOMAP_SERVER_URL', 'LOCAL_EVOMAP_API_KEY', 'LOCAL_EVOMAP_SKILL_PATH', 'GENES_PATH', 'CAPSULES_PATH', 'EVENTS_PATH', 'TASKS_PATH']),
-        steps: buildStdioSteps(client, '~/.cursor/rules/localevomap.mdc', '.cursor/mcp.json', 'examples/.cursor/mcp.json'),
+        steps: buildStdioSteps(client, '~/.cursor/rules/localevomap.mdc', '.cursor/mcp.json', 'docs/examples/.cursor/mcp.json'),
         post_install_checks: buildPostInstallChecks(client, manifest.manifest_version, runtime.version, runtime.hash, skill.version, skill.hash, '~/.cursor/rules/localevomap.mdc'),
         limitations: [],
       };
@@ -305,13 +305,13 @@ function buildClientChecklist(client: AgentClient, manifest: Awaited<ReturnType<
           server_name: SERVER_NAME,
           transport: 'stdio',
           config_path: '.mcp.json',
-          template_path: 'examples/.mcp.json',
+          template_path: 'docs/examples/.mcp.json',
           command: 'node',
           args: [MCP_ENTRYPOINT_TOKEN],
           env_names: ['LOCAL_EVOMAP_CLIENT', 'LOCAL_EVOMAP_SERVER_URL', 'LOCAL_EVOMAP_API_KEY', 'LOCAL_EVOMAP_SKILL_PATH', 'GENES_PATH', 'CAPSULES_PATH', 'EVENTS_PATH', 'TASKS_PATH'],
         },
         env: pickEnv(['LOCAL_EVOMAP_CLIENT', 'LOCAL_EVOMAP_SERVER_URL', 'LOCAL_EVOMAP_API_KEY', 'LOCAL_EVOMAP_SKILL_PATH', 'GENES_PATH', 'CAPSULES_PATH', 'EVENTS_PATH', 'TASKS_PATH']),
-        steps: buildStdioSteps(client, '~/.claude/CLAUDE.md', '.mcp.json', 'examples/.mcp.json'),
+        steps: buildStdioSteps(client, '~/.claude/CLAUDE.md', '.mcp.json', 'docs/examples/.mcp.json'),
         post_install_checks: buildPostInstallChecks(client, manifest.manifest_version, runtime.version, runtime.hash, skill.version, skill.hash, '~/.claude/CLAUDE.md'),
         limitations: [],
       };
@@ -323,19 +323,19 @@ function buildClientChecklist(client: AgentClient, manifest: Awaited<ReturnType<
           version: skill.version,
           hash: skill.hash,
           download_url: skill.download_url,
-          target_path: 'opencode/localevomap-skill/opencode-skill.md',
+          target_path: 'skill/SKILL.md',
           auto_update_supported: skill.auto_update_supported,
         },
         mcp_config: {
           server_name: SERVER_NAME,
           transport: 'http',
-          config_path: 'opencode/localevomap.remote.json',
-          template_path: 'opencode/localevomap.remote.example.json',
+          config_path: 'docs/examples/localevomap.remote.json',
+          template_path: 'docs/examples/localevomap.remote.example.json',
           env_names: ['LOCAL_EVOMAP_SERVER_URL', 'LOCAL_EVOMAP_API_KEY'],
         },
         env: pickEnv(['LOCAL_EVOMAP_SERVER_URL', 'LOCAL_EVOMAP_API_KEY']),
-        steps: buildPartialSteps(client, 'opencode/localevomap-skill/opencode-skill.md', 'opencode/localevomap.remote.json', 'opencode/localevomap.remote.example.json'),
-        post_install_checks: buildPostInstallChecks(client, manifest.manifest_version, runtime.version, runtime.hash, skill.version, skill.hash, 'opencode/localevomap-skill/opencode-skill.md'),
+        steps: buildPartialSteps(client, 'skill/SKILL.md', 'docs/examples/localevomap.remote.json', 'docs/examples/localevomap.remote.example.json'),
+        post_install_checks: buildPostInstallChecks(client, manifest.manifest_version, runtime.version, runtime.hash, skill.version, skill.hash, 'skill/SKILL.md'),
         limitations: ['Current OpenCode integration is helper-template based; stdio MCP registration is still manual.'],
       };
     case 'kimi':
@@ -346,19 +346,19 @@ function buildClientChecklist(client: AgentClient, manifest: Awaited<ReturnType<
           version: skill.version,
           hash: skill.hash,
           download_url: skill.download_url,
-          target_path: 'opencode/localevomap-skill/kimi.md',
+          target_path: 'skill/SKILL.md',
           auto_update_supported: skill.auto_update_supported,
         },
         mcp_config: {
           server_name: SERVER_NAME,
           transport: 'http',
           config_path: '.kimi/localevolmap.json',
-          template_path: 'examples/kimi.localevomap.json',
+          template_path: 'docs/examples/kimi.localevomap.json',
           env_names: ['LOCAL_EVOMAP_SERVER_URL', 'LOCAL_EVOMAP_API_KEY'],
         },
         env: pickEnv(['LOCAL_EVOMAP_SERVER_URL', 'LOCAL_EVOMAP_API_KEY']),
-        steps: buildPartialSteps(client, 'opencode/localevomap-skill/kimi.md', '.kimi/localevolmap.json', 'examples/kimi.localevomap.json'),
-        post_install_checks: buildPostInstallChecks(client, manifest.manifest_version, runtime.version, runtime.hash, skill.version, skill.hash, 'opencode/localevomap-skill/kimi.md'),
+        steps: buildPartialSteps(client, 'skill/SKILL.md', '.kimi/localevolmap.json', 'docs/examples/kimi.localevomap.json'),
+        post_install_checks: buildPostInstallChecks(client, manifest.manifest_version, runtime.version, runtime.hash, skill.version, skill.hash, 'skill/SKILL.md'),
         limitations: ['Current Kimi integration is helper-template based; stdio MCP registration is still manual.'],
       };
   }
@@ -375,7 +375,7 @@ export async function buildAgentBootstrapChecklist(options: BuildAgentBootstrapC
     project: {
       name: 'LocalEvomap',
       preferred_runtime: 'local-mcp',
-      skill_entry: 'agent-skill/SKILL.md',
+      skill_entry: 'skill/SKILL.md',
       local_runtime_entry: MCP_ENTRYPOINT,
     },
     server: {

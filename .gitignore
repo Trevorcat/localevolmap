@@ -86,3 +86,15 @@ nul
 # Redundant root scripts (use scripts/ or dual-manage.sh)
 /start.sh
 /manage.sh
+
+# Plugin runtime data
+data/plugins/
+
+# Task session data
+data/tasks/
+
+# Python artifacts
+__pycache__/
+*.pyc
+.pytest_cache/
+*.db

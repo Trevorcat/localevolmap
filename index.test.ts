@@ -1,8 +1,8 @@
-﻿import * as fs from 'fs/promises';
+import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
 import { LocalEvomap, DEFAULT_CONFIG } from './index';
-import type { Capsule, Gene } from './types/gene-capsule-schema';
+import type { Capsule, Gene } from './core/types/gene-capsule-schema';
 
 describe('LocalEvomap feedback', () => {
   async function createTempRoot(): Promise<string> {

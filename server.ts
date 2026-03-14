@@ -2,7 +2,7 @@ import * as http from 'http';
 import * as fs from 'fs';
 import * as path from 'path';
 import { LocalEvomap, DEFAULT_CONFIG } from './index';
-import type { Gene, Capsule, EvolutionEvent } from './types/gene-capsule-schema';
+import type { Gene, Capsule, EvolutionEvent } from './core/types/gene-capsule-schema';
 import type { EvolutionResult, EvolutionChange } from './core/evolution-engine';
 import { ApprovalRequiredError } from './core/evolution-engine';
 import type { BlastRadiusEstimate } from './core/validation-gate';
@@ -10,15 +10,18 @@ import { shouldReuseCapsule } from './core/capsule-manager';
 import { resolveCapsuleGene, resolveCapsuleGenes } from './core/capsule-gene-resolver';
 import { InvalidSignalContextError } from './core/signal-extractor';
 import { matchPatternToSignals, NoMatchingGeneError, AllGenesBannedError } from './core/gene-selector';
-import { normalizeSignals } from './types/signal-registry';
+import { normalizeSignals } from './core/types/signal-registry';
 import { evaluateAgentCompatibility, loadAgentManifest } from './core/agent-manifest';
 import { buildAgentBootstrapChecklist } from './core/agent-bootstrap-manifest';
-import { isAgentClient } from './types/agent-bootstrap-schema';
-import type { AgentCheckRequest, AgentClient } from './types/agent-bootstrap-schema';
-import { TaskSessionStore } from './storage/task-session-store';
+import { isAgentClient } from './core/types/agent-bootstrap-schema';
+import type { AgentCheckRequest, AgentClient } from './core/types/agent-bootstrap-schema';
+import { TaskSessionStore } from './core/storage/task-session-store';
 import { EvolutionService } from './core/evolution-service';
 import { synthesizeGeneAlgorithmic } from './core/skill-distiller';
-import { DistillJobStore } from './storage/distill-job-store';
+import { DistillJobStore } from './core/storage/distill-job-store';
+import { createProjectPluginManager } from './core/plugins/plugin-manager';
+import { MappingProxy, type MappingProxyLike } from './core/plugins/mapping-proxy';
+import { handleUnifiedMappingRoute } from './core/plugins/http-mapping';
 
 // 加载 .env 文件（无依赖实现，避免引入 dotenv）
 function loadEnvFile(envPath: string): void {
@@ -126,6 +129,12 @@ let evomap: LocalEvomap | null = null;
 let taskStore: TaskSessionStore | null = null;
 let evolutionService: EvolutionService | null = null;
 let distillJobStore: DistillJobStore | null = null;
+let pluginManagerPromise: Promise<any> | null = null;
+let defaultMappingProxyPromise: Promise<MappingProxyLike> | null = null;
+
+export interface CreateHttpServerOptions {
+    mappingProxy?: MappingProxyLike;
+}
 
 async function getEvomap(): Promise<LocalEvomap> {
     if (!evomap) {
@@ -184,6 +193,29 @@ async function getDistillJobStore(): Promise<DistillJobStore> {
     return distillJobStore;
 }
 
+async function getDefaultPluginManager() {
+    if (!pluginManagerPromise) {
+        pluginManagerPromise = (async () => {
+            const manager = await createProjectPluginManager(PROJECT_ROOT);
+            await manager.initialize();
+            return manager;
+        })();
+    }
+
+    return pluginManagerPromise;
+}
+
+async function getDefaultMappingProxy(): Promise<MappingProxyLike> {
+    if (!defaultMappingProxyPromise) {
+        defaultMappingProxyPromise = (async () => {
+            const pluginManager = await getDefaultPluginManager();
+            return new MappingProxy({ pluginManager });
+        })();
+    }
+
+    return defaultMappingProxyPromise;
+}
+
 async function runAutomaticDistillation(evomap: LocalEvomap): Promise<{ distillJobId: string; distillStatus: string; distilledGeneId?: string | null }> {
     const allCapsules = (await evomap.getAllCapsules())
         .filter(capsule => !capsule._deleted && capsule.outcome.status === 'success')
@@ -216,7 +248,7 @@ async function runAutomaticDistillation(evomap: LocalEvomap): Promise<{ distillJ
     }
 }
 
-export function createHttpServer(): http.Server {
+export function createHttpServer(options: CreateHttpServerOptions = {}): http.Server {
 return http.createServer(async (req, res) => {
     // CORS & Headers
     const reqOrigin = req.headers.origin;
@@ -235,7 +267,7 @@ return http.createServer(async (req, res) => {
 
     // Serve static files
     if (url.pathname === '/' || url.pathname === '/index.html') {
-        const filePath = path.join(__dirname, 'public', 'index.html');
+        const filePath = path.join(__dirname, 'index.html');
         fs.readFile(filePath, (err, data) => {
             if (err) {
                 res.writeHead(500);
@@ -273,16 +305,15 @@ return http.createServer(async (req, res) => {
 
     if (url.pathname.startsWith('/skill/') || url.pathname === '/skill') {
         const projectRoot = PROJECT_ROOT;
-        const skillDir = path.join(projectRoot, 'opencode', 'localevomap-skill');
+        const skillDir = path.join(projectRoot, 'skill');
         
-        // Map client types to files
         const clientFileMap: Record<string, string> = {
-            'claude': 'claude-code.md',
-            'claude-code': 'claude-code.md',
-            'cursor': 'cursor.md',
-            'kimi': 'kimi.md',
-            'opencode': 'opencode-skill.md',
-            'codex': 'codex-agents.md',
+            'claude': 'SKILL.md',
+            'claude-code': 'SKILL.md',
+            'cursor': 'SKILL.md',
+            'kimi': 'SKILL.md',
+            'opencode': 'SKILL.md',
+            'codex': 'SKILL.md',
         };
         
         // /skill or /skill/ → return skill.json (manifest)
@@ -342,7 +373,7 @@ return http.createServer(async (req, res) => {
     // Hub API v1 endpoints (check first, before legacy /api/)
     if (url.pathname.startsWith('/api/v1/')) {
         console.log('[Server] Hub API request:', req.method, url.pathname);
-        await handleHubApi(req, res, url);
+        await handleHubApi(req, res, url, options.mappingProxy);
         return;
     }
 
@@ -420,7 +451,8 @@ return http.createServer(async (req, res) => {
 async function handleHubApi(
     req: http.IncomingMessage,
     res: http.ServerResponse,
-    url: URL
+    url: URL,
+    mappingProxy?: MappingProxyLike
 ): Promise<void> {
     res.setHeader('Content-Type', 'application/json');
     
@@ -439,6 +471,14 @@ async function handleHubApi(
     if (req.method === 'POST' && pathname === '/api/v1/agent/check') {
         await handleAgentCheck(req, res);
         return;
+    }
+
+    if (pathname.startsWith('/api/v1/mapping')) {
+        const resolvedMappingProxy = mappingProxy ?? await getDefaultMappingProxy();
+        const handled = await handleUnifiedMappingRoute(req, res, url, resolvedMappingProxy);
+        if (handled) {
+            return;
+        }
     }
     
     try {
@@ -2306,6 +2346,9 @@ if (require.main === module) {
     const server = createHttpServer();
     server.listen(PORT, HOST, () => {
         console.log(`LocalEvomap Core Server running at http://${HOST}:${PORT}`);
+        void getDefaultPluginManager().catch((error) => {
+            console.error('[Server] Plugin bootstrap failed:', error);
+        });
     });
 }
 

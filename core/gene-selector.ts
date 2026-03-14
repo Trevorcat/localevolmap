@@ -9,9 +9,9 @@ import type {
   SelectionResult,
   Signal,
   SignalPattern
-} from '../types/gene-capsule-schema';
+} from './types/gene-capsule-schema';
 import { getEpigeneticBoost, pruneExpiredMarks } from './epigenetic';
-import { getSignalConfidence, matchSignalPattern } from '../types/signal-registry';
+import { getSignalConfidence, matchSignalPattern } from './types/signal-registry';
 
 export const DISTILLED_PREFIX = 'gene_distilled_';
 export const DISTILLED_SCORE_FACTOR = 0.8;

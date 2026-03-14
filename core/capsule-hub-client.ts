@@ -8,7 +8,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as crypto from 'crypto';
-import type { Capsule, Signal } from '../types/gene-capsule-schema';
+import type { Capsule, Signal } from './types/gene-capsule-schema';
 
 // ============================================================================
 // 类型定义
