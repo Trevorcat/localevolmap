@@ -4,7 +4,7 @@ import * as path from 'path';
 import { LocalEvomap, DEFAULT_CONFIG } from './index';
 import type { Gene, Capsule, EvolutionEvent } from './types/gene-capsule-schema';
 import type { EvolutionResult, EvolutionChange } from './core/evolution-engine';
-import { LLMProviderError, ApprovalRequiredError } from './core/evolution-engine';
+import { ApprovalRequiredError } from './core/evolution-engine';
 import type { BlastRadiusEstimate } from './core/validation-gate';
 import { shouldReuseCapsule } from './core/capsule-manager';
 import { resolveCapsuleGene, resolveCapsuleGenes } from './core/capsule-gene-resolver';
@@ -17,7 +17,7 @@ import { isAgentClient } from './types/agent-bootstrap-schema';
 import type { AgentCheckRequest, AgentClient } from './types/agent-bootstrap-schema';
 import { TaskSessionStore } from './storage/task-session-store';
 import { EvolutionService } from './core/evolution-service';
-import { LLMProvider } from './core/llm-provider';
+import { synthesizeGeneAlgorithmic } from './core/skill-distiller';
 import { DistillJobStore } from './storage/distill-job-store';
 
 // 加载 .env 文件（无依赖实现，避免引入 dotenv）
@@ -129,17 +129,10 @@ let distillJobStore: DistillJobStore | null = null;
 
 async function getEvomap(): Promise<LocalEvomap> {
     if (!evomap) {
-        const llmProvider = process.env.EVOMAP_LLM_PROVIDER as 'openai' | 'anthropic' | 'local' | undefined;
-        const llmModel = process.env.EVOMAP_LLM_MODEL;
-        const llmApiKey = process.env.LLM_API_KEY || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY;
-        const llmBaseURL = process.env.LOCAL_LLM_BASE_URL;
-        
-        // 数据路径：从环境变量读取，否则使用默认配置
         const genesPath = process.env.GENES_PATH || DEFAULT_CONFIG.genes_path;
         const capsulesPath = process.env.CAPSULES_PATH || DEFAULT_CONFIG.capsules_path;
         const eventsPath = process.env.EVENTS_PATH || DEFAULT_CONFIG.events_path;
         
-        // 从环境变量读取审批配置
         const reviewMode = process.env.EVOMAP_REVIEW_MODE !== undefined
             ? process.env.EVOMAP_REVIEW_MODE === 'true'
             : DEFAULT_CONFIG.review_mode;
@@ -156,22 +149,12 @@ async function getEvomap(): Promise<LocalEvomap> {
             autoApproveLowRisk,
             autoApproveMediumRisk,
             dryRun,
-            ...(llmProvider && { llmProvider }),
-            ...(llmModel && { llmModel }),
-            ...(llmApiKey && { llmApiKey }),
-            ...(llmBaseURL && { llmBaseURL }),
         };
         
         evomap = new LocalEvomap(config);
         await evomap.init();
         
-        console.log('[Server] LocalEvomap initialized');
-        if (llmProvider && llmModel) {
-            console.log(`[Server] LLM: ${llmProvider} / ${llmModel}`);
-            if (llmBaseURL) console.log(`[Server] LLM BaseURL: ${llmBaseURL}`);
-        } else {
-            console.log('[Server] LLM: not configured (dry-run mode)');
-        }
+        console.log('[Server] LocalEvomap initialized (pure algorithmic mode, no LLM)');
     }
     return evomap;
 }
@@ -212,40 +195,21 @@ async function runAutomaticDistillation(evomap: LocalEvomap): Promise<{ distillJ
     const created = await jobStore.createPending({ sourceCapsuleIds, fingerprint });
     const running = created.status === 'running' ? created : await jobStore.markRunning(created.jobId);
 
-    const llmProvider = process.env.EVOMAP_LLM_PROVIDER as 'openai' | 'anthropic' | 'local' | undefined;
-    const llmModel = process.env.EVOMAP_LLM_MODEL;
-    const llmApiKey = process.env.LLM_API_KEY || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY;
-    const llmBaseURL = process.env.LOCAL_LLM_BASE_URL;
-
-    if (!llmProvider || !llmModel) {
-        await jobStore.markFailed(running.jobId, 'LLM is not configured for automatic distillation');
-        return { distillJobId: running.jobId, distillStatus: 'failed' };
-    }
-
     try {
-        const request = await evomap.prepareDistillation();
-        if (!request) {
-            await jobStore.markFailed(running.jobId, 'Distillation conditions are no longer met');
+        const allGenes = await evomap.getAllGenes();
+        const result = synthesizeGeneAlgorithmic(
+            await evomap.getAllCapsules(),
+            allGenes
+        );
+
+        if (!result.gene) {
+            await jobStore.markFailed(running.jobId, 'Algorithmic distillation produced no gene');
             return { distillJobId: running.jobId, distillStatus: 'failed' };
         }
 
-        const prompt = await fs.promises.readFile(request.promptFilePath, 'utf-8');
-        const llm = new LLMProvider({
-            provider: llmProvider,
-            model: llmModel,
-            apiKey: llmApiKey,
-            baseURL: llmBaseURL
-        });
-        const llmResponse = await llm.generateText(prompt);
-        const result = await evomap.completeDistillation(llmResponse.text, sourceCapsuleIds);
-
-        if (!result.success) {
-            await jobStore.markFailed(running.jobId, result.error || 'Distillation validation failed');
-            return { distillJobId: running.jobId, distillStatus: 'failed' };
-        }
-
-        await jobStore.markSucceeded(running.jobId, result.gene?.id ?? null);
-        return { distillJobId: running.jobId, distillStatus: 'succeeded', distilledGeneId: result.gene?.id ?? null };
+        await evomap.addGene(result.gene);
+        await jobStore.markSucceeded(running.jobId, result.gene.id);
+        return { distillJobId: running.jobId, distillStatus: 'succeeded', distilledGeneId: result.gene.id };
     } catch (error) {
         await jobStore.markFailed(running.jobId, (error as Error).message);
         return { distillJobId: running.jobId, distillStatus: 'failed' };
@@ -1456,7 +1420,8 @@ async function handleEvolve(
         res.end(JSON.stringify({
             event: result.event,
             changes: result.changes,
-            capsule_created: result.capsule_created
+            capsule_created: result.capsule_created,
+            guidance: result.guidance
         }));
     } catch (error) {
         console.error('[Hub API] Evolve error:', error);
@@ -1465,9 +1430,6 @@ async function handleEvolve(
         if (error instanceof InvalidSignalContextError) {
             res.writeHead(400);
             res.end(JSON.stringify({ error: 'invalid_input', message: msg }));
-        } else if (error instanceof LLMProviderError) {
-            res.writeHead(502);
-            res.end(JSON.stringify({ error: 'llm_failed', message: msg }));
         } else if (error instanceof ApprovalRequiredError) {
             const pendingId = `pending_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
             pendingApprovals.set(pendingId, {

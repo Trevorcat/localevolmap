@@ -362,9 +362,9 @@ ssh itops@your-server.example.com "ps aux | grep 'node.*dist/server' | grep -v g
 
 ## 下一步
 
-1. **配置 LLM**: 修改 `.env` 文件配置 LLM 提供者
-2. **执行进化**: 通过 API 或 Dashboard 触发进化流程
-3. **监控事件**: 定期查看 Events 页面了解系统活动
+1. **执行进化**: 通过 API 或 Dashboard 触发进化流程（纯算法模式，无需配置 LLM）
+2. **监控事件**: 定期查看 Events 页面了解系统活动
+3. **查看 guidance**: 进化结果中的 `guidance` 字段包含结构化策略引导，可供 Agent 消费
 
 ---
 

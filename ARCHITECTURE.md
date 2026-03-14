@@ -496,11 +496,10 @@ export class LocalEvomap {
     const capsules = await this.capsuleStore.getAll();
     const capsule = selectCapsule(capsules, signals, this.getEnvFingerprint());
     
-    // 5. 构建进化提示（这里调用 LLM）
+    // 5. 构建进化引导（纯算法模式，不调用 LLM）
     const prompt = this.buildGepPrompt({ signals, gene, capsule });
     
-    // 6. 执行进化（伪代码）
-    // const changes = await this.callLLM(prompt);
+    // 6. 生成结构化 guidance 供调用方 Agent 消费（不再调用 LLM）
     
     // 7. 验证
     const validationPassed = gene.validation?.every(cmd => 

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Local Evomap - 本地进化系统主入口
  * 
  * 整合所有模块，提供统一的进化系统 API
@@ -66,10 +66,13 @@ export const DEFAULT_CONFIG: EvolutionConfig & { externalSources?: CapsuleHubCon
 
 export type LocalEvomapConfig = EvolutionConfig & { 
   externalSources?: CapsuleHubConfig[];
-  // LLM 配置（透传给 EvolutionEngine）
+  /** @deprecated LLM 已移除，此字段无效 */
   llmProvider?: 'openai' | 'anthropic' | 'local';
+  /** @deprecated LLM 已移除，此字段无效 */
   llmModel?: string;
+  /** @deprecated LLM 已移除，此字段无效 */
   llmApiKey?: string;
+  /** @deprecated LLM 已移除，此字段无效 */
   llmBaseURL?: string;
 };
 

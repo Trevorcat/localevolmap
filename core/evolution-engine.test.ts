@@ -1,15 +1,7 @@
-import { EvolutionEngine, type EventLogger, type EvolutionEngineConfig, LLMProviderError } from './evolution-engine';
+import { EvolutionEngine, type EventLogger, type EvolutionEngineConfig } from './evolution-engine';
 import { GeneStore } from '../storage/gene-store';
 import { CapsuleStore } from '../storage/capsule-store';
 import type { EvolutionEvent, Gene } from '../types/gene-capsule-schema';
-
-const mockGenerateEvolution = jest.fn();
-
-jest.mock('./llm-provider', () => ({
-  LLMProvider: jest.fn().mockImplementation(() => ({
-    generateEvolution: mockGenerateEvolution
-  }))
-}));
 
 const testGene: Gene = {
   type: 'Gene',
@@ -82,10 +74,9 @@ function createStores() {
 describe('EvolutionEngine', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockGenerateEvolution.mockReset();
   });
 
-  test('无 LLM 时应返回空变更并记录事件并创建胶囊', async () => {
+  test('纯算法模式应返回空变更、guidance 引导并记录事件并创建胶囊', async () => {
     const { logger } = createEventLoggerMock();
     const { capsuleStore, geneStore, addSpy, upsertSpy } = createStores();
     const engine = new EvolutionEngine(baseConfig(), logger, capsuleStore, geneStore);
@@ -97,6 +88,8 @@ describe('EvolutionEngine', () => {
     const result = await engine.evolve(errorLogs);
 
     expect(result.changes).toEqual([]);
+    expect(result.guidance).toBeTruthy();
+    expect(result.guidance).toContain('Evolution Task');
     expect(result.event.outcome.status).toBe('success');
     expect(result.capsule_created).toMatch(/^capsule_/);
     expect(addSpy).toHaveBeenCalledTimes(1);
@@ -104,20 +97,22 @@ describe('EvolutionEngine', () => {
     expect((logger.append as jest.Mock).mock.calls.length).toBe(1);
   });
 
-  test('使用 mock LLM 且低风险变更时应通过审批并成功', async () => {
-    mockGenerateEvolution.mockResolvedValue({
-      changes: [
-        {
-          file: 'src/fix.ts',
-          operation: 'modify',
-          content: 'line1\nline2',
-          reasoning: 'small safe fix'
-        }
-      ],
-      summary: 'apply small fix',
-      confidence: 0.91
-    });
+  test('guidance 应包含基因策略和信号信息', async () => {
+    const { logger } = createEventLoggerMock();
+    const { capsuleStore, geneStore } = createStores();
+    const engine = new EvolutionEngine(baseConfig(), logger, capsuleStore, geneStore);
 
+    engine.setGenePool([structuredClone(testGene)]);
+    engine.setCapsulePool([]);
+
+    const result = await engine.evolve(errorLogs);
+
+    expect(result.guidance).toContain('Selected Gene: gene_test_repair');
+    expect(result.guidance).toContain('fix error');
+    expect(result.guidance).toContain('Detected Signals');
+  });
+
+  test('即使设置了 deprecated LLM 配置字段，引擎也应正常工作（不调 LLM）', async () => {
     const { logger } = createEventLoggerMock();
     const { capsuleStore, geneStore } = createStores();
     const engine = new EvolutionEngine(
@@ -131,29 +126,9 @@ describe('EvolutionEngine', () => {
 
     const result = await engine.evolve(errorLogs);
 
-    expect(result.changes).toHaveLength(1);
-    expect(result.event.metadata?.blast_radius?.risk_level).toBe('low');
+    expect(result.changes).toEqual([]);
+    expect(result.guidance).toBeTruthy();
     expect(result.event.outcome.status).toBe('success');
-    expect(result.capsule_created).toMatch(/^capsule_/);
-  });
-
-  test('LLM 抛错时应抛出 LLMProviderError 并记录失败事件', async () => {
-    mockGenerateEvolution.mockRejectedValue(new Error('mock llm failed'));
-
-    const { logger } = createEventLoggerMock();
-    const engine = new EvolutionEngine(
-      baseConfig({ llmProvider: 'local', llmModel: 'mock-model' }),
-      logger
-    );
-    engine.setGenePool([structuredClone(testGene)]);
-    engine.setCapsulePool([]);
-
-    await expect(engine.evolve(errorLogs)).rejects.toBeInstanceOf(LLMProviderError);
-
-    expect((logger.append as jest.Mock).mock.calls.length).toBe(1);
-    const errorEvent = (logger.append as jest.Mock).mock.calls[0][0] as EvolutionEvent;
-    expect(errorEvent.outcome.status).toBe('failed');
-    expect(errorEvent.validation.errors?.[0]).toContain('LLM generation failed: mock llm failed');
   });
 
   test('无匹配基因时应自动创建 auto-gene 并标记 auto_gene_created', async () => {
@@ -290,34 +265,25 @@ describe('EvolutionEngine', () => {
     expect(upsertSpy).toHaveBeenCalledTimes(2);
   });
 
-  test('审批拒绝不应记录失败事件或污染 bannedGeneIds', async () => {
-    const { logger, events } = createEventLoggerMock();
-    const engine = new EvolutionEngine(baseConfig({ review_mode: true }), logger);
-    const randomSpy = jest.spyOn(Math, 'random').mockReturnValue(0.99);
+  test('纯算法模式下 review_mode 不触发审批（无代码变更无需审批）', async () => {
+    const { logger } = createEventLoggerMock();
+    const { capsuleStore, geneStore } = createStores();
+    const engine = new EvolutionEngine(baseConfig({ review_mode: true }), logger, capsuleStore, geneStore);
 
     const primaryGene: Gene = {
       ...structuredClone(testGene),
       id: 'gene_primary',
       signals_match: ['log_error', 'error_type', 'error_undefined']
     };
-    const fallbackGene: Gene = {
-      ...structuredClone(testGene),
-      id: 'gene_fallback',
-      signals_match: ['log_error']
-    };
 
-    engine.setGenePool([primaryGene, fallbackGene]);
+    engine.setGenePool([primaryGene]);
     engine.setCapsulePool([]);
 
-    try {
-      await expect(engine.evolve(errorLogs)).rejects.toThrow('Approval required');
-      await expect(engine.evolve(errorLogs)).rejects.toThrow('Approval required');
-      await expect(engine.evolve(errorLogs)).rejects.toThrow('Approval required');
+    const result = await engine.evolve(errorLogs);
 
-      expect(events).toHaveLength(0);
-    } finally {
-      randomSpy.mockRestore();
-    }
+    expect(result.changes).toEqual([]);
+    expect(result.guidance).toBeTruthy();
+    expect(result.event.outcome.status).toBe('success');
   });
 
   test('distilled 基因应应用评分折扣，优先选择非 distilled 基因', async () => {

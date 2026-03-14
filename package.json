@@ -10,8 +10,11 @@
     "mcp:start": "node dist/mcp/server.js",
     "dev": "tsc --watch",
     "test": "jest",
+    "test:cloud-mapping": "python -m pytest -c cloud_mapping/pytest.ini cloud_mapping/tests -q",
     "test:coverage": "jest --coverage",
     "test:e2e": "playwright test",
+    "cloud-mapping:scan": "python -m cloud_mapping.scripts.scan_game_project",
+    "cloud-mapping:e2e": "python -m cloud_mapping.scripts.run_real_e2e",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:remote": "bash scripts/run-playwright-remote.sh",
     "test:api": "bash scripts/test-api.sh",
@@ -39,10 +42,7 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^3.0.58",
-    "@ai-sdk/openai": "^3.0.41",
     "@modelcontextprotocol/sdk": "^1.27.1",
-    "ai": "^6.0.116",
     "zod": "^4.3.6"
   }
 }

@@ -5,6 +5,8 @@ import {
   extractJsonFromResponse,
   resetDistillationState,
   shouldDistill,
+  synthesizeGeneFromPatterns,
+  synthesizeGeneAlgorithmic,
   type DistillationState
 } from './skill-distiller';
 import type { Capsule, Gene } from '../types/gene-capsule-schema';
@@ -83,5 +85,115 @@ describe('skill-distiller', () => {
   test('extracts JSON from markdown-wrapped LLM output', () => {
     const parsed = extractJsonFromResponse('```json\n{"id":"gene_distilled_ok"}\n```');
     expect(parsed.id).toBe('gene_distilled_ok');
+  });
+
+  describe('synthesizeGeneFromPatterns (algorithmic distillation)', () => {
+    test('should create a gene from coverage gaps', () => {
+      const capsules = [
+        createCapsule('c1', 'gene_a', ['uncovered_signal'], '2026-03-07T00:00:00.000Z'),
+        createCapsule('c2', 'gene_a', ['uncovered_signal'], '2026-03-07T00:01:00.000Z'),
+        createCapsule('c3', 'gene_a', ['uncovered_signal'], '2026-03-07T00:02:00.000Z'),
+        createCapsule('c4', 'gene_a', ['other_signal'], '2026-03-07T00:03:00.000Z'),
+        createCapsule('c5', 'gene_a', ['other_signal'], '2026-03-07T00:04:00.000Z')
+      ];
+
+      const data = collectDistillationData(capsules);
+      const analysis = analyzePatterns(data, existingGenes);
+
+      if (analysis.coverageGaps.length > 0) {
+        const gene = synthesizeGeneFromPatterns(analysis, data, existingGenes);
+        expect(gene).not.toBeNull();
+        expect(gene!.id).toMatch(/^gene_distilled_/);
+        expect(gene!.signals_match.length).toBeGreaterThan(0);
+        expect(gene!.constraints.forbidden_paths).toContain('.git');
+        expect(gene!._distilled_meta).toBeDefined();
+      }
+    });
+
+    test('should create a gene from strategy drift (split)', () => {
+      const capsules = [
+        createCapsule('c1', 'gene_a', ['error_timeout'], '2026-03-07T00:00:00.000Z'),
+        createCapsule('c2', 'gene_a', ['perf_critical'], '2026-03-07T00:01:00.000Z'),
+        createCapsule('c3', 'gene_a', ['perf_critical'], '2026-03-07T00:02:00.000Z'),
+        createCapsule('c4', 'gene_a', ['perf_critical'], '2026-03-07T00:03:00.000Z'),
+        createCapsule('c5', 'gene_a', ['perf_critical'], '2026-03-07T00:04:00.000Z')
+      ];
+
+      const data = collectDistillationData(capsules);
+      const analysis = analyzePatterns(data, existingGenes);
+
+      expect(analysis.strategyDrifts.length).toBeGreaterThan(0);
+
+      const gene = synthesizeGeneFromPatterns(analysis, data, existingGenes);
+      expect(gene).not.toBeNull();
+      expect(gene!.id).toMatch(/^gene_distilled_/);
+    });
+
+    test('should refine high-frequency gene', () => {
+      const capsules = Array.from({ length: 6 }, (_, index) =>
+        createCapsule(
+          `c${index}`,
+          'gene_hf',
+          ['error_timeout'],
+          new Date(Date.UTC(2026, 2, 7, 0, index, 0)).toISOString()
+        )
+      );
+      capsules.forEach(c => { c.summary = 'Fixed timeout error in database connection pool handler'; });
+
+      const genesWithHf: Gene[] = [{
+        type: 'Gene',
+        id: 'gene_hf',
+        category: 'repair',
+        signals_match: ['error_timeout'],
+        preconditions: [],
+        strategy: ['fix timeout'],
+        constraints: { forbidden_paths: ['.git', 'node_modules'] }
+      }];
+
+      const data = collectDistillationData(capsules);
+      const analysis = analyzePatterns(data, genesWithHf);
+
+      expect(analysis.highFrequencyGenes.length).toBeGreaterThan(0);
+
+      const gene = synthesizeGeneFromPatterns(analysis, data, genesWithHf);
+      if (gene) {
+        expect(gene.id).toMatch(/^gene_distilled_/);
+        expect(gene._distilled_meta).toBeDefined();
+      }
+    });
+
+    test('should return null when no patterns are actionable', () => {
+      const capsules = [
+        createCapsule('c1', 'gene_a', ['error'], '2026-03-07T00:00:00.000Z'),
+        createCapsule('c2', 'gene_a', ['error'], '2026-03-07T00:01:00.000Z'),
+      ];
+
+      const data = collectDistillationData(capsules);
+      const analysis = analyzePatterns(data, existingGenes);
+
+      if (analysis.coverageGaps.length === 0 &&
+          analysis.strategyDrifts.length === 0 &&
+          analysis.highFrequencyGenes.length === 0) {
+        const gene = synthesizeGeneFromPatterns(analysis, data, existingGenes);
+        expect(gene).toBeNull();
+      }
+    });
+  });
+
+  describe('synthesizeGeneAlgorithmic (one-stop entry)', () => {
+    test('should perform algorithmic distillation and update state', () => {
+      const now = Date.UTC(2026, 2, 7, 12, 0, 0);
+      const state: DistillationState = { lastDistillationTime: 0 };
+      const capsules = Array.from({ length: 10 }, (_, index) =>
+        createCapsule(`c${index}`, 'gene_a', ['uncovered_new_signal'], new Date(now - index * 1000).toISOString())
+      );
+
+      const result = synthesizeGeneAlgorithmic(capsules, existingGenes, state, now);
+
+      expect(state.lastDistillationTime).toBe(now);
+      if (result.gene) {
+        expect(result.gene.id).toMatch(/^gene_distilled_/);
+      }
+    });
   });
 });

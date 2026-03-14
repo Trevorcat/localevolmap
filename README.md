@@ -124,11 +124,11 @@ Dashboard 默认可通过 `http://localhost:3000` 访问。
 | `POST` | `/api/v1/genes` | 创建基因 |
 | `GET` | `/api/v1/capsules/search` | 搜索胶囊 |
 | `POST` | `/api/v1/capsules` | 创建胶囊（已知时建议显式传 `gene`） |
-| `POST` | `/api/v1/evolve` | 执行一次进化 |
+| `POST` | `/api/v1/evolve` | 执行一次进化（纯算法模式） |
 | `POST` | `/api/v1/feedback` | 提交 retrospective 反馈 |
 | `GET` | `/api/v1/events` | 查看事件流 |
-| `POST` | `/api/v1/distill/prepare` | 准备蒸馏 |
-| `POST` | `/api/v1/distill/complete` | 完成蒸馏 |
+| `POST` | `/api/v1/distill/prepare` | 准备蒸馏（手动模式） |
+| `POST` | `/api/v1/distill/complete` | 完成蒸馏（手动模式；自动蒸馏已由算法完成） |
 
 更完整的字段与示例请查看 `docs/API_REFERENCE.md`。
 

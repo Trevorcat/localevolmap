@@ -11,7 +11,7 @@
 | 进程管理 | nohup + PID 文件（**没有 PM2**） |
 | 正式服 | `/home/itops/localevolmap`，端口 `3000` |
 | 测试服 | `/home/itops/localevolmap-test`，端口 `3001` |
-| LLM | Codex 5.3（`gpt-5.3-codex`，`https://your-llm-endpoint.example.com/v1`） |
+| 进化模式 | **纯算法模式**（不依赖外部 LLM） |
 | 构建 | 本地 Windows `npm run build` → scp 到服务器 |
 
 ## 核心原则：测试服先行
@@ -85,7 +85,7 @@ scripts/
 关键文件：
 - `server.ts` — HTTP API 服务器
 - `public/index.html` — Dashboard 单页面应用（无前端构建步骤）
-- `core/` — 核心算法（LLM provider、evolution engine、signal extractor 等）
+- `core/` — 核心算法（evolution engine、signal extractor、skill distiller 等）
 - `index.ts` — 主入口，`DEFAULT_CONFIG` 定义默认数据路径
 - `types/gene-capsule-schema.ts` — TypeScript 类型定义
 
@@ -237,10 +237,10 @@ EVENTS_PATH=./data-test/events
 |------|------|--------|
 | `PORT` | 监听端口 | `3000` |
 | `HOST` | 监听地址 | `0.0.0.0` |
-| `EVOMAP_LLM_PROVIDER` | LLM 提供商 | 无（dry-run 模式） |
-| `EVOMAP_LLM_MODEL` | LLM 模型名 | 无 |
-| `LLM_API_KEY` | LLM API 密钥 | 无 |
-| `LOCAL_LLM_BASE_URL` | LLM API 地址 | 无 |
+| ~~`EVOMAP_LLM_PROVIDER`~~ | ~~LLM 提供商~~ | **已废弃** — 纯算法模式无需配置 |
+| ~~`EVOMAP_LLM_MODEL`~~ | ~~LLM 模型名~~ | **已废弃** |
+| ~~`LLM_API_KEY`~~ | ~~LLM API 密钥~~ | **已废弃** |
+| ~~`LOCAL_LLM_BASE_URL`~~ | ~~LLM API 地址~~ | **已废弃** |
 | `GENES_PATH` | 基因存储路径 | `./data/genes` |
 | `CAPSULES_PATH` | 胶囊存储路径 | `./data/capsules` |
 | `EVENTS_PATH` | 事件日志路径 | `./data/events` |
@@ -279,7 +279,7 @@ ssh deploy@your-server.example.com "cd /home/itops/localevolmap && tar czf data-
 | 端口被占用 | `ss -tlnp \| grep 3000`（或 3001） |
 | node 命令找不到 | `source ~/.nvm/nvm.sh` |
 | 数据路径错误 | 检查 `.env` 中 `GENES_PATH` 等变量 |
-| LLM 调用失败 | 检查 `.env` 中 LLM 配置，`tail server.log` 看错误 |
+| ~~LLM 调用失败~~ | **已废弃** — 纯算法模式不再依赖 LLM |
 | Dashboard 显示异常 | 确认 `dist/public/index.html` 已更新 |
 | 正式服数据丢失 | 检查 `.env` 中路径是否指向 `./data/`（不是 `./data-test/`） |
 
@@ -293,20 +293,16 @@ ssh deploy@your-server.example.com "tail -100 /home/itops/localevolmap/server.lo
 ssh deploy@your-server.example.com "tail -100 /home/itops/localevolmap-test/server.log"
 ```
 
-## LLM 配置
+## 进化模式说明
 
-当前使用 Codex 5.3 API（OpenAI-compatible 接口）：
+自 v2026.03.14 起，LocalEvomap 已切换为**纯算法模式**：
 
-```bash
-EVOMAP_LLM_PROVIDER=local
-EVOMAP_LLM_MODEL=gpt-5.3-codex
-LLM_API_KEY=YOUR_LLM_API_KEY
-LOCAL_LLM_BASE_URL=https://your-llm-endpoint.example.com/v1
-```
+- **进化引擎**不再调用外部 LLM，而是基于选中基因的策略和信号信息生成结构化 `guidance` 引导文本
+- **蒸馏过程**由算法自动完成（覆盖缺口分析、策略漂移分裂、高频基因提炼），无需 LLM 参与
+- LLM 相关环境变量（`EVOMAP_LLM_PROVIDER`、`EVOMAP_LLM_MODEL`、`LLM_API_KEY`、`LOCAL_LLM_BASE_URL`）仍可配置但**不再被核心引擎使用**
+- `core/llm-provider.ts` 已标记为 `@deprecated`，保留仅供可选的子项目或未来扩展使用
 
-**注意：** `core/llm-provider.ts` 中已实现：
-- `stream: true` — Codex 5.3 要求必须开启流式
-- `collectStreamResponse()` — SSE 流式响应收集
-- `extractJson()` — 从 LLM 输出中提取 JSON（Codex 会在 JSON 前输出 markdown 文本）
-
-如需更换 LLM，只需修改 `.env` 中的 4 个变量。
+这意味着：
+1. 部署时**无需配置任何 LLM 凭证**即可完整运行
+2. 多用户并发场景下不会产生 token 消耗
+3. 进化结果的 `guidance` 字段可供调用方的 Agent 自行消费并执行

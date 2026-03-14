@@ -1,6 +1,12 @@
 /**
+ * @deprecated 此模块已弃用。LocalEvomap 核心引擎已完成去 LLM 化改造，
+ * 不再内部调用 LLM。此文件保留仅用于：
+ * 1. 可选的 LLM 增强蒸馏路径（/api/v1/distill/complete）
+ * 2. Cloud Mapping 子项目（独立系统）
+ * 3. 向后兼容
+ *
  * LLM Provider Layer
- * 
+ *
  * 统一的 LLM 调用抽象层，支持多模型切换
  * - openai/anthropic: 使用 Vercel AI SDK generateObject（tool calling mode）
  * - local (SGLang/vLLM): 直接调用 OpenAI-compatible API + 手动 Zod 校验

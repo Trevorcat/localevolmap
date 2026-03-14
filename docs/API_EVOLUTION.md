@@ -66,7 +66,9 @@
 
 ### 4.1 职责
 
-接收原始日志，**串联完整 12 步进化循环**（信号提取 → 基因选择 → 胶囊匹配 → LLM 调用 → 验证 → 记录），返回 `EvolutionEvent`。
+接收原始日志，**串联完整进化循环**（信号提取 → 基因选择 → 胶囊匹配 → 纯算法策略引导 → 验证 → 记录），返回 `EvolutionEvent`。
+
+> **v2026.03.14 变更**：进化引擎已切换为纯算法模式，不再调用 LLM。引擎输出结构化 `guidance` 引导文本，`changes` 数组始终为空。
 
 ### 4.2 认证
 
@@ -158,7 +160,8 @@ HTTP 200 OK
 | 字段 | 类型 | 说明 |
 |---|---|---|
 | `event` | `EvolutionEvent` | 完整的进化事件记录（已持久化） |
-| `changes` | `EvolutionChange[]` | LLM 生成的具体文件变更列表 |
+| `guidance` | `string` | 基于选中基因策略和信号生成的结构化引导文本，供调用方 Agent 消费 |
+| `changes` | `EvolutionChange[]` | 纯算法模式下始终为空数组（保留字段以保持向后兼容） |
 | `capsule_created` | `string \| null` | 如果本次进化成功且无已有胶囊复用，返回新创建的胶囊 ID |
 
 ### 4.5 错误响应
@@ -187,17 +190,9 @@ HTTP 403 Forbidden
 }
 ```
 
-**LLM 调用失败：**
-```
-HTTP 502 Bad Gateway
-```
-```json
-{
-  "error": "llm_failed",
-  "message": "LLM generation failed: Connection refused",
-  "event_id": "event_error_1772791234"
-}
-```
+~~**LLM 调用失败（已废弃）：**~~
+
+> 纯算法模式下不再出现此错误。保留此节供旧版文档参考。
 
 **空日志：**
 ```
@@ -221,17 +216,9 @@ HTTP 400 Bad Request
 
 ### 4.7 超时策略
 
-Qwen 27B 调用可能耗时 30-60 秒。
+纯算法模式下，进化循环通常在毫秒级完成，无需特殊超时配置。
 
-**当前阶段**：同步等待。设置合理的 HTTP 超时（建议 120 秒）。
-
-**未来演进**（如果需要）：
-```
-POST /api/v1/evolve → 202 { "taskId": "evo_xxx" }
-GET  /api/v1/evolve/:taskId → { "status": "running" | "completed" | "failed", "event": ... }
-```
-
-当前阶段不需要异步，同步足够。
+> 历史说明：此前使用 LLM 时可能耗时 30-60 秒，需要较长的 HTTP 超时。纯算法模式下此问题已不存在。
 
 ---
 
@@ -383,7 +370,7 @@ Content-Type: application/json
 |---|---|---|
 | `evolve()` 不返回 `changes` | `evolution-engine.ts` L120 | 修改返回类型为 `{ event: EvolutionEvent, changes: EvolutionChange[] }` 或提供 `getLastChanges()` 方法 |
 | `evolve()` 不返回新创建的 capsule ID | `evolution-engine.ts` L438 | `createCapsuleFromSuccess` 返回 capsule ID，透传到 `evolve()` 返回值 |
-| 错误没有分类 | `evolution-engine.ts` L191 | 区分 `NoMatchingGeneError`、`ApprovalRequiredError`、`LLMFailedError` 等，便于 server 映射 HTTP 状态码 |
+| 错误没有分类 | `evolution-engine.ts` L191 | 区分 `NoMatchingGeneError`、`ApprovalRequiredError` 等，便于 server 映射 HTTP 状态码（`LLMFailedError` 已废弃） |
 | `dryRun` / `strategy` 无法按请求覆盖 | `evolution-engine.ts` | `evolve()` 接受可选的 per-request overrides 参数 |
 
 ---

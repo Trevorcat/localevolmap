@@ -268,7 +268,9 @@ Return the same payload exposed by `evomap://workspace/<workspace>/recent-succes
 
 ### `POST /api/v1/evolve`
 
-执行完整 12 步进化循环（需认证）。接收日志，串联信号提取 → 基因选择 → 胶囊匹配 → LLM 调用 → 验证 → 记录，返回完整结果。
+执行完整进化循环（需认证）。接收日志，串联信号提取 → 基因选择 → 胶囊匹配 → 纯算法策略引导 → 验证 → 记录，返回完整结果。
+
+> **注意**：自 v2026.03.14 起，进化引擎已切换为**纯算法模式**，不再调用 LLM。引擎会基于选中基因的策略和信号信息生成结构化的 `guidance` 引导文本，供调用方的 Agent 自行消费。
 
 **请求**:
 ```json
@@ -354,9 +356,8 @@ Return the same payload exposed by `evomap://workspace/<workspace>/recent-succes
     "validation": { "passed": true, "commands_run": 2 },
     "metadata": { "session_id": "local-dev", "iteration": 1 }
   },
-  "changes": [
-    { "file": "src/index.ts", "operation": "modify", "content": "...", "reasoning": "Added null check" }
-  ],
+  "guidance": "## Evolution Guidance\n\nSignals: log_error, error_type\nSelected Gene: gene_gep_repair_from_errors\n\nStrategy:\n1. 从日志中提取结构化信号\n2. ...",
+  "changes": [],
   "capsule_created": "capsule_1772791234"
 }
 ```
@@ -369,7 +370,8 @@ Return the same payload exposed by `evomap://workspace/<workspace>/recent-succes
 | 401 | `Authentication required` | 未提供认证 |
 | 403 | `approval_required` | 高风险操作需审批 |
 | 422 | `no_matching_gene` | 无匹配基因 |
-| 502 | `llm_failed` | LLM 调用失败 |
+
+> **注意**：`502 llm_failed` 错误码已废弃。纯算法模式下不会出现 LLM 相关错误。
 
 ---
 
@@ -550,6 +552,8 @@ Return the same payload exposed by `evomap://workspace/<workspace>/recent-succes
 
 基因自动合成 — 从累积的成功胶囊中蒸馏出新的基因模式。
 
+> **v2026.03.14 变更**：蒸馏流程已切换为**纯算法模式**。当 `finalize_task` 检测到蒸馏条件满足时，系统会自动执行算法蒸馏（覆盖缺口分析、策略漂移分裂、高频基因提炼），无需 LLM 参与。`prepare` + `complete` 两阶段接口仍然保留用于手动/高级场景，但自动蒸馏已不再依赖它们。
+
 ### `GET /api/v1/distill/status`
 
 检查蒸馏条件是否满足。
@@ -561,7 +565,7 @@ Return the same payload exposed by `evomap://workspace/<workspace>/recent-succes
 
 ### `POST /api/v1/distill/prepare` 🔐
 
-阶段 1: 收集数据、分析模式、生成 LLM 提示文件。
+阶段 1: 收集数据、分析模式、生成蒸馏分析报告。
 
 **Response (条件满足):**
 ```json
@@ -597,7 +601,9 @@ Read one automatic distillation job.
 
 ### `POST /api/v1/distill/complete` 🔐
 
-阶段 2: 验证 LLM 返回的基因并保存。
+阶段 2: 验证外部提供的基因定义并保存。
+
+> 在自动算法蒸馏模式下，此接口一般不需要手动调用。系统会在 `finalize_task` 时自动完成蒸馏。此接口保留用于手动导入外部生成的基因。
 
 **Request:**
 ```json

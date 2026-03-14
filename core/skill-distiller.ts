@@ -4,14 +4,14 @@
  * 对齐原版 EvoMap/evolver 的 skillDistiller.js
  * 从累积的成功胶囊中蒸馏出新的基因模式
  *
- * 两阶段流程：
- * 1. prepareDistillation() — 收集数据、分析模式、生成 LLM 提示
- * 2. completeDistillation() — 验证 LLM 返回的基因、保存
+ * 支持两种蒸馏路径：
+ * 1. 纯算法蒸馏（默认）：synthesizeGeneAlgorithmic()
+ * 2. 可选 LLM 增强：prepareDistillation() + completeDistillation()
  */
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import type { Gene, Capsule, Signal, DistillationRequest, DistillationResult } from '../types/gene-capsule-schema';
+import type { Gene, Capsule, Signal, Category, DistillationRequest, DistillationResult } from '../types/gene-capsule-schema';
 import { DISTILLED_PREFIX, computeSignalOverlap, matchPatternToSignals } from './gene-selector';
 
 // ============================================================================
@@ -238,10 +238,343 @@ export function analyzePatterns(
 }
 
 // ============================================================================
-// 提示构建
+// 纯算法蒸馏（默认路径）
 // ============================================================================
 
 /**
+ * 从信号推断基因类别（复用 auto-gene-builder 的逻辑）
+ */
+function inferCategoryFromSignals(signals: Signal[]): Category {
+  const signalStr = signals.join(' ').toLowerCase();
+
+  if (/error|exception|failed|crash|bug|fix|broken|错误|失败/.test(signalStr)) return 'repair';
+  if (/slow|performance|latency|timeout|memory|cpu|性能/.test(signalStr)) return 'performance';
+  if (/security|vulnerability|auth|permission|xss|injection|安全/.test(signalStr)) return 'security';
+  if (/test|coverage|spec|assert|测试/.test(signalStr)) return 'test';
+  if (/refactor|cleanup|debt|duplicate|重构/.test(signalStr)) return 'refactor';
+  if (/optimize|improve|enhance|优化/.test(signalStr)) return 'optimize';
+  if (/feature|add|new|create|implement|功能|新增/.test(signalStr)) return 'feature';
+  if (/analysis|retrospective|feedback|review|总结|复盘|反馈/.test(signalStr)) return 'analysis';
+  return 'repair';
+}
+
+/**
+ * 为类别生成默认策略
+ */
+function generateStrategyForCategory(category: Category): string[] {
+  const strategies: Record<Category, string[]> = {
+    repair: ['定位错误根因', '编写修复补丁', '验证错误不再复现'],
+    performance: ['识别性能瓶颈', '应用针对性优化', '验证性能改善指标'],
+    security: ['识别安全漏洞', '应用安全补丁', '验证漏洞已修复'],
+    test: ['分析测试覆盖缺口', '编写缺失的测试用例', '确保测试全部通过'],
+    refactor: ['识别需要重构的代码', '应用重构变更', '验证行为未改变'],
+    optimize: ['分析优化空间', '应用优化策略', '验证优化效果'],
+    analysis: ['归纳任务中的错误与修正', '提炼可复用的经验模式', '验证总结可指导后续任务'],
+    feature: ['理解新功能需求', '实现最小功能版本', '验证功能正确性']
+  };
+  return strategies[category];
+}
+
+/**
+ * 从覆盖缺口创建新基因
+ *
+ * 对未被任何现有基因覆盖的高频信号，创建新基因来覆盖
+ */
+function buildGeneFromCoverageGap(
+  coverageGaps: string[],
+  data: DistillationData
+): Gene | null {
+  if (coverageGaps.length === 0) return null;
+
+  const signals: Signal[] = coverageGaps.slice(0, 10);
+  const category = inferCategoryFromSignals(signals);
+  const strategy = generateStrategyForCategory(category);
+
+  const sourceCapsuleIds: string[] = [];
+  for (const [, geneData] of data.byGene) {
+    for (const capsule of geneData.capsules) {
+      const hasCoverageGapSignal = capsule.trigger.some(
+        t => coverageGaps.includes(t.toLowerCase())
+      );
+      if (hasCoverageGapSignal) {
+        sourceCapsuleIds.push(capsule.id);
+      }
+    }
+  }
+
+  const gene: Gene = {
+    type: 'Gene',
+    id: `${DISTILLED_PREFIX}coverage_${Date.now()}`,
+    category,
+    signals_match: signals,
+    preconditions: [`Distilled from ${coverageGaps.length} uncovered signals`],
+    strategy: [
+      '从未覆盖的信号模式中提取问题类型',
+      ...strategy
+    ],
+    constraints: {
+      max_files: DISTILLED_MAX_FILES,
+      max_lines: 200,
+      forbidden_paths: ['.git', 'node_modules']
+    },
+    metadata: {
+      author: 'skill-distiller',
+      created_at: new Date().toISOString(),
+      version: '1.0.0',
+      description: `Distilled gene covering ${coverageGaps.length} previously uncovered signal patterns`,
+      tags: ['distilled', 'coverage-gap', category]
+    },
+    _distilled_meta: {
+      source_capsule_ids: sourceCapsuleIds.slice(0, 20),
+      distilled_at: new Date().toISOString(),
+      pattern_summary: `Coverage gap: ${coverageGaps.slice(0, 5).join(', ')}`
+    }
+  };
+
+  return gene;
+}
+
+/**
+ * 分裂策略漂移的基因
+ *
+ * 当一个基因关联的胶囊的触发信号 Jaccard 相似度过低时，
+ * 说明这个基因覆盖的场景过于宽泛，应该分裂为两个更聚焦的基因。
+ * 使用简单二分聚类：按时间顺序把胶囊分成前半和后半两组。
+ */
+function splitDriftedGene(
+  drift: { geneId: string; jaccardSimilarity: number },
+  data: DistillationData,
+  existingGenes: Gene[]
+): Gene | null {
+  const geneData = data.byGene.get(drift.geneId);
+  if (!geneData || geneData.capsules.length < 2) return null;
+
+  const parentGene = existingGenes.find(g => g.id === drift.geneId);
+
+  const sortedCapsules = [...geneData.capsules].sort((a, b) => {
+    const timeA = a.metadata?.created_at ? new Date(a.metadata.created_at).getTime() : 0;
+    const timeB = b.metadata?.created_at ? new Date(b.metadata.created_at).getTime() : 0;
+    return timeA - timeB;
+  });
+
+  const mid = Math.ceil(sortedCapsules.length / 2);
+  const laterGroup = sortedCapsules.slice(mid);
+
+  const laterSignals = new Map<string, number>();
+  for (const capsule of laterGroup) {
+    for (const signal of capsule.trigger) {
+      const lower = signal.toLowerCase();
+      laterSignals.set(lower, (laterSignals.get(lower) || 0) + 1);
+    }
+  }
+
+  const topSignals = [...laterSignals.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([signal]) => signal);
+
+  if (topSignals.length === 0) return null;
+
+  const maxOverlap = existingGenes.reduce((max, gene) => {
+    return Math.max(max, computeSignalOverlap(topSignals, gene.signals_match));
+  }, 0);
+  if (maxOverlap > 0.5) return null;
+
+  const category = parentGene?.category || inferCategoryFromSignals(topSignals);
+  const strategy = parentGene?.strategy || generateStrategyForCategory(category);
+
+  const laterSummaries = laterGroup.map(c => c.summary).filter(Boolean);
+  const strategyHint = laterSummaries.length > 0
+    ? `基于最近 ${laterGroup.length} 个胶囊的模式提炼`
+    : '';
+
+  const gene: Gene = {
+    type: 'Gene',
+    id: `${DISTILLED_PREFIX}split_${Date.now()}`,
+    category,
+    signals_match: topSignals,
+    preconditions: [`Split from drifted gene ${drift.geneId} (Jaccard=${drift.jaccardSimilarity.toFixed(2)})`],
+    strategy: strategyHint
+      ? [strategyHint, ...strategy]
+      : strategy,
+    constraints: {
+      max_files: DISTILLED_MAX_FILES,
+      max_lines: 200,
+      forbidden_paths: ['.git', 'node_modules']
+    },
+    metadata: {
+      author: 'skill-distiller',
+      created_at: new Date().toISOString(),
+      version: '1.0.0',
+      description: `Split from ${drift.geneId} due to strategy drift`,
+      tags: ['distilled', 'split', category]
+    },
+    _distilled_meta: {
+      source_capsule_ids: laterGroup.map(c => c.id),
+      distilled_at: new Date().toISOString(),
+      pattern_summary: `Split from ${drift.geneId}: later capsules diverged (Jaccard=${drift.jaccardSimilarity.toFixed(2)})`
+    }
+  };
+
+  return gene;
+}
+
+/**
+ * 高频基因策略提炼
+ *
+ * 对高频使用的基因，从其关联的成功胶囊 summary 中提取共性关键词，
+ * 丰富基因的 signals_match 和 strategy，产出新的变体基因
+ */
+function refineHighFrequencyGene(
+  hfGene: { geneId: string; count: number; avgScore: number },
+  data: DistillationData
+): Gene | null {
+  const geneData = data.byGene.get(hfGene.geneId);
+  if (!geneData || geneData.capsules.length < HIGH_FREQUENCY_THRESHOLD) return null;
+
+  const wordFreq = new Map<string, number>();
+  for (const capsule of geneData.capsules) {
+    if (!capsule.summary) continue;
+    const words = capsule.summary
+      .toLowerCase()
+      .split(/[\s,;.:!?/\\|()[\]{}<>]+/)
+      .filter(w => w.length >= 3 && !/^(the|and|for|with|from|this|that|was|are|has|had|not|but|can|will|into)$/.test(w));
+
+    const seen = new Set<string>();
+    for (const word of words) {
+      if (!seen.has(word)) {
+        seen.add(word);
+        wordFreq.set(word, (wordFreq.get(word) || 0) + 1);
+      }
+    }
+  }
+
+  const minAppearances = Math.max(2, Math.floor(geneData.capsules.length * 0.4));
+  const commonWords = [...wordFreq.entries()]
+    .filter(([, count]) => count >= minAppearances)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8)
+    .map(([word]) => word);
+
+  if (commonWords.length < 2) return null;
+
+  const allTriggers = new Map<string, number>();
+  for (const capsule of geneData.capsules) {
+    for (const signal of capsule.trigger) {
+      const lower = signal.toLowerCase();
+      allTriggers.set(lower, (allTriggers.get(lower) || 0) + 1);
+    }
+  }
+
+  const enrichedSignals = [...allTriggers.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([signal]) => signal);
+
+  const category = inferCategoryFromSignals(enrichedSignals);
+  const baseStrategy = generateStrategyForCategory(category);
+  const refinedStrategy = [
+    `基于 ${hfGene.count} 个成功胶囊提炼的高频模式`,
+    `关键特征: ${commonWords.slice(0, 5).join(', ')}`,
+    ...baseStrategy
+  ];
+
+  const gene: Gene = {
+    type: 'Gene',
+    id: `${DISTILLED_PREFIX}refined_${Date.now()}`,
+    category,
+    signals_match: enrichedSignals,
+    preconditions: [`Refined from high-frequency gene ${hfGene.geneId} (${hfGene.count} capsules)`],
+    strategy: refinedStrategy,
+    constraints: {
+      max_files: DISTILLED_MAX_FILES,
+      max_lines: 200,
+      forbidden_paths: ['.git', 'node_modules']
+    },
+    metadata: {
+      author: 'skill-distiller',
+      created_at: new Date().toISOString(),
+      version: '1.0.0',
+      description: `Refined variant of ${hfGene.geneId} with enriched signals and strategy`,
+      tags: ['distilled', 'refined', category, ...commonWords.slice(0, 3)]
+    },
+    _distilled_meta: {
+      source_capsule_ids: geneData.capsules.map(c => c.id),
+      distilled_at: new Date().toISOString(),
+      pattern_summary: `High-frequency refinement of ${hfGene.geneId}: ${commonWords.slice(0, 5).join(', ')}`
+    }
+  };
+
+  return gene;
+}
+
+/**
+ * 纯算法蒸馏：从模式分析中合成新基因
+ *
+ * 优先级：覆盖缺口 > 策略漂移分裂 > 高频基因提炼
+ */
+export function synthesizeGeneFromPatterns(
+  analysis: PatternAnalysis,
+  data: DistillationData,
+  existingGenes: Gene[]
+): Gene | null {
+  if (analysis.coverageGaps.length > 0) {
+    const gene = buildGeneFromCoverageGap(analysis.coverageGaps, data);
+    if (gene) {
+      const validationResult = validateSynthesizedGene(gene, existingGenes);
+      if (validationResult.success && validationResult.gene) return validationResult.gene;
+    }
+  }
+
+  if (analysis.strategyDrifts.length > 0) {
+    const gene = splitDriftedGene(analysis.strategyDrifts[0], data, existingGenes);
+    if (gene) {
+      const validationResult = validateSynthesizedGene(gene, existingGenes);
+      if (validationResult.success && validationResult.gene) return validationResult.gene;
+    }
+  }
+
+  if (analysis.highFrequencyGenes.length > 0) {
+    const gene = refineHighFrequencyGene(analysis.highFrequencyGenes[0], data);
+    if (gene) {
+      const validationResult = validateSynthesizedGene(gene, existingGenes);
+      if (validationResult.success && validationResult.gene) return validationResult.gene;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * 一站式算法蒸馏入口
+ *
+ * 由 EvolutionEngine.tryDistillation() 调用，
+ * 替代原来的 prepareDistillation() + LLM call + completeDistillation() 流程
+ */
+export function synthesizeGeneAlgorithmic(
+  capsules: Capsule[],
+  genes: Gene[],
+  state: DistillationState = globalDistillationState,
+  now: number = Date.now()
+): { gene: Gene | null } {
+  const data = collectDistillationData(capsules);
+  const analysis = analyzePatterns(data, genes);
+
+  state.lastDistillationTime = now;
+
+  const gene = synthesizeGeneFromPatterns(analysis, data, genes);
+  return { gene };
+}
+
+// ============================================================================
+// 提示构建（可选 LLM 增强路径）
+// ============================================================================
+
+/**
+ * @deprecated 默认蒸馏已改为纯算法路径 synthesizeGeneAlgorithmic()。
+ * 此函数保留用于可选的 LLM 增强蒸馏：用户可通过 /api/v1/distill/prepare
+ * 获取此 prompt，自行调用外部 LLM 后通过 /api/v1/distill/complete 提交结果。
+ *
  * 构建蒸馏提示
  *
  * 生成发送给 LLM 的提示文本，包含:
