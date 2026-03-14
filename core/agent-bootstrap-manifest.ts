@@ -369,11 +369,22 @@ export async function buildAgentBootstrapChecklist(options: BuildAgentBootstrapC
   const manifest = await loadAgentManifest(projectRoot);
   const baseUrl = normalizeBaseUrl(options.baseUrl);
   const selectedClients = options.client ? [options.client] : ALL_CLIENTS;
+  const absoluteRoot = path.resolve(projectRoot);
 
-  return {
+  const resolveTokens = (obj: unknown): unknown => {
+    if (typeof obj === 'string') return obj.replace(/\{repo_root\}/g, absoluteRoot);
+    if (Array.isArray(obj)) return obj.map(resolveTokens);
+    if (obj && typeof obj === 'object') {
+      return Object.fromEntries(Object.entries(obj).map(([k, v]) => [k, resolveTokens(v)]));
+    }
+    return obj;
+  };
+
+  const checklist: AgentBootstrapChecklist = {
     schema_version: '2026-03-13.1',
     project: {
       name: 'LocalEvomap',
+      repo_root: absoluteRoot,
       preferred_runtime: 'local-mcp',
       skill_entry: 'skill/SKILL.md',
       local_runtime_entry: MCP_ENTRYPOINT,
@@ -401,4 +412,6 @@ export async function buildAgentBootstrapChecklist(options: BuildAgentBootstrapC
       required_tools: ['start_task', 'search_knowledge', 'record_usage', 'get_task_context', 'finalize_task', 'get_runtime_status'],
     },
   };
+
+  return resolveTokens(checklist) as AgentBootstrapChecklist;
 }

@@ -774,8 +774,52 @@ async function handleAgentManifest(
     res: http.ServerResponse
 ): Promise<void> {
     const manifest = await loadAgentManifest(PROJECT_ROOT);
+    const baseUrl = resolveRequestBaseUrl(req);
+    const repoRoot = path.resolve(PROJECT_ROOT);
+    const mcpEntry = path.join(repoRoot, 'dist', 'mcp', 'server.js');
+    const apiKey = HUB_API_KEY;
+
+    const buildMcpConfig = (client: string) => ({
+        type: 'stdio' as const,
+        command: 'node',
+        args: [mcpEntry],
+        env: {
+            LOCAL_EVOMAP_CLIENT: client,
+            LOCAL_EVOMAP_SERVER_URL: baseUrl,
+            LOCAL_EVOMAP_API_KEY: apiKey,
+        },
+    });
+
+    const install: Record<string, unknown> = {
+        repo_root: repoRoot,
+        server_url: baseUrl,
+        skill_download_base: `${baseUrl}/skill`,
+        clients: {
+            cursor: {
+                skill_url: `${baseUrl}/skill/cursor`,
+                skill_target: '~/.cursor/rules/localevomap.mdc',
+                mcp_config_path: '.cursor/mcp.json',
+                mcp_config: { mcpServers: { 'local-evomap': buildMcpConfig('cursor') } },
+            },
+            'claude-code': {
+                skill_url: `${baseUrl}/skill/claude-code`,
+                skill_target: '~/.claude/CLAUDE.md',
+                mcp_config_path: '.mcp.json',
+                mcp_config: { mcpServers: { 'local-evomap': buildMcpConfig('claude-code') } },
+                cli: `claude mcp add-json local-evomap '${JSON.stringify(buildMcpConfig('claude-code'))}'`,
+            },
+            codex: {
+                skill_url: `${baseUrl}/skill/codex`,
+                skill_target: '~/.codex/AGENTS.md',
+                mcp_config_path: '~/.codex/config.toml',
+                mcp_config: { mcpServers: { 'local-evomap': buildMcpConfig('codex') } },
+                cli: `codex mcp add local-evomap -- node ${mcpEntry}`,
+            },
+        },
+    };
+
     res.writeHead(200);
-    res.end(JSON.stringify(manifest));
+    res.end(JSON.stringify({ ...manifest, install }));
 }
 
 async function handleAgentCheck(

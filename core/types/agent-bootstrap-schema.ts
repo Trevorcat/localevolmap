@@ -164,6 +164,7 @@ export interface AgentBootstrapClientChecklist {
 
 export interface AgentBootstrapProjectInfo {
   name: string;
+  repo_root: string;
   preferred_runtime: 'local-mcp';
   skill_entry: string;
   local_runtime_entry: string;
