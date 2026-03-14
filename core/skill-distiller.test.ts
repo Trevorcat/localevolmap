@@ -82,7 +82,7 @@ describe('skill-distiller', () => {
     expect(result.error).toContain('strategy must be a non-empty array');
   });
 
-  test('extracts JSON from markdown-wrapped LLM output', () => {
+  test('extracts JSON from markdown-wrapped output', () => {
     const parsed = extractJsonFromResponse('```json\n{"id":"gene_distilled_ok"}\n```');
     expect(parsed.id).toBe('gene_distilled_ok');
   });

@@ -154,7 +154,7 @@ async function getEvomap(): Promise<LocalEvomap> {
         evomap = new LocalEvomap(config);
         await evomap.init();
         
-        console.log('[Server] LocalEvomap initialized (pure algorithmic mode, no LLM)');
+        console.log('[Server] LocalEvomap initialized (algorithmic mode)');
     }
     return evomap;
 }
@@ -2016,7 +2016,7 @@ async function handleDistillComplete(
     
     if (!parsed.responseText || typeof parsed.responseText !== 'string') {
         res.writeHead(400);
-        res.end(JSON.stringify({ error: 'Missing "responseText" field (LLM response)' }));
+        res.end(JSON.stringify({ error: 'Missing "responseText" field' }));
         return;
     }
     

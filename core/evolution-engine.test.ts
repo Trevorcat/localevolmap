@@ -112,11 +112,11 @@ describe('EvolutionEngine', () => {
     expect(result.guidance).toContain('Detected Signals');
   });
 
-  test('即使设置了 deprecated LLM 配置字段，引擎也应正常工作（不调 LLM）', async () => {
+  test('引擎应以纯算法模式正常工作', async () => {
     const { logger } = createEventLoggerMock();
     const { capsuleStore, geneStore } = createStores();
     const engine = new EvolutionEngine(
-      baseConfig({ llmProvider: 'local', llmModel: 'mock-model' }),
+      baseConfig(),
       logger,
       capsuleStore,
       geneStore

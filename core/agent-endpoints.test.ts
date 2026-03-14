@@ -59,10 +59,6 @@ describe('agent bootstrap endpoints', () => {
     EVENTS_PATH: process.env.EVENTS_PATH,
     TASKS_PATH: process.env.TASKS_PATH,
     DISTILL_JOBS_PATH: process.env.DISTILL_JOBS_PATH,
-    EVOMAP_LLM_PROVIDER: process.env.EVOMAP_LLM_PROVIDER,
-    EVOMAP_LLM_MODEL: process.env.EVOMAP_LLM_MODEL,
-    LLM_API_KEY: process.env.LLM_API_KEY,
-    LOCAL_LLM_BASE_URL: process.env.LOCAL_LLM_BASE_URL,
   };
 
   async function seedDistillReadyKnowledge(seedId: string): Promise<void> {
@@ -114,11 +110,6 @@ describe('agent bootstrap endpoints', () => {
     process.env.EVENTS_PATH = path.join(root, 'events');
     process.env.TASKS_PATH = path.join(root, 'tasks');
     process.env.DISTILL_JOBS_PATH = path.join(root, 'distill-jobs');
-    delete process.env.EVOMAP_LLM_PROVIDER;
-    delete process.env.EVOMAP_LLM_MODEL;
-    delete process.env.LLM_API_KEY;
-    delete process.env.LOCAL_LLM_BASE_URL;
-
     server = createHttpServer();
     await new Promise<void>(resolve => server.listen(0, '127.0.0.1', () => resolve()));
     port = (server.address() as AddressInfo).port;
@@ -126,18 +117,6 @@ describe('agent bootstrap endpoints', () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
-
-    if (originalEnv.EVOMAP_LLM_PROVIDER === undefined) delete process.env.EVOMAP_LLM_PROVIDER;
-    else process.env.EVOMAP_LLM_PROVIDER = originalEnv.EVOMAP_LLM_PROVIDER;
-
-    if (originalEnv.EVOMAP_LLM_MODEL === undefined) delete process.env.EVOMAP_LLM_MODEL;
-    else process.env.EVOMAP_LLM_MODEL = originalEnv.EVOMAP_LLM_MODEL;
-
-    if (originalEnv.LLM_API_KEY === undefined) delete process.env.LLM_API_KEY;
-    else process.env.LLM_API_KEY = originalEnv.LLM_API_KEY;
-
-    if (originalEnv.LOCAL_LLM_BASE_URL === undefined) delete process.env.LOCAL_LLM_BASE_URL;
-    else process.env.LOCAL_LLM_BASE_URL = originalEnv.LOCAL_LLM_BASE_URL;
   });
 
   afterAll(async () => {
@@ -148,14 +127,6 @@ describe('agent bootstrap endpoints', () => {
     process.env.EVENTS_PATH = originalEnv.EVENTS_PATH;
     process.env.TASKS_PATH = originalEnv.TASKS_PATH;
     process.env.DISTILL_JOBS_PATH = originalEnv.DISTILL_JOBS_PATH;
-    if (originalEnv.EVOMAP_LLM_PROVIDER === undefined) delete process.env.EVOMAP_LLM_PROVIDER;
-    else process.env.EVOMAP_LLM_PROVIDER = originalEnv.EVOMAP_LLM_PROVIDER;
-    if (originalEnv.EVOMAP_LLM_MODEL === undefined) delete process.env.EVOMAP_LLM_MODEL;
-    else process.env.EVOMAP_LLM_MODEL = originalEnv.EVOMAP_LLM_MODEL;
-    if (originalEnv.LLM_API_KEY === undefined) delete process.env.LLM_API_KEY;
-    else process.env.LLM_API_KEY = originalEnv.LLM_API_KEY;
-    if (originalEnv.LOCAL_LLM_BASE_URL === undefined) delete process.env.LOCAL_LLM_BASE_URL;
-    else process.env.LOCAL_LLM_BASE_URL = originalEnv.LOCAL_LLM_BASE_URL;
   });
 
   test('serves the checked-in agent manifest', async () => {
@@ -258,7 +229,7 @@ describe('agent bootstrap endpoints', () => {
     }, authHeaders);
 
     const finalized = await requestJson(port, 'POST', `/api/v1/tasks/${started.payload.taskId}/finalize`, {
-      summary: 'Finalize should trigger algorithmic distillation without LLM.',
+      summary: 'Finalize should trigger algorithmic distillation.',
       outcome: { status: 'success', score: 0.93 },
       retrospective: {
         signals: ['remote-evolution', 'distill'],

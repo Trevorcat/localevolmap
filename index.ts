@@ -66,14 +66,6 @@ export const DEFAULT_CONFIG: EvolutionConfig & { externalSources?: CapsuleHubCon
 
 export type LocalEvomapConfig = EvolutionConfig & { 
   externalSources?: CapsuleHubConfig[];
-  /** @deprecated LLM 已移除，此字段无效 */
-  llmProvider?: 'openai' | 'anthropic' | 'local';
-  /** @deprecated LLM 已移除，此字段无效 */
-  llmModel?: string;
-  /** @deprecated LLM 已移除，此字段无效 */
-  llmApiKey?: string;
-  /** @deprecated LLM 已移除，此字段无效 */
-  llmBaseURL?: string;
 };
 
 export class LocalEvomap {
@@ -550,7 +542,7 @@ export class LocalEvomap {
 
   /**
    * 准备蒸馏 (阶段1)
-   * 收集数据、分析模式、生成 LLM 提示文件
+   * 收集数据、分析模式、生成提示文件（供外部增强蒸馏路径使用）
    */
   async prepareDistillation(): Promise<DistillationRequest | null> {
     if (!this.initialized) {
@@ -566,7 +558,7 @@ export class LocalEvomap {
   
   /**
    * 完成蒸馏 (阶段2)
-   * 验证 LLM 响应并保存新基因
+   * 验证外部响应并保存新基因
    */
   async completeDistillation(
     responseText: string,
@@ -729,8 +721,7 @@ export class LocalEvomap {
    * 获取配置
    */
   getConfig(): EvolutionConfig {
-    const { llmApiKey, ...safeConfig } = this.config;
-    return { ...safeConfig };
+    return { ...this.config };
   }
   
   /**

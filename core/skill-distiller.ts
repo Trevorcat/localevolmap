@@ -6,7 +6,7 @@
  *
  * 支持两种蒸馏路径：
  * 1. 纯算法蒸馏（默认）：synthesizeGeneAlgorithmic()
- * 2. 可选 LLM 增强：prepareDistillation() + completeDistillation()
+ * 2. 外部增强蒸馏：prepareDistillation() + completeDistillation()
  */
 
 import * as fs from 'fs/promises';
@@ -549,7 +549,7 @@ export function synthesizeGeneFromPatterns(
  * 一站式算法蒸馏入口
  *
  * 由 EvolutionEngine.tryDistillation() 调用，
- * 替代原来的 prepareDistillation() + LLM call + completeDistillation() 流程
+ * 替代原来的 prepareDistillation() + completeDistillation() 流程
  */
 export function synthesizeGeneAlgorithmic(
   capsules: Capsule[],
@@ -567,17 +567,17 @@ export function synthesizeGeneAlgorithmic(
 }
 
 // ============================================================================
-// 提示构建（可选 LLM 增强路径）
+// 提示构建（可选外部增强蒸馏路径）
 // ============================================================================
 
 /**
- * @deprecated 默认蒸馏已改为纯算法路径 synthesizeGeneAlgorithmic()。
- * 此函数保留用于可选的 LLM 增强蒸馏：用户可通过 /api/v1/distill/prepare
- * 获取此 prompt，自行调用外部 LLM 后通过 /api/v1/distill/complete 提交结果。
+ * 默认蒸馏已改为纯算法路径 synthesizeGeneAlgorithmic()。
+ * 此函数保留用于可选的外部增强蒸馏：用户可通过 /api/v1/distill/prepare
+ * 获取此 prompt，自行调用外部服务后通过 /api/v1/distill/complete 提交结果。
  *
  * 构建蒸馏提示
  *
- * 生成发送给 LLM 的提示文本，包含:
+ * 生成蒸馏提示文本，包含:
  * - 模式分析结果
  * - 样本胶囊
  * - 现有基因列表
@@ -678,7 +678,7 @@ export function buildDistillationPrompt(
 // ============================================================================
 
 /**
- * 验证 LLM 合成的基因
+ * 验证外部合成的基因
  *
  * 检查:
  * 1. ID 以 gene_distilled_ 开头
@@ -853,9 +853,9 @@ export async function prepareDistillation(
 /**
  * 阶段 2: 完成蒸馏
  *
- * 接收 LLM 的响应文本，验证并返回结果
+ * 接收外部响应文本，验证并返回结果
  *
- * @param responseText LLM 返回的 JSON 文本
+ * @param responseText 外部返回的 JSON 文本
  * @param existingGenes 现有基因列表 (用于重叠检查)
  * @param sourceCapsuleIds 源胶囊 ID 列表 (用于追踪)
  * @returns 蒸馏结果
@@ -865,14 +865,14 @@ export function completeDistillation(
   existingGenes: Gene[],
   sourceCapsuleIds: string[] = []
 ): DistillationResult {
-  // 从 LLM 响应中提取 JSON
+  // 从响应中提取 JSON
   let parsed: any;
   try {
     parsed = extractJsonFromResponse(responseText);
   } catch (error) {
     return {
       success: false,
-      error: `Failed to parse LLM response: ${(error as Error).message}`
+      error: `Failed to parse response: ${(error as Error).message}`
     };
   }
 
@@ -892,7 +892,7 @@ export function completeDistillation(
 // ============================================================================
 
 /**
- * 从 LLM 响应中提取 JSON 对象
+ * 从响应文本中提取 JSON 对象
  *
  * 处理:
  * 1. 纯 JSON

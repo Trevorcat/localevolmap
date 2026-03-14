@@ -1,8 +1,8 @@
 /**
  * Evolution Engine - 进化引擎
  *
- * 纯算法协议引擎，不调用 LLM。
- * 输出结构化策略引导（GEP prompt），由宿主 Agent 自带的 LLM 执行变更。
+ * 纯算法协议引擎，输出结构化策略引导（GEP prompt），
+ * 由宿主 Agent 自行执行变更。
  */
 
 import { execSync } from 'child_process';
@@ -33,15 +33,6 @@ import type { CapsuleStore } from '../storage/capsule-store';
 import type { GeneStore } from '../storage/gene-store';
 
 export interface EvolutionEngineConfig extends EvolutionConfig {
-  /** @deprecated LLM 已移除，此字段无效 */
-  llmProvider?: 'openai' | 'anthropic' | 'local';
-  /** @deprecated LLM 已移除，此字段无效 */
-  llmModel?: string;
-  /** @deprecated LLM 已移除，此字段无效 */
-  llmApiKey?: string;
-  /** @deprecated LLM 已移除，此字段无效 */
-  llmBaseURL?: string;
-
   /** @planned — 回滚能力，预留接口，当前版本未实现 */
   rollbackEnabled?: boolean;
   /** @planned — 回滚策略，依赖 rollbackEnabled，当前未实现 */
@@ -87,16 +78,6 @@ interface ValidationCheckResult {
   errors: string[];
   warnings: string[];
   commandsRun: number;
-}
-
-/**
- * @deprecated LLM 已从引擎中移除。保留此类以兼容 server.ts 中的错误处理分支。
- */
-export class LLMProviderError extends Error {
-  constructor(message: string, public readonly cause?: unknown) {
-    super(message);
-    this.name = 'LLMProviderError';
-  }
 }
 
 export interface ApprovalContext {
