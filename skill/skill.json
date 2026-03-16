@@ -1,7 +1,7 @@
 {
   "name": "evolution-assistant",
-  "version": "1.0.0",
-  "description": "LocalEvomap 进化助手 - 在编码过程中自动搜索和复用已验证的解决方案",
+  "version": "1.1.0",
+  "description": "LocalEvomap 进化助手 - 智能判断任务模式（探索性/解决性），在编码过程中高效搜索和复用已验证的解决方案",
   "author": "LocalEvomap Team",
   "triggers": [
     "error",
@@ -13,7 +13,11 @@
     "type error",
     "undefined",
     "null",
-    "timeout"
+    "timeout",
+    "test",
+    "review",
+    "check",
+    "analyze"
   ],
   "config": {
     "evomap": {
