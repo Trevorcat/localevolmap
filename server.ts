@@ -23,6 +23,26 @@ import { createProjectPluginManager } from './core/plugins/plugin-manager';
 import { MappingProxy, type MappingProxyLike } from './core/plugins/mapping-proxy';
 import { handleUnifiedMappingRoute } from './core/plugins/http-mapping';
 
+// Client configuration mappings for install plan endpoint
+const CLIENT_CONFIGS: Record<string, { skill: { global: string; project: string }; mcp: { global: string; project: string } | null }> = {
+    claude: {
+        skill: { global: '~/.claude/commands/evomap.md', project: '.claude/commands/evomap.md' },
+        mcp: { global: '~/.claude/mcp.json', project: '.claude/mcp.json' }
+    },
+    codex: {
+        skill: { global: '~/.codex/AGENTS.md', project: 'AGENTS.md' },
+        mcp: null // Codex doesn't support MCP
+    },
+    opencode: {
+        skill: { global: '~/.config/opencode/commands/evomap.md', project: '.opencode/commands/evomap.md' },
+        mcp: null
+    },
+    cursor: {
+        skill: { global: '~/.cursor/rules/localevomap.mdc', project: '.cursor/rules/localevomap.mdc' },
+        mcp: { global: '~/.cursor/mcp.json', project: '.cursor/mcp.json' }
+    }
+};
+
 // 加载 .env 文件（无依赖实现，避免引入 dotenv）
 function loadEnvFile(envPath: string): void {
   try {
@@ -473,6 +493,16 @@ async function handleHubApi(
         return;
     }
 
+    if (req.method === 'POST' && pathname === '/api/v1/install/plan') {
+        await handleInstallPlan(req, res);
+        return;
+    }
+
+    if (req.method === 'GET' && pathname === '/api/v1/install/detect') {
+        await handleInstallDetect(req, res);
+        return;
+    }
+
     if (pathname.startsWith('/api/v1/mapping')) {
         const resolvedMappingProxy = mappingProxy ?? await getDefaultMappingProxy();
         const handled = await handleUnifiedMappingRoute(req, res, url, resolvedMappingProxy);
@@ -847,6 +877,227 @@ async function handleAgentCheck(
     const result = evaluateAgentCompatibility(manifest, parsed);
     res.writeHead(200);
     res.end(JSON.stringify(result));
+}
+
+/**
+ * Handle install plan request
+ * Generates installation plan for AI agent clients
+ */
+async function handleInstallPlan(
+    req: http.IncomingMessage,
+    res: http.ServerResponse
+): Promise<void> {
+    // API key is optional but recommended
+    const apiKey = req.headers.authorization;
+    const hasValidKey = apiKey ? checkApiKey(req) : false;
+
+    const body = await readRequestBody(req);
+    let parsed: {
+        client?: string;
+        scope?: 'global' | 'project';
+        features?: string[];
+        serverUrl?: string;
+    };
+    try {
+        parsed = JSON.parse(body || '{}');
+    } catch (error) {
+        res.writeHead(400);
+        res.end(JSON.stringify({ error: 'Invalid JSON body', detail: (error as Error).message }));
+        return;
+    }
+
+    // Validate and detect client
+    let detectedClient: string;
+    const requestedClient = parsed.client || 'auto';
+
+    if (requestedClient === 'auto') {
+        // Try to detect from User-Agent or default to claude
+        const userAgent = req.headers['user-agent'] || '';
+        if (userAgent.toLowerCase().includes('claude')) {
+            detectedClient = 'claude';
+        } else if (userAgent.toLowerCase().includes('cursor')) {
+            detectedClient = 'cursor';
+        } else if (userAgent.toLowerCase().includes('codex')) {
+            detectedClient = 'codex';
+        } else if (userAgent.toLowerCase().includes('opencode')) {
+            detectedClient = 'opencode';
+        } else {
+            detectedClient = 'claude'; // Default fallback
+        }
+    } else if (CLIENT_CONFIGS[requestedClient]) {
+        detectedClient = requestedClient;
+    } else {
+        res.writeHead(400);
+        res.end(JSON.stringify({
+            error: 'Unsupported client',
+            supportedClients: Object.keys(CLIENT_CONFIGS)
+        }));
+        return;
+    }
+
+    // Validate scope
+    const scope = parsed.scope === 'project' ? 'project' : 'global';
+
+    // Determine features to include
+    const requestedFeatures = parsed.features || ['skill', 'mcp'];
+    const clientConfig = CLIENT_CONFIGS[detectedClient];
+
+    // Build server URL
+    const serverUrl = parsed.serverUrl || resolveRequestBaseUrl(req);
+
+    // Detect OS (simplified - in production could use user-agent or other headers)
+    const userAgent = req.headers['user-agent'] || '';
+    let detectedOS = 'linux';
+    if (userAgent.toLowerCase().includes('win')) {
+        detectedOS = 'windows';
+    } else if (userAgent.toLowerCase().includes('mac') || userAgent.toLowerCase().includes('darwin')) {
+        detectedOS = 'macos';
+    }
+
+    // Build the plan
+    const plan: {
+        skill?: {
+            action: string;
+            url: string;
+            targetPath: string;
+            description: string;
+        };
+        mcp?: {
+            action: string;
+            config: {
+                mcpServers: {
+                    localevomap: {
+                        command: string;
+                        args: string[];
+                        env: {
+                            LOCAL_EVOMAP_SERVER_URL: string;
+                            LOCAL_EVOMAP_API_KEY: string;
+                            LOCAL_EVOMAP_CLIENT: string;
+                        };
+                    };
+                };
+            };
+            targetPath: string;
+        };
+        verification: {
+            steps: Array<{ description: string; command?: string; endpoint?: string }>;
+        };
+    } = {
+        verification: {
+            steps: [
+                { description: 'Check server connection', endpoint: '/api/v1/genes' }
+            ]
+        }
+    };
+
+    // Add skill plan if requested and supported
+    if (requestedFeatures.includes('skill') && clientConfig.skill) {
+        plan.skill = {
+            action: 'download',
+            url: `${serverUrl}/skill/${detectedClient}`,
+            targetPath: clientConfig.skill[scope],
+            description: 'Download skill file'
+        };
+        plan.verification.steps.unshift({
+            description: 'Check skill file',
+            command: `test -f ${clientConfig.skill[scope].replace('~', '$HOME')}`
+        });
+    }
+
+    // Add MCP plan if requested and supported
+    if (requestedFeatures.includes('mcp') && clientConfig.mcp) {
+        plan.mcp = {
+            action: 'configure',
+            config: {
+                mcpServers: {
+                    localevomap: {
+                        command: 'npx',
+                        args: ['-y', '@trevorcat/localevomap-mcp@latest'],
+                        env: {
+                            LOCAL_EVOMAP_SERVER_URL: serverUrl,
+                            LOCAL_EVOMAP_API_KEY: hasValidKey ? '{{API_KEY}}' : '',
+                            LOCAL_EVOMAP_CLIENT: detectedClient
+                        }
+                    }
+                }
+            },
+            targetPath: clientConfig.mcp[scope]
+        };
+    }
+
+    const response = {
+        success: true,
+        detectedClient,
+        detectedOS,
+        plan
+    };
+
+    res.writeHead(200);
+    res.end(JSON.stringify(response));
+}
+
+/**
+ * Handle install detect - detect environment and available clients
+ */
+async function handleInstallDetect(
+    req: http.IncomingMessage,
+    res: http.ServerResponse
+): Promise<void> {
+    const userAgent = req.headers['user-agent'] || '';
+    const clientHint = req.headers['x-client-hint'] as string | undefined;
+    const userAgentLower = userAgent.toLowerCase();
+
+    // Detect OS
+    let detectedOS: 'windows' | 'macos' | 'linux' = 'linux';
+    if (userAgentLower.includes('win')) {
+        detectedOS = 'windows';
+    } else if (userAgentLower.includes('mac') || userAgentLower.includes('darwin')) {
+        detectedOS = 'macos';
+    }
+
+    // Detect shell (simplified)
+    let shell = 'bash';
+    if (detectedOS === 'windows') {
+        shell = 'powershell';
+    }
+
+    // Detect clients based on User-Agent and hints
+    const detectedClients: string[] = [];
+    const preferredClient: string = clientHint || 'claude';
+
+    // Check for known clients in User-Agent
+    if (userAgentLower.includes('claude') || true) { // Always support claude
+        detectedClients.push('claude');
+    }
+    if (userAgentLower.includes('cursor')) {
+        detectedClients.push('cursor');
+    }
+    if (userAgentLower.includes('codex')) {
+        detectedClients.push('codex');
+    }
+    if (userAgentLower.includes('opencode')) {
+        detectedClients.push('opencode');
+    }
+
+    // Add client from hint if not already detected
+    if (clientHint && CLIENT_CONFIGS[clientHint] && !detectedClients.includes(clientHint)) {
+        detectedClients.push(clientHint);
+    }
+
+    // Fallback to claude if no clients detected
+    if (detectedClients.length === 0) {
+        detectedClients.push('claude');
+    }
+
+    const response = {
+        os: detectedOS,
+        shell,
+        detectedClients,
+        preferredClient
+    };
+
+    res.writeHead(200);
+    res.end(JSON.stringify(response));
 }
 
 /**
