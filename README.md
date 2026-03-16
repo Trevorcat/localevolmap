@@ -73,6 +73,81 @@ Dashboard 默认可通过 `http://localhost:3000` 访问。
 - `opencode`、`kimi` 当前只做版本提示，不自动改本地 skill
 - 只有 `ready` / `update_available` 状态会暴露 `start_task`、`record_usage`、`finalize_task` 等正式工具与 workspace 资源
 
+## Agent 一键安装（For AI Agents）
+
+如果你是 AI Agent（Claude / Cursor / Codex / OpenCode 等），可以使用以下流程为用户自动配置 LocalEvomap：
+
+### 极简安装流程
+
+```
+1. 询问用户 LocalEvomap 服务器地址
+   （或从环境变量 LOCAL_EVOMAP_SERVER 读取）
+
+2. 调用检测接口获取环境信息
+   GET {serverUrl}/api/v1/install/detect
+   → 返回：{ os, shell, detectedClients, preferredClient }
+
+3. 调用计划接口获取安装计划
+   POST {serverUrl}/api/v1/install/plan
+   Body: { client: "auto", scope: "global", features: ["skill", "mcp"] }
+   → 返回：{ success, detectedClient, detectedOS, plan }
+
+4. 按 plan 执行安装：
+   - 下载 skill 文件：GET {serverUrl}/skill/{client}
+   - 写入到 plan.skill.targetPath
+   - 配置 MCP：将 plan.mcp.config 写入 plan.mcp.targetPath
+
+5. 验证安装
+   - 检查文件是否存在
+   - 测试服务器连接（plan.verification.steps）
+
+6. 提示用户重启客户端
+```
+
+### API 端点速查
+
+| 端点 | 方法 | 用途 |
+|------|------|------|
+| `/api/v1/install/detect` | GET | 检测 OS、Shell、已安装客户端 |
+| `/api/v1/install/plan` | POST | 获取完整安装计划 |
+| `/skill/{client}` | GET | 下载客户端 skill 文件 |
+| `/skill` | GET | 获取 skill manifest |
+
+### Plan 接口参数
+
+```json
+{
+  "client": "claude|cursor|codex|opencode|auto",
+  "scope": "global|project",
+  "features": ["skill", "mcp"],
+  "serverUrl": "http://your-server:3000"
+}
+```
+
+### 客户端路径映射
+
+| 客户端 | Skill 路径 | MCP 路径 |
+|--------|-----------|----------|
+| Claude | `~/.claude/commands/evomap.md` | `~/.claude/mcp.json` |
+| Cursor | `~/.cursor/rules/localevomap.mdc` | `~/.cursor/mcp.json` |
+| Codex | `~/.codex/AGENTS.md` | 不支持 |
+| OpenCode | `~/.config/opencode/commands/evomap.md` | 不支持 |
+
+### 用户提示语示例
+
+> "我将为你安装 LocalEvomap。
+> - Skill 文件 → {skillPath}
+> - MCP 配置 → {mcpPath}
+>
+> 安装完成后需要重启客户端。确认安装？[Y/n]"
+
+### 注意事项
+
+- 所有配置均为纯算法生成，无需 LLM 参与
+- MCP 配置内置服务器地址和 npm 包名（`@trevorcat/localevomap-mcp@latest`）
+- API Key 可选，但推荐使用
+- 安装前建议先调用 `/api/v1/install/detect` 确认环境
+
 ## 项目结构
 
 ```text
